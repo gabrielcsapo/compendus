@@ -12,13 +12,18 @@ import {
 import { getComicPage, getComicPageCount } from "../app/lib/processing/comic";
 import { extractEpubResource } from "../app/lib/processing/epub";
 import { processBook } from "../app/lib/processing";
+import { getBookFilePath } from "../app/lib/storage";
 import { processAndStoreCover } from "../app/lib/processing/cover";
 import { indexBookMetadata } from "../app/lib/search/indexer";
-import { db, books } from "../app/lib/db";
+import { db, books, bookmarks, highlights } from "../app/lib/db";
 import { sql } from "drizzle-orm";
 import type { BookFormat } from "../app/lib/types";
 import { lookupByISBN, lookupGoogleBooksByISBN } from "../app/lib/metadata";
 import { addToWantedList, getWantedBooks } from "../app/actions/wanted";
+import { getContent, paginationEngine, invalidateContent, clearContentCache } from "../app/lib/reader";
+import { renderPdfPage } from "../app/lib/reader/pdf-renderer";
+import type { ViewportConfig, ReaderInfoResponse, ReaderPageResponse, TocEntry } from "../app/lib/reader/types";
+import { v4 as uuid } from "uuid";
 
 // CORS headers for public API
 const corsHeaders = {
@@ -342,6 +347,28 @@ async function handleApiRequest(
         );
       }
 
+      // Parse request body early to check for fallback title/author
+      let bodyData: {
+        status?: "wishlist" | "searching" | "ordered";
+        priority?: number;
+        notes?: string;
+        title?: string;
+        author?: string;
+      } = {};
+      try {
+        const contentType = request.headers.get("content-type");
+        if (contentType?.includes("application/json")) {
+          const body = await request.json();
+          if (body.status) bodyData.status = body.status;
+          if (body.priority !== undefined) bodyData.priority = body.priority;
+          if (body.notes) bodyData.notes = body.notes;
+          if (body.title) bodyData.title = body.title;
+          if (body.author) bodyData.author = body.author;
+        }
+      } catch {
+        // Ignore body parsing errors, use defaults
+      }
+
       // Look up book metadata from external sources
       // Try Google Books first for better covers, then Open Library
       let metadata = await lookupGoogleBooksByISBN(isbn);
@@ -350,34 +377,53 @@ async function handleApiRequest(
         metadata = await lookupByISBN(isbn);
       }
 
+      // If no metadata found, check for fallback title/author
       if (!metadata) {
-        return jsonResponse(
-          {
-            success: false,
-            error: "Book not found. Could not find metadata for this ISBN.",
-            code: "BOOK_NOT_FOUND",
-          },
-          404,
-        );
+        if (bodyData.title) {
+          // Create manual metadata entry with provided title and optional author
+          metadata = {
+            title: bodyData.title,
+            subtitle: null,
+            authors: bodyData.author ? [bodyData.author] : [],
+            publisher: null,
+            publishedDate: null,
+            description: null,
+            pageCount: null,
+            isbn: isbn,
+            isbn13: isbn.length === 13 ? isbn : null,
+            isbn10: isbn.length === 10 ? isbn : null,
+            language: "en",
+            subjects: [],
+            series: null,
+            seriesNumber: null,
+            coverUrl: null,
+            coverUrlHQ: null,
+            coverUrls: [],
+            source: "manual" as const,
+            sourceId: `manual-${isbn}`,
+          };
+        } else {
+          return jsonResponse(
+            {
+              success: false,
+              error:
+                "Book not found. Could not find metadata for this ISBN. You can provide 'title' and optionally 'author' in the request body to add it manually.",
+              code: "BOOK_NOT_FOUND",
+            },
+            404,
+          );
+        }
       }
 
-      // Parse optional parameters from request body
-      let options: {
+      // Build options from parsed body
+      const options: {
         status?: "wishlist" | "searching" | "ordered";
         priority?: number;
         notes?: string;
       } = {};
-      try {
-        const contentType = request.headers.get("content-type");
-        if (contentType?.includes("application/json")) {
-          const body = await request.json();
-          if (body.status) options.status = body.status;
-          if (body.priority !== undefined) options.priority = body.priority;
-          if (body.notes) options.notes = body.notes;
-        }
-      } catch {
-        // Ignore body parsing errors, use defaults
-      }
+      if (bodyData.status) options.status = bodyData.status;
+      if (bodyData.priority !== undefined) options.priority = bodyData.priority;
+      if (bodyData.notes) options.notes = bodyData.notes;
 
       // Add to wanted list
       const wantedBook = await addToWantedList(metadata, options);
@@ -425,6 +471,444 @@ async function handleApiRequest(
     }
   }
 
+  // ============================================
+  // READER API ENDPOINTS
+  // ============================================
+
+  // Helper to parse viewport from query params
+  const parseViewport = (params: URLSearchParams): ViewportConfig => ({
+    width: parseInt(params.get("width") || "800", 10),
+    height: parseInt(params.get("height") || "1200", 10),
+    fontSize: params.has("fontSize") ? parseInt(params.get("fontSize")!, 10) : undefined,
+    lineHeight: params.has("lineHeight") ? parseFloat(params.get("lineHeight")!) : undefined,
+  });
+
+  // GET /api/reader/:bookId/info - Get book info with total pages
+  const readerInfoMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/info$/);
+  if (readerInfoMatch && request.method === "GET") {
+    try {
+      const bookId = readerInfoMatch[1];
+      const viewport = parseViewport(searchParams);
+
+      // Get book from database
+      const book = await db.select().from(books).where(eq(books.id, bookId)).get();
+      if (!book) {
+        return jsonResponse({ success: false, error: "book_not_found" }, 404);
+      }
+
+      // Get normalized content
+      const content = await getContent(bookId);
+      if (!content) {
+        return jsonResponse({ success: false, error: "content_not_found" }, 404);
+      }
+
+      // Calculate total pages for viewport
+      const totalPages = paginationEngine.calculateTotalPages(content, viewport);
+
+      // Get TOC with page numbers
+      let toc: TocEntry[] = [];
+      if (content.type === "text" || content.type === "pdf") {
+        toc = paginationEngine.calculateTocPageNumbers(content, content.toc, viewport);
+      }
+
+      const response: ReaderInfoResponse = {
+        id: book.id,
+        title: book.title,
+        format: book.format,
+        totalPages,
+        toc,
+        coverPath: book.coverPath || undefined,
+      };
+
+      // Add audio-specific fields
+      if (content.type === "audio") {
+        response.duration = content.duration;
+        response.chapters = content.chapters;
+      }
+
+      return jsonResponse({ success: true, ...response });
+    } catch (error) {
+      console.error("Reader info error:", error);
+      return jsonResponse({ success: false, error: "reader_error" }, 500);
+    }
+  }
+
+  // GET /api/reader/:bookId/page/:pageNum - Get page content
+  const readerPageMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/page\/(\d+)$/);
+  if (readerPageMatch && request.method === "GET") {
+    try {
+      const bookId = readerPageMatch[1];
+      const pageNum = parseInt(readerPageMatch[2], 10);
+      const viewport = parseViewport(searchParams);
+
+      // Get normalized content
+      const content = await getContent(bookId);
+      if (!content) {
+        return jsonResponse({ success: false, error: "content_not_found" }, 404);
+      }
+
+      const totalPages = paginationEngine.calculateTotalPages(content, viewport);
+      const pageContent = paginationEngine.getPage(content, pageNum, viewport, bookId);
+
+      const response: ReaderPageResponse = {
+        pageNum: Math.max(1, Math.min(pageNum, totalPages)),
+        totalPages,
+        position: pageContent.position,
+        content: pageContent,
+        nextPage: pageNum < totalPages ? pageNum + 1 : null,
+        prevPage: pageNum > 1 ? pageNum - 1 : null,
+      };
+
+      return jsonResponse({ success: true, ...response });
+    } catch (error) {
+      console.error("Reader page error:", error);
+      return jsonResponse({ success: false, error: "reader_error" }, 500);
+    }
+  }
+
+  // GET /api/reader/:bookId/position/:position - Get page for position
+  const readerPositionMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/position\/([\d.]+)$/);
+  if (readerPositionMatch && request.method === "GET") {
+    try {
+      const bookId = readerPositionMatch[1];
+      const position = parseFloat(readerPositionMatch[2]);
+      const viewport = parseViewport(searchParams);
+
+      // Get normalized content
+      const content = await getContent(bookId);
+      if (!content) {
+        return jsonResponse({ success: false, error: "content_not_found" }, 404);
+      }
+
+      const pageNum = paginationEngine.getPageForPosition(content, position, viewport);
+      const pageContent = paginationEngine.getPage(content, pageNum, viewport, bookId);
+
+      return jsonResponse({
+        success: true,
+        pageNum,
+        content: pageContent,
+        position: pageContent.position,
+      });
+    } catch (error) {
+      console.error("Reader position error:", error);
+      return jsonResponse({ success: false, error: "reader_error" }, 500);
+    }
+  }
+
+  // GET /api/reader/:bookId/pdf-page/:pageNum - Render PDF page as image
+  const pdfPageMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/pdf-page\/(\d+)$/);
+  if (pdfPageMatch && request.method === "GET") {
+    try {
+      const bookId = pdfPageMatch[1];
+      const pageNumber = parseInt(pdfPageMatch[2], 10);
+      const scale = parseFloat(searchParams.get("scale") || "2.0");
+
+      // Get book to find the file
+      const book = await db.query.books.findFirst({
+        where: eq(books.id, bookId),
+      });
+
+      if (!book || book.format !== "pdf") {
+        return new Response("PDF not found", { status: 404 });
+      }
+
+      // Read PDF file
+      const pdfPath = resolve("data", "books", `${bookId}.pdf`);
+      if (!existsSync(pdfPath)) {
+        return new Response("PDF file not found", { status: 404 });
+      }
+
+      const buffer = await readFile(pdfPath);
+      const pngBuffer = await renderPdfPage(buffer, bookId, pageNumber, scale);
+
+      // Convert Buffer to Uint8Array for Response
+      const uint8Array = new Uint8Array(pngBuffer);
+
+      return new Response(uint8Array, {
+        status: 200,
+        headers: {
+          "Content-Type": "image/png",
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    } catch (error) {
+      console.error("PDF page render error:", error);
+      return new Response("Failed to render PDF page", { status: 500 });
+    }
+  }
+
+  // GET /api/reader/:bookId/search - Search within book
+  const readerSearchMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/search$/);
+  if (readerSearchMatch && request.method === "GET") {
+    try {
+      const bookId = readerSearchMatch[1];
+      const query = searchParams.get("q") || "";
+      const viewport = parseViewport(searchParams);
+
+      if (!query) {
+        return jsonResponse({ success: false, error: "query_required" }, 400);
+      }
+
+      // Get normalized content
+      const content = await getContent(bookId);
+      if (!content) {
+        return jsonResponse({ success: false, error: "content_not_found" }, 404);
+      }
+
+      const results = paginationEngine.searchContent(content, query, viewport);
+
+      return jsonResponse({
+        success: true,
+        query,
+        results,
+        totalResults: results.length,
+      });
+    } catch (error) {
+      console.error("Reader search error:", error);
+      return jsonResponse({ success: false, error: "reader_error" }, 500);
+    }
+  }
+
+  // GET /api/reader/:bookId/bookmarks - Get bookmarks for book
+  const readerBookmarksGetMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmarks$/);
+  if (readerBookmarksGetMatch && request.method === "GET") {
+    try {
+      const bookId = readerBookmarksGetMatch[1];
+
+      const bookmarksList = await db
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.bookId, bookId))
+        .all();
+
+      return jsonResponse({
+        success: true,
+        bookmarks: bookmarksList.map((b) => ({
+          id: b.id,
+          position: parseFloat(b.position),
+          title: b.title,
+          note: b.note,
+          color: b.color,
+          createdAt: b.createdAt?.toISOString(),
+        })),
+      });
+    } catch (error) {
+      console.error("Get bookmarks error:", error);
+      return jsonResponse({ success: false, error: "bookmarks_error" }, 500);
+    }
+  }
+
+  // POST /api/reader/:bookId/bookmark - Add bookmark
+  const readerBookmarkPostMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmark$/);
+  if (readerBookmarkPostMatch && request.method === "POST") {
+    try {
+      const bookId = readerBookmarkPostMatch[1];
+      const body = await request.json();
+
+      const { position, title, note, color } = body;
+
+      if (position === undefined || typeof position !== "number") {
+        return jsonResponse({ success: false, error: "position_required" }, 400);
+      }
+
+      const id = uuid();
+      await db.insert(bookmarks).values({
+        id,
+        bookId,
+        position: position.toString(),
+        title: title || null,
+        note: note || null,
+        color: color || null,
+      });
+
+      return jsonResponse({
+        success: true,
+        bookmark: { id, bookId, position, title, note, color },
+      });
+    } catch (error) {
+      console.error("Add bookmark error:", error);
+      return jsonResponse({ success: false, error: "bookmark_error" }, 500);
+    }
+  }
+
+  // DELETE /api/reader/:bookId/bookmark/:bookmarkId - Delete bookmark
+  const readerBookmarkDeleteMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmark\/([a-f0-9-]+)$/);
+  if (readerBookmarkDeleteMatch && request.method === "DELETE") {
+    try {
+      const bookmarkId = readerBookmarkDeleteMatch[2];
+
+      await db.delete(bookmarks).where(eq(bookmarks.id, bookmarkId));
+
+      return jsonResponse({ success: true });
+    } catch (error) {
+      console.error("Delete bookmark error:", error);
+      return jsonResponse({ success: false, error: "bookmark_error" }, 500);
+    }
+  }
+
+  // GET /api/reader/:bookId/highlights - Get highlights for book
+  const readerHighlightsGetMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlights$/);
+  if (readerHighlightsGetMatch && request.method === "GET") {
+    try {
+      const bookId = readerHighlightsGetMatch[1];
+
+      const highlightsList = await db
+        .select()
+        .from(highlights)
+        .where(eq(highlights.bookId, bookId))
+        .all();
+
+      return jsonResponse({
+        success: true,
+        highlights: highlightsList.map((h) => ({
+          id: h.id,
+          startPosition: parseFloat(h.startPosition),
+          endPosition: parseFloat(h.endPosition),
+          text: h.text,
+          note: h.note,
+          color: h.color,
+          createdAt: h.createdAt?.toISOString(),
+        })),
+      });
+    } catch (error) {
+      console.error("Get highlights error:", error);
+      return jsonResponse({ success: false, error: "highlights_error" }, 500);
+    }
+  }
+
+  // POST /api/reader/:bookId/highlight - Add highlight
+  const readerHighlightPostMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlight$/);
+  if (readerHighlightPostMatch && request.method === "POST") {
+    try {
+      const bookId = readerHighlightPostMatch[1];
+      const body = await request.json();
+
+      const { startPosition, endPosition, text, note, color } = body;
+
+      if (startPosition === undefined || endPosition === undefined || !text) {
+        return jsonResponse({ success: false, error: "invalid_highlight" }, 400);
+      }
+
+      const id = uuid();
+      await db.insert(highlights).values({
+        id,
+        bookId,
+        startPosition: startPosition.toString(),
+        endPosition: endPosition.toString(),
+        text,
+        note: note || null,
+        color: color || "#ffff00",
+      });
+
+      return jsonResponse({
+        success: true,
+        highlight: { id, bookId, startPosition, endPosition, text, note, color },
+      });
+    } catch (error) {
+      console.error("Add highlight error:", error);
+      return jsonResponse({ success: false, error: "highlight_error" }, 500);
+    }
+  }
+
+  // DELETE /api/reader/:bookId/highlight/:highlightId - Delete highlight
+  const readerHighlightDeleteMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlight\/([a-f0-9-]+)$/);
+  if (readerHighlightDeleteMatch && request.method === "DELETE") {
+    try {
+      const highlightId = readerHighlightDeleteMatch[2];
+
+      await db.delete(highlights).where(eq(highlights.id, highlightId));
+
+      return jsonResponse({ success: true });
+    } catch (error) {
+      console.error("Delete highlight error:", error);
+      return jsonResponse({ success: false, error: "highlight_error" }, 500);
+    }
+  }
+
+  // POST /api/reader/:bookId/progress - Save reading progress
+  const readerProgressMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/progress$/);
+  if (readerProgressMatch && request.method === "POST") {
+    try {
+      const bookId = readerProgressMatch[1];
+      const body = await request.json();
+
+      const { position, pageNum } = body;
+
+      if (position === undefined || typeof position !== "number") {
+        return jsonResponse({ success: false, error: "position_required" }, 400);
+      }
+
+      // Update book's reading progress
+      await db
+        .update(books)
+        .set({
+          readingProgress: position,
+          lastPosition: JSON.stringify({ position, pageNum }),
+          lastReadAt: sql`(unixepoch())`,
+          updatedAt: sql`(unixepoch())`,
+        })
+        .where(eq(books.id, bookId));
+
+      return jsonResponse({ success: true, position, pageNum });
+    } catch (error) {
+      console.error("Save progress error:", error);
+      return jsonResponse({ success: false, error: "progress_error" }, 500);
+    }
+  }
+
+  // DELETE /api/reader/:bookId/cache - Invalidate cached content for a book
+  const cacheInvalidateMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/cache$/);
+  if (cacheInvalidateMatch && request.method === "DELETE") {
+    const bookId = cacheInvalidateMatch[1];
+    invalidateContent(bookId);
+    return jsonResponse({ success: true, message: `Cache invalidated for ${bookId}` });
+  }
+
+  // DELETE /api/reader/cache - Clear entire content cache
+  if (pathname === "/api/reader/cache" && request.method === "DELETE") {
+    clearContentCache();
+    return jsonResponse({ success: true, message: "Cache cleared" });
+  }
+
+  // GET /api/reader/:bookId/resource/* - Serve embedded resources from EPUB files
+  const epubResourceMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/resource\/(.+)$/);
+  if (epubResourceMatch && request.method === "GET") {
+    try {
+      const bookId = epubResourceMatch[1];
+      const resourcePath = decodeURIComponent(epubResourceMatch[2]);
+
+      // Get book to find the file
+      const book = await db.query.books.findFirst({
+        where: eq(books.id, bookId),
+      });
+
+      if (!book || book.format !== "epub") {
+        return new Response("Not found", { status: 404 });
+      }
+
+      // Read EPUB file
+      const filePath = getBookFilePath(bookId, "epub");
+      const buffer = await readFile(filePath);
+
+      // Extract resource from EPUB
+      const resource = await extractEpubResource(buffer, resourcePath);
+
+      if (!resource) {
+        return new Response("Resource not found", { status: 404 });
+      }
+
+      return new Response(new Uint8Array(resource.data), {
+        headers: {
+          "Content-Type": resource.mimeType,
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    } catch (error) {
+      console.error("EPUB resource error:", error);
+      return new Response("Error loading resource", { status: 500 });
+    }
+  }
+
   // API endpoint not found (we already verified pathname starts with /api/)
   return jsonResponse(
     {
@@ -440,9 +924,16 @@ async function handleApiRequest(
         wishlist:
           "GET /api/wishlist?status=<status>&series=<series>&limit=<limit>",
         wishlistByIsbn:
-          "POST /api/wishlist/isbn/:isbn (optional JSON body: {status, priority, notes})",
-        wishlistDownload:
-          "POST /api/wishlist/download (JSON body: {key, limit?})",
+          "POST /api/wishlist/isbn/:isbn (JSON body: {status?, priority?, notes?, title?, author?} - title/author used as fallback if ISBN lookup fails)",
+        readerInfo: "GET /api/reader/:bookId/info?width=&height=",
+        readerPage: "GET /api/reader/:bookId/page/:pageNum?width=&height=",
+        readerPosition: "GET /api/reader/:bookId/position/:position?width=&height=",
+        readerSearch: "GET /api/reader/:bookId/search?q=&width=&height=",
+        readerBookmarks: "GET /api/reader/:bookId/bookmarks",
+        readerBookmark: "POST /api/reader/:bookId/bookmark",
+        readerHighlights: "GET /api/reader/:bookId/highlights",
+        readerHighlight: "POST /api/reader/:bookId/highlight",
+        readerProgress: "POST /api/reader/:bookId/progress",
       },
     },
     404,
@@ -486,6 +977,42 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
       const buffer = await readFile(filePath);
       return new Response(buffer, {
         headers: { "Content-Type": "image/jpeg" },
+      });
+    }
+  }
+
+  // Handle /mobi-images/:bookId/:filename requests (images extracted by mobi-parser)
+  // Also supports legacy /mobi-images/:filename for backwards compatibility
+  if (pathname.startsWith("/mobi-images/")) {
+    const pathParts = pathname.slice("/mobi-images/".length).split("/");
+    let filePath: string;
+
+    if (pathParts.length >= 2) {
+      // New format: /mobi-images/{bookId}/{filename}
+      const [bookId, ...rest] = pathParts;
+      const filename = rest.join("/");
+      filePath = resolve(process.cwd(), "images", bookId, filename);
+    } else {
+      // Legacy format: /mobi-images/{filename} - serve from shared directory
+      const filename = pathParts[0];
+      filePath = resolve(process.cwd(), "images", filename);
+    }
+
+    if (existsSync(filePath)) {
+      const buffer = await readFile(filePath);
+      const ext = filePath.split(".").pop()?.toLowerCase();
+      const contentType = {
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        gif: "image/gif",
+        webp: "image/webp",
+      }[ext || ""] || "image/jpeg";
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=86400",
+        },
       });
     }
   }
@@ -560,8 +1087,8 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
   if (epubResourceMatch) {
     const [, bookId, resourcePath] = epubResourceMatch;
 
-    // Skip if this looks like a route (e.g., /book/:id/read)
-    if (resourcePath === "read" || resourcePath === "edit") {
+    // Skip if this looks like a route (e.g., /book/:id/read or /book/:id/read.rsc)
+    if (resourcePath === "read" || resourcePath === "edit" || resourcePath.endsWith(".rsc")) {
       return null;
     }
 

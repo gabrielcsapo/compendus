@@ -1,83 +1,25 @@
-import type { unstable_RSCRouteConfigEntry } from "react-router";
+import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
-export const routes: unstable_RSCRouteConfigEntry[] = [
-  {
-    id: "root",
-    path: "",
-    lazy: () => import("./root"),
-    children: [
-      {
-        id: "home",
-        index: true,
-        lazy: () => import("./routes/home"),
-      },
-      {
-        id: "search",
-        path: "search",
-        lazy: () => import("./routes/search"),
-      },
-      {
-        id: "book",
-        path: "book/:id",
-        lazy: () => import("./routes/book.$id"),
-      },
-      {
-        id: "book-read",
-        path: "book/:id/read",
-        lazy: () => import("./routes/book.$id.read"),
-      },
-      {
-        id: "collections",
-        path: "collections",
-        lazy: () => import("./routes/collections"),
-      },
-      {
-        id: "collection",
-        path: "collection/:id",
-        lazy: () => import("./routes/collection.$id"),
-      },
-      {
-        id: "tags",
-        path: "tags",
-        lazy: () => import("./routes/tags"),
-      },
-      {
-        id: "unmatched",
-        path: "unmatched",
-        lazy: () => import("./routes/unmatched"),
-      },
-      {
-        id: "discover",
-        path: "discover",
-        lazy: () => import("./routes/discover"),
-        children: [
-          {
-            id: "discover-index",
-            index: true,
-            lazy: () => import("./routes/discover._index"),
-          },
-          {
-            id: "discover-wishlist",
-            path: "wishlist",
-            lazy: () => import("./routes/discover.wishlist"),
-          },
-          {
-            id: "discover-series",
-            path: "series",
-            lazy: () => import("./routes/discover.series"),
-          },
-        ],
-      },
-      {
-        id: "about",
-        path: "about",
-        lazy: () => import("./routes/about"),
-      },
-      {
-        id: "docs",
-        path: "docs",
-        lazy: () => import("./routes/docs"),
-      },
-    ],
-  },
-];
+export default [
+  index("routes/home.tsx"),
+
+  route("search", "routes/search.tsx"),
+
+  route("book/:id", "routes/book.$id.tsx"),
+  route("book/:id/read", "routes/book.$id.read.tsx"),
+
+  route("collections", "routes/collections.tsx"),
+  route("collection/:id", "routes/collection.$id.tsx"),
+
+  route("tags", "routes/tags.tsx"),
+  route("unmatched", "routes/unmatched.tsx"),
+
+  route("discover", "routes/discover.tsx", [
+    index("routes/discover._index.tsx"),
+    route("wishlist", "routes/discover.wishlist.tsx"),
+    route("series", "routes/discover.series.tsx"),
+  ]),
+
+  route("about", "routes/about.tsx"),
+  route("docs", "routes/docs.tsx"),
+] satisfies RouteConfig;

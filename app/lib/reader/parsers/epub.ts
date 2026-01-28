@@ -1,0 +1,214 @@
+import { initEpubFile } from "@lingo-reader/epub-parser";
+import { resolve } from "path";
+import { mkdirSync } from "fs";
+import type { TextContent, NormalizedChapter, TocEntry } from "../types";
+
+/**
+ * Validate that a buffer looks like a valid ZIP file
+ */
+function isValidZipBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 22) return false;
+  if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) return false;
+
+  const searchStart = Math.max(0, buffer.length - 65557);
+  for (let i = buffer.length - 22; i >= searchStart; i--) {
+    if (
+      buffer[i] === 0x50 &&
+      buffer[i + 1] === 0x4b &&
+      buffer[i + 2] === 0x05 &&
+      buffer[i + 3] === 0x06
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Strip HTML tags and normalize whitespace
+ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Sanitize HTML for safe rendering
+ * Removes scripts, event handlers, and dangerous elements
+ * Rewrites image src URLs to point to the EPUB resource API
+ */
+function sanitizeHtml(html: string, bookId: string): string {
+  return html
+    // Remove script tags and their content
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    // Remove style tags and their content (we apply our own styles)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    // Remove event handlers
+    .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\s+on\w+\s*=\s*[^\s>]*/gi, "")
+    // Remove javascript: URLs
+    .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, "")
+    // Remove data: URLs in src (potential XSS)
+    .replace(/src\s*=\s*["']data:[^"']*["']/gi, "")
+    // Rewrite image src URLs to use the EPUB resource API
+    .replace(
+      /(<img[^>]*\s+src\s*=\s*["'])([^"']+)(["'][^>]*>)/gi,
+      (match, before, src, after) => {
+        // Skip absolute URLs and data URIs
+        if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) {
+          return match;
+        }
+        // Handle absolute filesystem paths (from epub-parser extracting to disk)
+        // These start with / and contain paths like /Users/.../images/{bookId}/filename.jpg
+        if (src.startsWith("/") && src.includes("/images/")) {
+          const filename = src.split("/").pop() || src;
+          return `${before}/mobi-images/${bookId}/${filename}${after}`;
+        }
+        // For relative EPUB internal paths, use the resource API
+        const encodedPath = encodeURIComponent(src);
+        return `${before}/api/reader/${bookId}/resource/${encodedPath}${after}`;
+      }
+    )
+    // Also rewrite SVG image xlink:href URLs (used by some EPUBs for cover images)
+    .replace(
+      /(<image[^>]*\s+xlink:href\s*=\s*["'])([^"']+)(["'][^>]*>)/gi,
+      (match, before, href, after) => {
+        // Skip absolute URLs and data URIs
+        if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("data:")) {
+          return match;
+        }
+        // Handle absolute filesystem paths (from epub-parser extracting to disk)
+        if (href.startsWith("/") && href.includes("/images/")) {
+          const filename = href.split("/").pop() || href;
+          return `${before}/mobi-images/${bookId}/${filename}${after}`;
+        }
+        // For relative EPUB internal paths, use the resource API
+        const encodedPath = encodeURIComponent(href);
+        return `${before}/api/reader/${bookId}/resource/${encodedPath}${after}`;
+      }
+    )
+    // Keep the structure but ensure it's safe
+    .trim();
+}
+
+/**
+ * Parse EPUB file into normalized content for the reader
+ */
+export async function parseEpub(buffer: Buffer, bookId: string): Promise<TextContent> {
+  // Validate ZIP structure
+  if (!isValidZipBuffer(buffer)) {
+    return createEmptyContent(bookId);
+  }
+
+  // Create book-specific directory for extracted resources
+  const resourceDir = resolve(process.cwd(), "images", bookId);
+  mkdirSync(resourceDir, { recursive: true });
+
+  let epub;
+  try {
+    epub = await initEpubFile(buffer, resourceDir);
+  } catch {
+    return createEmptyContent(bookId);
+  }
+
+  let spine;
+  let toc;
+  try {
+    spine = epub.getSpine();
+    toc = epub.getToc();
+  } catch {
+    return createEmptyContent(bookId);
+  }
+
+  const chapters: NormalizedChapter[] = [];
+  let totalCharacters = 0;
+
+  for (let i = 0; i < spine.length; i++) {
+    const spineItem = spine[i];
+    try {
+      const chapterContent = await epub.loadChapter(spineItem.id);
+      const html = sanitizeHtml(chapterContent.html || "", bookId);
+      const text = stripHtml(chapterContent.html || "");
+
+      // Find matching TOC entry for title
+      const tocEntry = toc.find((t) => t.href.includes(spineItem.href));
+      const title = tocEntry?.label || `Chapter ${i + 1}`;
+
+      chapters.push({
+        id: spineItem.id,
+        title,
+        html,
+        text,
+        characterStart: totalCharacters,
+        characterEnd: totalCharacters + text.length,
+      });
+
+      totalCharacters += text.length;
+    } catch {
+      // Skip chapters that fail to load
+    }
+  }
+
+  // Build TOC with normalized positions
+  const normalizedToc = buildToc(toc, chapters, totalCharacters);
+
+  return {
+    bookId,
+    format: "epub",
+    type: "text",
+    chapters,
+    totalCharacters,
+    toc: normalizedToc,
+  };
+}
+
+/**
+ * Build normalized TOC with positions
+ */
+function buildToc(
+  rawToc: Array<{ label: string; href: string; children?: unknown[] }>,
+  chapters: NormalizedChapter[],
+  totalCharacters: number,
+  level = 0,
+): TocEntry[] {
+  return rawToc.map((item) => {
+    // Find the chapter that matches this TOC entry
+    const chapter = chapters.find((ch) => ch.id.includes(item.href) || item.href.includes(ch.id));
+    const position = chapter ? chapter.characterStart / Math.max(1, totalCharacters) : 0;
+
+    const entry: TocEntry = {
+      title: item.label,
+      position,
+      level,
+    };
+
+    if (item.children && Array.isArray(item.children) && item.children.length > 0) {
+      entry.children = buildToc(
+        item.children as Array<{ label: string; href: string; children?: unknown[] }>,
+        chapters,
+        totalCharacters,
+        level + 1,
+      );
+    }
+
+    return entry;
+  });
+}
+
+/**
+ * Create empty content structure for failed parses
+ */
+function createEmptyContent(bookId: string): TextContent {
+  return {
+    bookId,
+    format: "epub",
+    type: "text",
+    chapters: [],
+    totalCharacters: 0,
+    toc: [],
+  };
+}

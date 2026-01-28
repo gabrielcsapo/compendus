@@ -9,6 +9,7 @@ dist/
 .env
 .env.local
 .env.*.local
+local/
 
 # IDE
 .idea/

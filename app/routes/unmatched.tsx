@@ -9,6 +9,7 @@ import {
   applyMetadata,
   skipBookMatch,
 } from "../actions/books";
+import { ClickableCoverPlaceholder } from "../components/CoverExtractButton";
 import type { Book } from "../lib/db/schema";
 import type { MetadataSearchResult } from "../lib/metadata";
 
@@ -215,14 +216,14 @@ export default function UnmatchedBooks() {
             <div className="grid md:grid-cols-[280px_1fr] gap-6">
               {/* Book info */}
               <div>
-                <div
-                  className="aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-lg bg-gradient-to-br from-primary-light to-accent-light flex items-center justify-center p-4"
-                  style={{ backgroundColor: currentBook.coverColor || undefined }}
-                >
-                  <span className="text-center text-foreground-muted text-sm font-medium">
-                    {currentBook.title}
-                  </span>
-                </div>
+                <ClickableCoverPlaceholder
+                  bookId={currentBook.id}
+                  bookFormat={currentBook.format}
+                  title={currentBook.title}
+                  coverColor={currentBook.coverColor}
+                  onSuccess={loadNextBook}
+                  className="aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-lg"
+                />
                 <h3 className="font-semibold text-foreground mt-3 line-clamp-2">
                   {currentBook.title}
                 </h3>

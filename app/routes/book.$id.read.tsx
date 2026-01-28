@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs } from "react-router";
 import { getBook } from "../actions/books";
-import { ReaderContainer } from "../components/readers/ReaderContainer";
+import { ReaderShell } from "../components/reader/ReaderShell";
 
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 
@@ -13,11 +13,14 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return { book };
 }
 
-function BookReader({ loaderData }: { loaderData: LoaderData }) {
+export default function BookReader({ loaderData }: { loaderData: LoaderData }) {
   const { book } = loaderData;
-  return <ReaderContainer book={book} />;
-}
 
-// Export both Component and default for React Router compatibility
-export { BookReader as Component };
-export default BookReader;
+  return (
+    <ReaderShell
+      bookId={book.id}
+      initialPosition={book.readingProgress || 0}
+      returnUrl={`/book/${book.id}`}
+    />
+  );
+}

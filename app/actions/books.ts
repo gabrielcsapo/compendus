@@ -628,3 +628,62 @@ export async function applyMetadata(
     book: updatedBook || undefined,
   };
 }
+
+/**
+ * Re-extract cover from the book file itself (EPUB, PDF, etc.)
+ * Useful for books that were uploaded before cover extraction was working
+ */
+export async function extractCoverFromBook(
+  bookId: string,
+): Promise<{ success: boolean; message: string; book?: Book }> {
+  const book = await getBook(bookId);
+  if (!book) {
+    return { success: false, message: "Book not found" };
+  }
+
+  // Already has a cover
+  if (book.coverPath) {
+    return { success: false, message: "Book already has a cover" };
+  }
+
+  try {
+    const { readFile } = await import("fs/promises");
+    const { getBookFilePath } = await import("../lib/storage");
+    const { extractCover } = await import("../lib/processing/cover");
+    const { storeCoverImage } = await import("../lib/storage");
+
+    // Read the book file
+    const filePath = getBookFilePath(bookId, book.format);
+    const buffer = await readFile(filePath);
+
+    // Extract cover from the file
+    const coverResult = await extractCover(buffer, book.format);
+
+    if (!coverResult) {
+      return { success: false, message: "No cover found in book file" };
+    }
+
+    // Store the cover
+    const coverPath = storeCoverImage(coverResult.buffer, bookId);
+
+    // Update the book record
+    await db
+      .update(books)
+      .set({
+        coverPath,
+        coverColor: coverResult.dominantColor,
+        updatedAt: sql`(unixepoch())`,
+      })
+      .where(eq(books.id, bookId));
+
+    const updatedBook = await getBook(bookId);
+    return {
+      success: true,
+      message: "Cover extracted from book file",
+      book: updatedBook || undefined,
+    };
+  } catch (error) {
+    console.error("Failed to extract cover:", error);
+    return { success: false, message: "Failed to extract cover from book file" };
+  }
+}
