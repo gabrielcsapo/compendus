@@ -163,15 +163,42 @@ export async function extractEpubCover(buffer: Buffer): Promise<Buffer | null> {
   try {
     const epub = await initEpubFile(buffer);
     const coverPath = epub.getCoverImage();
-    // getCoverImage returns a path, not actual image data
-    // For now, return null as we'd need additional processing
+
     if (coverPath) {
-      // The cover would need to be extracted from the epub zip
-      // This is complex and would require accessing the internal zip
-      return null;
+      // Extract the cover image from the EPUB zip using existing helper
+      const resource = await extractEpubResource(buffer, coverPath);
+      if (resource && resource.mimeType.startsWith("image/")) {
+        return resource.data;
+      }
     }
+
+    // Fallback: Try to find cover by common naming patterns in the ZIP
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const files = Object.keys(zip.files);
+
+    // Common cover file patterns (sorted by priority)
+    const coverPatterns = [
+      /cover\.(jpe?g|png|gif|webp)$/i,
+      /cover[-_]?image\.(jpe?g|png|gif|webp)$/i,
+      /title\.(jpe?g|png|gif|webp)$/i,
+      /front\.(jpe?g|png|gif|webp)$/i,
+      /jacket\.(jpe?g|png|gif|webp)$/i,
+    ];
+
+    for (const pattern of coverPatterns) {
+      const coverFile = files.find((f) => pattern.test(f));
+      if (coverFile) {
+        const file = zip.file(coverFile);
+        if (file) {
+          return await file.async("nodebuffer");
+        }
+      }
+    }
+
     return null;
-  } catch {
+  } catch (err) {
+    console.error("Error extracting EPUB cover:", err);
     return null;
   }
 }

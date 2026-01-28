@@ -4,6 +4,7 @@ import { getTagsForBook } from "../actions/tags";
 import { getCollectionsForBook } from "../actions/collections";
 import { MetadataRefreshButton } from "../components/MetadataRefreshButton";
 import { CoverUploadButton } from "../components/CoverUploadButton";
+import { CoverExtractButton } from "../components/CoverExtractButton";
 import { BookCollectionsManager } from "../components/BookCollectionsManager";
 import { EditBookButton } from "../components/EditBookButton";
 import { DeleteBookButton } from "../components/DeleteBookButton";
@@ -64,7 +65,12 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
             )}
           </div>
 
-          {/* Cover upload */}
+          {/* Cover actions */}
+          {!book.coverPath && (
+            <div className="mt-3">
+              <CoverExtractButton bookId={book.id} bookFormat={book.format} />
+            </div>
+          )}
           <CoverUploadButton bookId={book.id} hasCover={!!book.coverPath} />
 
           {/* Read button */}

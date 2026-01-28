@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import rsc from "@vitejs/plugin-rsc";
 import { defineConfig } from "vite";
 import { resolve } from "path";
+import { reactRouter } from "./react-router-vite/plugin.js";
 
 export default defineConfig({
   clearScreen: false,
@@ -13,6 +14,7 @@ export default defineConfig({
     // import("vite-plugin-inspect").then(m => m.default()),
     tailwindcss(),
     react(),
+    reactRouter(),
     rsc({
       entries: {
         client: "./react-router-vite/entry.browser.tsx",
