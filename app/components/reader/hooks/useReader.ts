@@ -9,6 +9,18 @@ import type {
   ReaderBookmark,
   ReaderHighlight,
 } from "@/lib/reader/types";
+import {
+  getReaderInfo,
+  getReaderPage,
+  getReaderPageForPosition,
+  getBookmarks,
+  getHighlights,
+  addBookmark as addBookmarkAction,
+  deleteBookmark as deleteBookmarkAction,
+  addHighlight as addHighlightAction,
+  deleteHighlight as deleteHighlightAction,
+  saveReadingProgress,
+} from "@/actions/reader";
 
 export interface UseReaderOptions {
   bookId: string;
@@ -101,13 +113,18 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
   // Number of pages to prefetch ahead
   const PREFETCH_AHEAD = 5;
 
-  // Build query string for viewport
-  const viewportQuery = `width=${viewport.width}&height=${viewport.height}&fontSize=${settings.fontSize}&lineHeight=${settings.lineHeight}`;
-
   // Reset prefetch cache when book changes
   useEffect(() => {
     prefetchedPages.current.clear();
   }, [bookId]);
+
+  // Build viewport config object
+  const viewportConfig = {
+    width: viewport.width,
+    height: viewport.height,
+    fontSize: settings.fontSize,
+    lineHeight: settings.lineHeight,
+  };
 
   // Fetch book info when viewport changes
   useEffect(() => {
@@ -115,26 +132,22 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
 
     const fetchInfo = async () => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/info?${viewportQuery}`);
-        const data = await res.json();
+        const data = await getReaderInfo(bookId, viewportConfig);
 
-        if (data.success) {
+        if (data) {
           setBookInfo(data);
           setError(null);
 
           // Apply initial position if not yet applied
           if (!initialPositionApplied.current && initialPosition > 0) {
             initialPositionApplied.current = true;
-            const posRes = await fetch(
-              `/api/reader/${bookId}/position/${initialPosition}?${viewportQuery}`,
-            );
-            const posData = await posRes.json();
-            if (posData.success) {
+            const posData = await getReaderPageForPosition(bookId, initialPosition, viewportConfig);
+            if (posData) {
               setCurrentPage(posData.pageNum);
             }
           }
         } else {
-          setError(data.error || "Failed to load book");
+          setError("Failed to load book");
         }
       } catch (err) {
         setError("Failed to connect to server");
@@ -144,7 +157,7 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     };
 
     fetchInfo();
-  }, [bookId, viewportQuery, initialPosition]);
+  }, [bookId, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, initialPosition]);
 
   // Fetch page content when page changes
   useEffect(() => {
@@ -153,17 +166,15 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     const fetchPages = async () => {
       try {
         // Fetch the left (or only) page
-        const res = await fetch(`/api/reader/${bookId}/page/${currentPage}?${viewportQuery}`);
-        const data = await res.json();
+        const data = await getReaderPage(bookId, currentPage, viewportConfig);
 
-        if (data.success) {
+        if (data) {
           setPageContent(data.content);
 
           // In spread mode, also fetch the right page if available
           if (isSpreadMode && data.content?.type === "image" && currentPage < bookInfo.totalPages) {
-            const rightRes = await fetch(`/api/reader/${bookId}/page/${currentPage + 1}?${viewportQuery}`);
-            const rightData = await rightRes.json();
-            if (rightData.success) {
+            const rightData = await getReaderPage(bookId, currentPage + 1, viewportConfig);
+            if (rightData) {
               setRightPageContent(rightData.content);
             } else {
               setRightPageContent(null);
@@ -178,7 +189,7 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     };
 
     fetchPages();
-  }, [bookId, currentPage, viewportQuery, bookInfo, isSpreadMode]);
+  }, [bookId, currentPage, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, bookInfo, isSpreadMode]);
 
   // Prefetch upcoming pages in the background
   useEffect(() => {
@@ -198,12 +209,11 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
         // Mark as prefetched before starting
         prefetchedPages.current.add(pageNum);
 
-        // Fetch page data (this triggers server-side rendering for PDFs)
-        fetch(`/api/reader/${bookId}/page/${pageNum}?${viewportQuery}`)
-          .then((res) => res.json())
+        // Use server action for prefetching
+        getReaderPage(bookId, pageNum, viewportConfig)
           .then((data) => {
             // For image content (PDFs, comics), also prefetch the image
-            if (data.success && data.content?.imageUrl) {
+            if (data?.content?.imageUrl) {
               const img = new Image();
               img.src = data.content.imageUrl;
             }
@@ -218,26 +228,19 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     // Small delay to prioritize current page load
     const timer = setTimeout(prefetchPages, 100);
     return () => clearTimeout(timer);
-  }, [bookId, currentPage, viewportQuery, bookInfo]);
+  }, [bookId, currentPage, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, bookInfo]);
 
   // Fetch bookmarks and highlights
   useEffect(() => {
     const fetchAnnotations = async () => {
       try {
-        const [bookmarksRes, highlightsRes] = await Promise.all([
-          fetch(`/api/reader/${bookId}/bookmarks`),
-          fetch(`/api/reader/${bookId}/highlights`),
+        const [bookmarksData, highlightsData] = await Promise.all([
+          getBookmarks(bookId),
+          getHighlights(bookId),
         ]);
 
-        const bookmarksData = await bookmarksRes.json();
-        const highlightsData = await highlightsRes.json();
-
-        if (bookmarksData.success) {
-          setBookmarks(bookmarksData.bookmarks);
-        }
-        if (highlightsData.success) {
-          setHighlights(highlightsData.highlights);
-        }
+        setBookmarks(bookmarksData);
+        setHighlights(highlightsData);
       } catch (err) {
         console.error("Failed to fetch annotations:", err);
       }
@@ -259,10 +262,9 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
   const goToPosition = useCallback(
     async (position: number) => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/position/${position}?${viewportQuery}`);
-        const data = await res.json();
+        const data = await getReaderPageForPosition(bookId, position, viewportConfig);
 
-        if (data.success) {
+        if (data) {
           setCurrentPage(data.pageNum);
           setPageContent(data.content);
         }
@@ -270,7 +272,7 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
         console.error("Failed to go to position:", err);
       }
     },
-    [bookId, viewportQuery],
+    [bookId, viewport.width, viewport.height, settings.fontSize, settings.lineHeight],
   );
 
   // In spread mode with image content, move by 2 pages
@@ -288,16 +290,8 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
   const addBookmark = useCallback(
     async (position: number, title?: string, note?: string) => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/bookmark`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ position, title, note }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          setBookmarks((prev) => [...prev, data.bookmark]);
-        }
+        const bookmark = await addBookmarkAction(bookId, position, title, note);
+        setBookmarks((prev) => [...prev, bookmark]);
       } catch (err) {
         console.error("Failed to add bookmark:", err);
       }
@@ -308,19 +302,13 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
   const removeBookmark = useCallback(
     async (bookmarkId: string) => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/bookmark/${bookmarkId}`, {
-          method: "DELETE",
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
-        }
+        await deleteBookmarkAction(bookmarkId);
+        setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
       } catch (err) {
         console.error("Failed to remove bookmark:", err);
       }
     },
-    [bookId],
+    [],
   );
 
   // Highlight functions
@@ -333,16 +321,8 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
       color?: string,
     ) => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/highlight`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ startPosition, endPosition, text, note, color }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          setHighlights((prev) => [...prev, data.highlight]);
-        }
+        const highlight = await addHighlightAction(bookId, startPosition, endPosition, text, note, color);
+        setHighlights((prev) => [...prev, highlight]);
       } catch (err) {
         console.error("Failed to add highlight:", err);
       }
@@ -353,19 +333,13 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
   const removeHighlight = useCallback(
     async (highlightId: string) => {
       try {
-        const res = await fetch(`/api/reader/${bookId}/highlight/${highlightId}`, {
-          method: "DELETE",
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
-        }
+        await deleteHighlightAction(highlightId);
+        setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
       } catch (err) {
         console.error("Failed to remove highlight:", err);
       }
     },
-    [bookId],
+    [],
   );
 
   // Save progress
@@ -373,14 +347,7 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     if (!pageContent) return;
 
     try {
-      await fetch(`/api/reader/${bookId}/progress`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          position: pageContent.position,
-          pageNum: currentPage,
-        }),
-      });
+      await saveReadingProgress(bookId, pageContent.position, currentPage);
     } catch (err) {
       console.error("Failed to save progress:", err);
     }
