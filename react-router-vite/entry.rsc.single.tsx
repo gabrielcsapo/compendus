@@ -3,27 +3,19 @@ import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { eq } from "drizzle-orm";
-import {
-  apiSearchBooks,
-  apiLookupByIsbn,
-  apiGetBook,
-  apiListBooks,
-} from "../app/lib/api/search";
+import { apiSearchBooks, apiLookupByIsbn, apiGetBook, apiListBooks } from "../app/lib/api/search";
 import { getComicPage, getComicPageCount } from "../app/lib/processing/comic";
 import { extractEpubResource } from "../app/lib/processing/epub";
 import { processBook } from "../app/lib/processing";
 import { getBookFilePath } from "../app/lib/storage";
 import { processAndStoreCover } from "../app/lib/processing/cover";
 import { indexBookMetadata } from "../app/lib/search/indexer";
-import { db, books, bookmarks, highlights } from "../app/lib/db";
+import { db, books } from "../app/lib/db";
 import { sql } from "drizzle-orm";
 import type { BookFormat } from "../app/lib/types";
 import { lookupByISBN, lookupGoogleBooksByISBN } from "../app/lib/metadata";
 import { addToWantedList, getWantedBooks } from "../app/actions/wanted";
-import { getContent, paginationEngine, invalidateContent, clearContentCache } from "../app/lib/reader";
 import { renderPdfPage } from "../app/lib/reader/pdf-renderer";
-import type { ViewportConfig, ReaderInfoResponse, ReaderPageResponse, TocEntry } from "../app/lib/reader/types";
-import { v4 as uuid } from "uuid";
 
 // CORS headers for public API
 const corsHeaders = {
@@ -68,11 +60,7 @@ async function handleApiRequest(
     const offset = parseInt(searchParams.get("offset") || "0", 10);
     const searchContent = searchParams.get("content") === "true";
 
-    const result = await apiSearchBooks(
-      query,
-      { limit, offset, searchContent },
-      baseUrl,
-    );
+    const result = await apiSearchBooks(query, { limit, offset, searchContent }, baseUrl);
     return jsonResponse(result, result.success ? 200 : 400);
   }
 
@@ -102,19 +90,13 @@ async function handleApiRequest(
   }
 
   // POST /api/books/:id/cover - upload custom cover image
-  const coverUploadMatch = pathname.match(
-    /^\/api\/books\/([a-f0-9-]+)\/cover$/,
-  );
+  const coverUploadMatch = pathname.match(/^\/api\/books\/([a-f0-9-]+)\/cover$/);
   if (coverUploadMatch && request.method === "POST") {
     try {
       const bookId = coverUploadMatch[1];
 
       // Check if book exists
-      const book = await db
-        .select()
-        .from(books)
-        .where(eq(books.id, bookId))
-        .get();
+      const book = await db.select().from(books).where(eq(books.id, bookId)).get();
       if (!book) {
         return jsonResponse({ success: false, error: "book_not_found" }, 404);
       }
@@ -239,18 +221,9 @@ async function handleApiRequest(
 
       if (result.success && result.bookId) {
         // Get the book to index it
-        const book = await db
-          .select()
-          .from(books)
-          .where(eq(books.id, result.bookId))
-          .get();
+        const book = await db.select().from(books).where(eq(books.id, result.bookId)).get();
         if (book) {
-          await indexBookMetadata(
-            book.id,
-            book.title,
-            book.authors || "[]",
-            book.description,
-          );
+          await indexBookMetadata(book.id, book.title, book.authors || "[]", book.description);
 
           return jsonResponse({
             success: true,
@@ -273,11 +246,7 @@ async function handleApiRequest(
   // GET /api/wishlist - get wishlist items
   if (pathname === "/api/wishlist" && request.method === "GET") {
     try {
-      const status = searchParams.get("status") as
-        | "wishlist"
-        | "searching"
-        | "ordered"
-        | null;
+      const status = searchParams.get("status") as "wishlist" | "searching" | "ordered" | null;
       const series = searchParams.get("series");
       const limitParam = searchParams.get("limit");
       const limit = limitParam ? parseInt(limitParam, 10) : undefined;
@@ -444,156 +413,24 @@ async function handleApiRequest(
         },
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to add book to wishlist";
+      const message = error instanceof Error ? error.message : "Failed to add book to wishlist";
 
       // Handle specific error cases
       if (message.includes("already in your wanted list")) {
-        return jsonResponse(
-          { success: false, error: message, code: "ALREADY_IN_WISHLIST" },
-          409,
-        );
+        return jsonResponse({ success: false, error: message, code: "ALREADY_IN_WISHLIST" }, 409);
       }
       if (message.includes("already own this book")) {
-        return jsonResponse(
-          { success: false, error: message, code: "ALREADY_OWNED" },
-          409,
-        );
+        return jsonResponse({ success: false, error: message, code: "ALREADY_OWNED" }, 409);
       }
 
       console.error("Wishlist add error:", error);
-      return jsonResponse(
-        { success: false, error: message, code: "WISHLIST_ERROR" },
-        500,
-      );
+      return jsonResponse({ success: false, error: message, code: "WISHLIST_ERROR" }, 500);
     }
   }
 
   // ============================================
-  // READER API ENDPOINTS
+  // READER BINARY ENDPOINTS (kept for binary responses)
   // ============================================
-
-  // Helper to parse viewport from query params
-  const parseViewport = (params: URLSearchParams): ViewportConfig => ({
-    width: parseInt(params.get("width") || "800", 10),
-    height: parseInt(params.get("height") || "1200", 10),
-    fontSize: params.has("fontSize") ? parseInt(params.get("fontSize")!, 10) : undefined,
-    lineHeight: params.has("lineHeight") ? parseFloat(params.get("lineHeight")!) : undefined,
-  });
-
-  // GET /api/reader/:bookId/info - Get book info with total pages
-  const readerInfoMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/info$/);
-  if (readerInfoMatch && request.method === "GET") {
-    try {
-      const bookId = readerInfoMatch[1];
-      const viewport = parseViewport(searchParams);
-
-      // Get book from database
-      const book = await db.select().from(books).where(eq(books.id, bookId)).get();
-      if (!book) {
-        return jsonResponse({ success: false, error: "book_not_found" }, 404);
-      }
-
-      // Get normalized content
-      const content = await getContent(bookId);
-      if (!content) {
-        return jsonResponse({ success: false, error: "content_not_found" }, 404);
-      }
-
-      // Calculate total pages for viewport
-      const totalPages = paginationEngine.calculateTotalPages(content, viewport);
-
-      // Get TOC with page numbers
-      let toc: TocEntry[] = [];
-      if (content.type === "text" || content.type === "pdf") {
-        toc = paginationEngine.calculateTocPageNumbers(content, content.toc, viewport);
-      }
-
-      const response: ReaderInfoResponse = {
-        id: book.id,
-        title: book.title,
-        format: book.format,
-        totalPages,
-        toc,
-        coverPath: book.coverPath || undefined,
-      };
-
-      // Add audio-specific fields
-      if (content.type === "audio") {
-        response.duration = content.duration;
-        response.chapters = content.chapters;
-      }
-
-      return jsonResponse({ success: true, ...response });
-    } catch (error) {
-      console.error("Reader info error:", error);
-      return jsonResponse({ success: false, error: "reader_error" }, 500);
-    }
-  }
-
-  // GET /api/reader/:bookId/page/:pageNum - Get page content
-  const readerPageMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/page\/(\d+)$/);
-  if (readerPageMatch && request.method === "GET") {
-    try {
-      const bookId = readerPageMatch[1];
-      const pageNum = parseInt(readerPageMatch[2], 10);
-      const viewport = parseViewport(searchParams);
-
-      // Get normalized content
-      const content = await getContent(bookId);
-      if (!content) {
-        return jsonResponse({ success: false, error: "content_not_found" }, 404);
-      }
-
-      const totalPages = paginationEngine.calculateTotalPages(content, viewport);
-      const pageContent = paginationEngine.getPage(content, pageNum, viewport, bookId);
-
-      const response: ReaderPageResponse = {
-        pageNum: Math.max(1, Math.min(pageNum, totalPages)),
-        totalPages,
-        position: pageContent.position,
-        content: pageContent,
-        nextPage: pageNum < totalPages ? pageNum + 1 : null,
-        prevPage: pageNum > 1 ? pageNum - 1 : null,
-      };
-
-      return jsonResponse({ success: true, ...response });
-    } catch (error) {
-      console.error("Reader page error:", error);
-      return jsonResponse({ success: false, error: "reader_error" }, 500);
-    }
-  }
-
-  // GET /api/reader/:bookId/position/:position - Get page for position
-  const readerPositionMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/position\/([\d.]+)$/);
-  if (readerPositionMatch && request.method === "GET") {
-    try {
-      const bookId = readerPositionMatch[1];
-      const position = parseFloat(readerPositionMatch[2]);
-      const viewport = parseViewport(searchParams);
-
-      // Get normalized content
-      const content = await getContent(bookId);
-      if (!content) {
-        return jsonResponse({ success: false, error: "content_not_found" }, 404);
-      }
-
-      const pageNum = paginationEngine.getPageForPosition(content, position, viewport);
-      const pageContent = paginationEngine.getPage(content, pageNum, viewport, bookId);
-
-      return jsonResponse({
-        success: true,
-        pageNum,
-        content: pageContent,
-        position: pageContent.position,
-      });
-    } catch (error) {
-      console.error("Reader position error:", error);
-      return jsonResponse({ success: false, error: "reader_error" }, 500);
-    }
-  }
 
   // GET /api/reader/:bookId/pdf-page/:pageNum - Render PDF page as image
   const pdfPageMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/pdf-page\/(\d+)$/);
@@ -635,239 +472,6 @@ async function handleApiRequest(
       console.error("PDF page render error:", error);
       return new Response("Failed to render PDF page", { status: 500 });
     }
-  }
-
-  // GET /api/reader/:bookId/search - Search within book
-  const readerSearchMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/search$/);
-  if (readerSearchMatch && request.method === "GET") {
-    try {
-      const bookId = readerSearchMatch[1];
-      const query = searchParams.get("q") || "";
-      const viewport = parseViewport(searchParams);
-
-      if (!query) {
-        return jsonResponse({ success: false, error: "query_required" }, 400);
-      }
-
-      // Get normalized content
-      const content = await getContent(bookId);
-      if (!content) {
-        return jsonResponse({ success: false, error: "content_not_found" }, 404);
-      }
-
-      const results = paginationEngine.searchContent(content, query, viewport);
-
-      return jsonResponse({
-        success: true,
-        query,
-        results,
-        totalResults: results.length,
-      });
-    } catch (error) {
-      console.error("Reader search error:", error);
-      return jsonResponse({ success: false, error: "reader_error" }, 500);
-    }
-  }
-
-  // GET /api/reader/:bookId/bookmarks - Get bookmarks for book
-  const readerBookmarksGetMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmarks$/);
-  if (readerBookmarksGetMatch && request.method === "GET") {
-    try {
-      const bookId = readerBookmarksGetMatch[1];
-
-      const bookmarksList = await db
-        .select()
-        .from(bookmarks)
-        .where(eq(bookmarks.bookId, bookId))
-        .all();
-
-      return jsonResponse({
-        success: true,
-        bookmarks: bookmarksList.map((b) => ({
-          id: b.id,
-          position: parseFloat(b.position),
-          title: b.title,
-          note: b.note,
-          color: b.color,
-          createdAt: b.createdAt?.toISOString(),
-        })),
-      });
-    } catch (error) {
-      console.error("Get bookmarks error:", error);
-      return jsonResponse({ success: false, error: "bookmarks_error" }, 500);
-    }
-  }
-
-  // POST /api/reader/:bookId/bookmark - Add bookmark
-  const readerBookmarkPostMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmark$/);
-  if (readerBookmarkPostMatch && request.method === "POST") {
-    try {
-      const bookId = readerBookmarkPostMatch[1];
-      const body = await request.json();
-
-      const { position, title, note, color } = body;
-
-      if (position === undefined || typeof position !== "number") {
-        return jsonResponse({ success: false, error: "position_required" }, 400);
-      }
-
-      const id = uuid();
-      await db.insert(bookmarks).values({
-        id,
-        bookId,
-        position: position.toString(),
-        title: title || null,
-        note: note || null,
-        color: color || null,
-      });
-
-      return jsonResponse({
-        success: true,
-        bookmark: { id, bookId, position, title, note, color },
-      });
-    } catch (error) {
-      console.error("Add bookmark error:", error);
-      return jsonResponse({ success: false, error: "bookmark_error" }, 500);
-    }
-  }
-
-  // DELETE /api/reader/:bookId/bookmark/:bookmarkId - Delete bookmark
-  const readerBookmarkDeleteMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/bookmark\/([a-f0-9-]+)$/);
-  if (readerBookmarkDeleteMatch && request.method === "DELETE") {
-    try {
-      const bookmarkId = readerBookmarkDeleteMatch[2];
-
-      await db.delete(bookmarks).where(eq(bookmarks.id, bookmarkId));
-
-      return jsonResponse({ success: true });
-    } catch (error) {
-      console.error("Delete bookmark error:", error);
-      return jsonResponse({ success: false, error: "bookmark_error" }, 500);
-    }
-  }
-
-  // GET /api/reader/:bookId/highlights - Get highlights for book
-  const readerHighlightsGetMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlights$/);
-  if (readerHighlightsGetMatch && request.method === "GET") {
-    try {
-      const bookId = readerHighlightsGetMatch[1];
-
-      const highlightsList = await db
-        .select()
-        .from(highlights)
-        .where(eq(highlights.bookId, bookId))
-        .all();
-
-      return jsonResponse({
-        success: true,
-        highlights: highlightsList.map((h) => ({
-          id: h.id,
-          startPosition: parseFloat(h.startPosition),
-          endPosition: parseFloat(h.endPosition),
-          text: h.text,
-          note: h.note,
-          color: h.color,
-          createdAt: h.createdAt?.toISOString(),
-        })),
-      });
-    } catch (error) {
-      console.error("Get highlights error:", error);
-      return jsonResponse({ success: false, error: "highlights_error" }, 500);
-    }
-  }
-
-  // POST /api/reader/:bookId/highlight - Add highlight
-  const readerHighlightPostMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlight$/);
-  if (readerHighlightPostMatch && request.method === "POST") {
-    try {
-      const bookId = readerHighlightPostMatch[1];
-      const body = await request.json();
-
-      const { startPosition, endPosition, text, note, color } = body;
-
-      if (startPosition === undefined || endPosition === undefined || !text) {
-        return jsonResponse({ success: false, error: "invalid_highlight" }, 400);
-      }
-
-      const id = uuid();
-      await db.insert(highlights).values({
-        id,
-        bookId,
-        startPosition: startPosition.toString(),
-        endPosition: endPosition.toString(),
-        text,
-        note: note || null,
-        color: color || "#ffff00",
-      });
-
-      return jsonResponse({
-        success: true,
-        highlight: { id, bookId, startPosition, endPosition, text, note, color },
-      });
-    } catch (error) {
-      console.error("Add highlight error:", error);
-      return jsonResponse({ success: false, error: "highlight_error" }, 500);
-    }
-  }
-
-  // DELETE /api/reader/:bookId/highlight/:highlightId - Delete highlight
-  const readerHighlightDeleteMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/highlight\/([a-f0-9-]+)$/);
-  if (readerHighlightDeleteMatch && request.method === "DELETE") {
-    try {
-      const highlightId = readerHighlightDeleteMatch[2];
-
-      await db.delete(highlights).where(eq(highlights.id, highlightId));
-
-      return jsonResponse({ success: true });
-    } catch (error) {
-      console.error("Delete highlight error:", error);
-      return jsonResponse({ success: false, error: "highlight_error" }, 500);
-    }
-  }
-
-  // POST /api/reader/:bookId/progress - Save reading progress
-  const readerProgressMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/progress$/);
-  if (readerProgressMatch && request.method === "POST") {
-    try {
-      const bookId = readerProgressMatch[1];
-      const body = await request.json();
-
-      const { position, pageNum } = body;
-
-      if (position === undefined || typeof position !== "number") {
-        return jsonResponse({ success: false, error: "position_required" }, 400);
-      }
-
-      // Update book's reading progress
-      await db
-        .update(books)
-        .set({
-          readingProgress: position,
-          lastPosition: JSON.stringify({ position, pageNum }),
-          lastReadAt: sql`(unixepoch())`,
-          updatedAt: sql`(unixepoch())`,
-        })
-        .where(eq(books.id, bookId));
-
-      return jsonResponse({ success: true, position, pageNum });
-    } catch (error) {
-      console.error("Save progress error:", error);
-      return jsonResponse({ success: false, error: "progress_error" }, 500);
-    }
-  }
-
-  // DELETE /api/reader/:bookId/cache - Invalidate cached content for a book
-  const cacheInvalidateMatch = pathname.match(/^\/api\/reader\/([a-f0-9-]+)\/cache$/);
-  if (cacheInvalidateMatch && request.method === "DELETE") {
-    const bookId = cacheInvalidateMatch[1];
-    invalidateContent(bookId);
-    return jsonResponse({ success: true, message: `Cache invalidated for ${bookId}` });
-  }
-
-  // DELETE /api/reader/cache - Clear entire content cache
-  if (pathname === "/api/reader/cache" && request.method === "DELETE") {
-    clearContentCache();
-    return jsonResponse({ success: true, message: "Cache cleared" });
   }
 
   // GET /api/reader/:bookId/resource/* - Serve embedded resources from EPUB files
@@ -921,19 +525,12 @@ async function handleApiRequest(
         getBook: "GET /api/books/:id",
         lookupIsbn: "GET /api/books/isbn/:isbn",
         upload: "POST /api/upload (multipart/form-data with 'file' field)",
-        wishlist:
-          "GET /api/wishlist?status=<status>&series=<series>&limit=<limit>",
+        uploadCover: "POST /api/books/:id/cover (multipart/form-data with 'cover' field)",
+        wishlist: "GET /api/wishlist?status=<status>&series=<series>&limit=<limit>",
         wishlistByIsbn:
-          "POST /api/wishlist/isbn/:isbn (JSON body: {status?, priority?, notes?, title?, author?} - title/author used as fallback if ISBN lookup fails)",
-        readerInfo: "GET /api/reader/:bookId/info?width=&height=",
-        readerPage: "GET /api/reader/:bookId/page/:pageNum?width=&height=",
-        readerPosition: "GET /api/reader/:bookId/position/:position?width=&height=",
-        readerSearch: "GET /api/reader/:bookId/search?q=&width=&height=",
-        readerBookmarks: "GET /api/reader/:bookId/bookmarks",
-        readerBookmark: "POST /api/reader/:bookId/bookmark",
-        readerHighlights: "GET /api/reader/:bookId/highlights",
-        readerHighlight: "POST /api/reader/:bookId/highlight",
-        readerProgress: "POST /api/reader/:bookId/progress",
+          "POST /api/wishlist/isbn/:isbn (JSON body: {status?, priority?, notes?, title?, author?})",
+        readerPdfPage: "GET /api/reader/:bookId/pdf-page/:pageNum?scale=2.0 (returns PNG)",
+        readerResource: "GET /api/reader/:bookId/resource/* (returns EPUB embedded resources)",
       },
     },
     404,
@@ -1001,13 +598,14 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
     if (existsSync(filePath)) {
       const buffer = await readFile(filePath);
       const ext = filePath.split(".").pop()?.toLowerCase();
-      const contentType = {
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        png: "image/png",
-        gif: "image/gif",
-        webp: "image/webp",
-      }[ext || ""] || "image/jpeg";
+      const contentType =
+        {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+        }[ext || ""] || "image/jpeg";
       return new Response(buffer, {
         headers: {
           "Content-Type": contentType,
@@ -1018,18 +616,11 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
   }
 
   // Handle /comic/:id/page/:pageNum requests for comic book pages
-  const comicPageMatch = pathname.match(
-    /^\/comic\/([a-f0-9-]+)\/(cbr|cbz)\/page\/(\d+)$/,
-  );
+  const comicPageMatch = pathname.match(/^\/comic\/([a-f0-9-]+)\/(cbr|cbz)\/page\/(\d+)$/);
   if (comicPageMatch) {
     const [, bookId, format, pageNumStr] = comicPageMatch;
     const pageNum = parseInt(pageNumStr, 10);
-    const bookPath = resolve(
-      process.cwd(),
-      "data",
-      "books",
-      `${bookId}.${format}`,
-    );
+    const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.${format}`);
 
     if (existsSync(bookPath)) {
       try {
@@ -1053,17 +644,10 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
   }
 
   // Handle /comic/:id/info requests for comic book metadata
-  const comicInfoMatch = pathname.match(
-    /^\/comic\/([a-f0-9-]+)\/(cbr|cbz)\/info$/,
-  );
+  const comicInfoMatch = pathname.match(/^\/comic\/([a-f0-9-]+)\/(cbr|cbz)\/info$/);
   if (comicInfoMatch) {
     const [, bookId, format] = comicInfoMatch;
-    const bookPath = resolve(
-      process.cwd(),
-      "data",
-      "books",
-      `${bookId}.${format}`,
-    );
+    const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.${format}`);
 
     if (existsSync(bookPath)) {
       try {
@@ -1087,8 +671,8 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
   if (epubResourceMatch) {
     const [, bookId, resourcePath] = epubResourceMatch;
 
-    // Skip if this looks like a route (e.g., /book/:id/read or /book/:id/read.rsc)
-    if (resourcePath === "read" || resourcePath === "edit" || resourcePath.endsWith(".rsc")) {
+    // Skip if this looks like a route (e.g., /book/:id/read)
+    if (resourcePath === "read" || resourcePath === "edit") {
       return null;
     }
 
@@ -1121,25 +705,23 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
 export default async function handler(request: Request) {
   const url = new URL(request.url);
 
-  // Handle API requests
-  const apiResponse = await handleApiRequest(
-    request,
-    url.pathname,
-    url.searchParams,
-  );
-  if (apiResponse) {
-    return apiResponse;
+  // don't handle rsc requests
+  const isRsc = url.pathname.includes(".manifest") || url.pathname.includes(".rsc");
+  if (!isRsc) {
+    // Handle API requests
+    const apiResponse = await handleApiRequest(request, url.pathname, url.searchParams);
+    if (apiResponse) {
+      return apiResponse;
+    }
+
+    // Check for static file requests
+    const staticResponse = await serveStaticFile(url.pathname);
+    if (staticResponse) {
+      return staticResponse;
+    }
   }
 
-  // Check for static file requests
-  const staticResponse = await serveStaticFile(url.pathname);
-  if (staticResponse) {
-    return staticResponse;
-  }
-
-  const ssr = await import.meta.viteRsc.loadModule<
-    typeof import("./entry.ssr")
-  >("ssr", "index");
+  const ssr = await import.meta.viteRsc.loadModule<typeof import("./entry.ssr")>("ssr", "index");
 
   return ssr.default(request, await fetchServer(request));
 }

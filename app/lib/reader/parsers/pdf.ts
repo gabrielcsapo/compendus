@@ -66,9 +66,8 @@ async function extractPdfToc(pdfDoc: pdfjsLib.PDFDocumentProxy): Promise<TocEntr
         // Try to get page number from destination
         if (item.dest) {
           try {
-            const dest = typeof item.dest === "string"
-              ? await pdfDoc.getDestination(item.dest)
-              : item.dest;
+            const dest =
+              typeof item.dest === "string" ? await pdfDoc.getDestination(item.dest) : item.dest;
 
             if (dest && Array.isArray(dest) && dest[0]) {
               const pageRef = dest[0] as { num: number; gen: number };

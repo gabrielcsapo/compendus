@@ -215,7 +215,10 @@ function stripHtml(html: string): string {
 /**
  * Extract a resource (image, css, etc.) from an EPUB file by path
  */
-export async function extractEpubResource(buffer: Buffer, resourcePath: string): Promise<{ data: Buffer; mimeType: string } | null> {
+export async function extractEpubResource(
+  buffer: Buffer,
+  resourcePath: string,
+): Promise<{ data: Buffer; mimeType: string } | null> {
   // Validate ZIP structure before parsing
   if (!isValidZipBuffer(buffer)) {
     return null;
@@ -233,10 +236,10 @@ export async function extractEpubResource(buffer: Buffer, resourcePath: string):
       `OPS/${resourcePath}`,
       `EPUB/${resourcePath}`,
       // Also try without leading slashes
-      resourcePath.replace(/^\/+/, ''),
-      `OEBPS/${resourcePath.replace(/^\/+/, '')}`,
-      `OPS/${resourcePath.replace(/^\/+/, '')}`,
-      `EPUB/${resourcePath.replace(/^\/+/, '')}`,
+      resourcePath.replace(/^\/+/, ""),
+      `OEBPS/${resourcePath.replace(/^\/+/, "")}`,
+      `OPS/${resourcePath.replace(/^\/+/, "")}`,
+      `EPUB/${resourcePath.replace(/^\/+/, "")}`,
     ];
 
     for (const path of possiblePaths) {
@@ -249,10 +252,10 @@ export async function extractEpubResource(buffer: Buffer, resourcePath: string):
     }
 
     // If not found by exact path, try to find by filename
-    const fileName = resourcePath.split('/').pop();
+    const fileName = resourcePath.split("/").pop();
     if (fileName) {
       const files = Object.keys(zip.files);
-      const matchingFile = files.find(f => f.endsWith(`/${fileName}`) || f === fileName);
+      const matchingFile = files.find((f) => f.endsWith(`/${fileName}`) || f === fileName);
       if (matchingFile) {
         const file = zip.file(matchingFile);
         if (file) {
@@ -271,22 +274,22 @@ export async function extractEpubResource(buffer: Buffer, resourcePath: string):
 }
 
 function getMimeType(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase();
+  const ext = path.split(".").pop()?.toLowerCase();
   const mimeTypes: Record<string, string> = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'svg': 'image/svg+xml',
-    'webp': 'image/webp',
-    'css': 'text/css',
-    'html': 'text/html',
-    'xhtml': 'application/xhtml+xml',
-    'xml': 'application/xml',
-    'ttf': 'font/ttf',
-    'otf': 'font/otf',
-    'woff': 'font/woff',
-    'woff2': 'font/woff2',
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    webp: "image/webp",
+    css: "text/css",
+    html: "text/html",
+    xhtml: "application/xhtml+xml",
+    xml: "application/xml",
+    ttf: "font/ttf",
+    otf: "font/otf",
+    woff: "font/woff",
+    woff2: "font/woff2",
   };
-  return mimeTypes[ext || ''] || 'application/octet-stream';
+  return mimeTypes[ext || ""] || "application/octet-stream";
 }

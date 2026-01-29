@@ -66,7 +66,18 @@ export function GlobalUploadDropzone() {
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files);
-      const validExtensions = [".pdf", ".epub", ".mobi", ".azw", ".azw3", ".cbr", ".cbz", ".m4b", ".m4a", ".mp3"];
+      const validExtensions = [
+        ".pdf",
+        ".epub",
+        ".mobi",
+        ".azw",
+        ".azw3",
+        ".cbr",
+        ".cbz",
+        ".m4b",
+        ".m4a",
+        ".mp3",
+      ];
 
       const validFiles = fileArray.filter((file) =>
         validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext)),

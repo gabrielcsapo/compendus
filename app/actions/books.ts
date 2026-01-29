@@ -273,7 +273,16 @@ export async function getLinkedFormats(bookId: string): Promise<Book[]> {
     .where(
       and(
         sql`${books.id} != ${bookId}`,
-        sql`(${books.isbn} IN (${sql.join(isbns.map(i => sql`${i}`), sql`, `)}) OR ${books.isbn13} IN (${sql.join(isbns.map(i => sql`${i}`), sql`, `)}) OR ${books.isbn10} IN (${sql.join(isbns.map(i => sql`${i}`), sql`, `)}))`,
+        sql`(${books.isbn} IN (${sql.join(
+          isbns.map((i) => sql`${i}`),
+          sql`, `,
+        )}) OR ${books.isbn13} IN (${sql.join(
+          isbns.map((i) => sql`${i}`),
+          sql`, `,
+        )}) OR ${books.isbn10} IN (${sql.join(
+          isbns.map((i) => sql`${i}`),
+          sql`, `,
+        )}))`,
       ),
     );
 
@@ -496,9 +505,7 @@ export async function applyMetadata(
     if (metadata.source === "openlibrary") {
       // Selected Open Library, try Google Books for ISBN
       const googleResults = await searchGoogleBooks(
-        metadata.authors.length > 0
-          ? `${metadata.title} ${metadata.authors[0]}`
-          : metadata.title,
+        metadata.authors.length > 0 ? `${metadata.title} ${metadata.authors[0]}` : metadata.title,
       );
       if (googleResults.length > 0 && (googleResults[0].isbn13 || googleResults[0].isbn10)) {
         enrichedMetadata = {
@@ -540,15 +547,18 @@ export async function applyMetadata(
     if (olData || googleData) {
       enrichedMetadata = {
         ...enrichedMetadata,
-        description: enrichedMetadata.description || olData?.description || googleData?.description || null,
+        description:
+          enrichedMetadata.description || olData?.description || googleData?.description || null,
         series: enrichedMetadata.series || olData?.series || googleData?.series || null,
-        seriesNumber: enrichedMetadata.seriesNumber || olData?.seriesNumber || googleData?.seriesNumber || null,
+        seriesNumber:
+          enrichedMetadata.seriesNumber || olData?.seriesNumber || googleData?.seriesNumber || null,
         publisher: enrichedMetadata.publisher || olData?.publisher || googleData?.publisher || null,
         pageCount: enrichedMetadata.pageCount || olData?.pageCount || googleData?.pageCount || null,
         language: enrichedMetadata.language || olData?.language || googleData?.language || null,
-        subjects: enrichedMetadata.subjects.length > 0
-          ? enrichedMetadata.subjects
-          : olData?.subjects || googleData?.subjects || [],
+        subjects:
+          enrichedMetadata.subjects.length > 0
+            ? enrichedMetadata.subjects
+            : olData?.subjects || googleData?.subjects || [],
       };
     }
   }
@@ -556,13 +566,18 @@ export async function applyMetadata(
   // Generate new filename based on metadata
   const newTitle = enrichedMetadata.title || book.title;
   const newAuthors =
-    enrichedMetadata.authors.length > 0 ? enrichedMetadata.authors : book.authors ? JSON.parse(book.authors) : [];
+    enrichedMetadata.authors.length > 0
+      ? enrichedMetadata.authors
+      : book.authors
+        ? JSON.parse(book.authors)
+        : [];
   const newFileName = generateFileName(newTitle, newAuthors, book.format);
 
   const updateData: Record<string, unknown> = {
     title: newTitle,
     subtitle: enrichedMetadata.subtitle || book.subtitle,
-    authors: enrichedMetadata.authors.length > 0 ? JSON.stringify(enrichedMetadata.authors) : book.authors,
+    authors:
+      enrichedMetadata.authors.length > 0 ? JSON.stringify(enrichedMetadata.authors) : book.authors,
     publisher: enrichedMetadata.publisher || book.publisher,
     description: enrichedMetadata.description || book.description,
     pageCount: enrichedMetadata.pageCount || book.pageCount,

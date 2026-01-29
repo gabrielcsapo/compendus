@@ -29,7 +29,7 @@ export interface AudioChapter {
   index: number;
   title: string;
   startTime: number; // Start time in seconds
-  endTime: number;   // End time in seconds
+  endTime: number; // End time in seconds
 }
 
 export interface ExtractedContent {

@@ -147,14 +147,13 @@ export function ClickableCoverPlaceholder({
   };
 
   return (
-    <div
-      className={`relative ${className}`}
-      style={{ backgroundColor: coverColor || undefined }}
-    >
+    <div className={`relative ${className}`} style={{ backgroundColor: coverColor || undefined }}>
       <div
         onClick={handleExtract}
         className={`w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-light to-accent-light ${
-          canExtract ? "cursor-pointer hover:from-primary-light/80 hover:to-accent-light/80 transition-colors" : ""
+          canExtract
+            ? "cursor-pointer hover:from-primary-light/80 hover:to-accent-light/80 transition-colors"
+            : ""
         }`}
       >
         {isExtracting ? (

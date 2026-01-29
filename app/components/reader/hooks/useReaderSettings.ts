@@ -1,11 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  type ReaderSettings,
-  DEFAULT_SETTINGS,
-  validateSettings,
-} from "@/lib/reader/settings";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { type ReaderSettings, DEFAULT_SETTINGS, validateSettings } from "@/lib/reader/settings";
 
 const STORAGE_KEY = "reader-settings";
 
@@ -13,35 +9,43 @@ const STORAGE_KEY = "reader-settings";
  * Hook to manage reader settings with localStorage persistence
  */
 export function useReaderSettings(bookId?: string) {
-  // Global settings
-  const [globalSettings, setGlobalSettings] = useState<ReaderSettings>(() => {
-    if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  // Track if we've hydrated from localStorage
+  const hasHydrated = useRef(false);
+
+  // Global settings - start with defaults to avoid hydration mismatch
+  const [globalSettings, setGlobalSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
+
+  // Book-specific overrides
+  const [bookSettings, setBookSettings] = useState<Partial<ReaderSettings>>({});
+
+  // Hydrate from localStorage after mount
+  useEffect(() => {
+    if (hasHydrated.current) return;
+    hasHydrated.current = true;
 
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return validateSettings(JSON.parse(stored));
+        setGlobalSettings(validateSettings(JSON.parse(stored)));
       }
     } catch {
       // Ignore parse errors
     }
-    return DEFAULT_SETTINGS;
-  });
+  }, []);
 
-  // Book-specific overrides
-  const [bookSettings, setBookSettings] = useState<Partial<ReaderSettings>>(() => {
-    if (typeof window === "undefined" || !bookId) return {};
+  // Hydrate book-specific settings after mount
+  useEffect(() => {
+    if (!bookId) return;
 
     try {
       const stored = localStorage.getItem(`${STORAGE_KEY}-${bookId}`);
       if (stored) {
-        return JSON.parse(stored);
+        setBookSettings(JSON.parse(stored));
       }
     } catch {
       // Ignore parse errors
     }
-    return {};
-  });
+  }, [bookId]);
 
   // Merged settings (book overrides global)
   const settings = useMemo(

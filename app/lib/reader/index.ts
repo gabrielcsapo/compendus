@@ -8,11 +8,6 @@ export * from "./settings";
 export { paginationEngine, PaginationEngine } from "./pagination";
 
 // Re-export content store
-export {
-  getContent,
-  invalidateContent,
-  clearContentCache,
-  getCacheStats,
-} from "./content-store";
+export { getContent, invalidateContent, clearContentCache, getCacheStats } from "./content-store";
 
 // Parsers are imported dynamically by content-store, not directly exported

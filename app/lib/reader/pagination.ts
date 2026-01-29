@@ -215,10 +215,7 @@ export class PaginationEngine {
 
       // Calculate the portion of this chapter we need
       const chapterStartOffset = Math.max(0, startChar - chapter.characterStart);
-      const chapterEndOffset = Math.min(
-        chapter.text.length,
-        endChar - chapter.characterStart,
-      );
+      const chapterEndOffset = Math.min(chapter.text.length, endChar - chapter.characterStart);
 
       // If we need the whole chapter, use the HTML directly
       if (chapterStartOffset === 0 && chapterEndOffset >= chapter.text.length) {
@@ -342,7 +339,10 @@ export class PaginationEngine {
 
         results.push({
           text: chapter.text.slice(foundIndex, foundIndex + query.length),
-          context: (contextStart > 0 ? "..." : "") + context + (contextEnd < chapter.text.length ? "..." : ""),
+          context:
+            (contextStart > 0 ? "..." : "") +
+            context +
+            (contextEnd < chapter.text.length ? "..." : ""),
           position,
           pageNum: this.getPageForPosition(content, position, viewport),
           chapterTitle: chapter.title,
