@@ -80,7 +80,7 @@ export function AudiobookReader({
       const currentChapter = getCurrentChapterIndex(audio.currentTime);
       onPositionChange(
         JSON.stringify({ currentTime: audio.currentTime, chapter: currentChapter }),
-        progress
+        progress,
       );
 
       // Check for end of chapter sleep timer
@@ -149,7 +149,7 @@ export function AudiobookReader({
       }
       return 0;
     },
-    [chapters]
+    [chapters],
   );
 
   const currentChapterIndex = getCurrentChapterIndex(currentTime);
@@ -170,12 +170,15 @@ export function AudiobookReader({
     audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
   }, []);
 
-  const goToChapter = useCallback((index: number) => {
-    const audio = audioRef.current;
-    if (!audio || !chapters[index]) return;
-    audio.currentTime = chapters[index].startTime;
-    setShowToc(false);
-  }, [chapters]);
+  const goToChapter = useCallback(
+    (index: number) => {
+      const audio = audioRef.current;
+      if (!audio || !chapters[index]) return;
+      audio.currentTime = chapters[index].startTime;
+      setShowToc(false);
+    },
+    [chapters],
+  );
 
   const goToPreviousChapter = useCallback(() => {
     const audio = audioRef.current;
@@ -277,7 +280,12 @@ export function AudiobookReader({
               title="Chapters"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
           )}
@@ -299,7 +307,12 @@ export function AudiobookReader({
               title="Sleep Timer"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                />
               </svg>
               {sleepTimeRemaining > 0 && (
                 <span className="absolute -top-1 -right-1 text-xs bg-primary text-white rounded-full px-1">
@@ -351,8 +364,18 @@ export function AudiobookReader({
 
           {/* Volume */}
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" />
+            <svg
+              className="w-5 h-5 text-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z"
+              />
             </svg>
             <input
               type="range"
@@ -371,16 +394,22 @@ export function AudiobookReader({
           {/* Cover Art */}
           {coverPath ? (
             <div className="w-64 h-64 rounded-lg shadow-lg overflow-hidden flex-shrink-0">
-              <img
-                src={coverPath}
-                alt="Cover art"
-                className="w-full h-full object-cover"
-              />
+              <img src={coverPath} alt="Cover art" className="w-full h-full object-cover" />
             </div>
           ) : (
             <div className="w-64 h-64 rounded-lg bg-surface-elevated flex items-center justify-center flex-shrink-0">
-              <svg className="w-24 h-24 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              <svg
+                className="w-24 h-24 text-foreground-muted"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
               </svg>
             </div>
           )}
@@ -394,7 +423,12 @@ export function AudiobookReader({
               title="Skip back 15 seconds"
             >
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"
+                />
               </svg>
               <span className="text-xs">15</span>
             </button>
@@ -450,7 +484,12 @@ export function AudiobookReader({
               title="Skip forward 30 seconds"
             >
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z"
+                />
               </svg>
               <span className="text-xs">30</span>
             </button>

@@ -51,9 +51,7 @@ export async function importBook(formData: FormData): Promise<ImportResult> {
   }
 
   const hasValidType = validTypes.includes(file.type);
-  const hasValidExtension = validExtensions.some((ext) =>
-    file.name.toLowerCase().endsWith(ext),
-  );
+  const hasValidExtension = validExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
 
   if (!hasValidType && !hasValidExtension) {
     return { success: false, error: "invalid_format" };
@@ -105,12 +103,7 @@ export async function importBook(formData: FormData): Promise<ImportResult> {
     // Index metadata in FTS
     const book = await getBook(result.bookId);
     if (book) {
-      await indexBookMetadata(
-        book.id,
-        book.title,
-        book.authors || "[]",
-        book.description,
-      );
+      await indexBookMetadata(book.id, book.title, book.authors || "[]", book.description);
 
       return {
         ...result,
@@ -126,9 +119,7 @@ export async function importBook(formData: FormData): Promise<ImportResult> {
   return result;
 }
 
-export async function importMultipleBooks(
-  formData: FormData,
-): Promise<ImportResult[]> {
+export async function importMultipleBooks(formData: FormData): Promise<ImportResult[]> {
   const files = formData.getAll("files") as File[];
   const results: ImportResult[] = [];
 
@@ -153,10 +144,7 @@ export interface CoverUploadResult {
   coverColor?: string;
 }
 
-export async function uploadCover(
-  bookId: string,
-  formData: FormData,
-): Promise<CoverUploadResult> {
+export async function uploadCover(bookId: string, formData: FormData): Promise<CoverUploadResult> {
   // Check if book exists
   const book = await db.select().from(books).where(eq(books.id, bookId)).get();
   if (!book) {
@@ -196,7 +184,7 @@ export async function uploadCover(
     return {
       success: true,
       coverPath: result.path,
-      coverColor: result.dominantColor,
+      coverColor: result.dominantColor ?? undefined,
     };
   }
 

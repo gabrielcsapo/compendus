@@ -78,11 +78,7 @@ export interface UseReaderReturn {
  */
 export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): UseReaderReturn {
   const viewport = useViewport();
-  const {
-    settings,
-    updateGlobalSetting,
-    updateBookSetting,
-  } = useReaderSettings(bookId);
+  const { settings, updateGlobalSetting, updateBookSetting } = useReaderSettings(bookId);
 
   // State
   const [bookInfo, setBookInfo] = useState<ReaderInfoResponse | null>(null);
@@ -157,7 +153,14 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     };
 
     fetchInfo();
-  }, [bookId, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, initialPosition]);
+  }, [
+    bookId,
+    viewport.width,
+    viewport.height,
+    settings.fontSize,
+    settings.lineHeight,
+    initialPosition,
+  ]);
 
   // Fetch page content when page changes
   useEffect(() => {
@@ -189,7 +192,16 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     };
 
     fetchPages();
-  }, [bookId, currentPage, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, bookInfo, isSpreadMode]);
+  }, [
+    bookId,
+    currentPage,
+    viewport.width,
+    viewport.height,
+    settings.fontSize,
+    settings.lineHeight,
+    bookInfo,
+    isSpreadMode,
+  ]);
 
   // Prefetch upcoming pages in the background
   useEffect(() => {
@@ -228,7 +240,15 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     // Small delay to prioritize current page load
     const timer = setTimeout(prefetchPages, 100);
     return () => clearTimeout(timer);
-  }, [bookId, currentPage, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, bookInfo]);
+  }, [
+    bookId,
+    currentPage,
+    viewport.width,
+    viewport.height,
+    settings.fontSize,
+    settings.lineHeight,
+    bookInfo,
+  ]);
 
   // Fetch bookmarks and highlights
   useEffect(() => {
@@ -299,17 +319,14 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     [bookId],
   );
 
-  const removeBookmark = useCallback(
-    async (bookmarkId: string) => {
-      try {
-        await deleteBookmarkAction(bookmarkId);
-        setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
-      } catch (err) {
-        console.error("Failed to remove bookmark:", err);
-      }
-    },
-    [],
-  );
+  const removeBookmark = useCallback(async (bookmarkId: string) => {
+    try {
+      await deleteBookmarkAction(bookmarkId);
+      setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
+    } catch (err) {
+      console.error("Failed to remove bookmark:", err);
+    }
+  }, []);
 
   // Highlight functions
   const addHighlight = useCallback(
@@ -321,7 +338,14 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
       color?: string,
     ) => {
       try {
-        const highlight = await addHighlightAction(bookId, startPosition, endPosition, text, note, color);
+        const highlight = await addHighlightAction(
+          bookId,
+          startPosition,
+          endPosition,
+          text,
+          note,
+          color,
+        );
         setHighlights((prev) => [...prev, highlight]);
       } catch (err) {
         console.error("Failed to add highlight:", err);
@@ -330,17 +354,14 @@ export function useReader({ bookId, initialPosition = 0 }: UseReaderOptions): Us
     [bookId],
   );
 
-  const removeHighlight = useCallback(
-    async (highlightId: string) => {
-      try {
-        await deleteHighlightAction(highlightId);
-        setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
-      } catch (err) {
-        console.error("Failed to remove highlight:", err);
-      }
-    },
-    [],
-  );
+  const removeHighlight = useCallback(async (highlightId: string) => {
+    try {
+      await deleteHighlightAction(highlightId);
+      setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    } catch (err) {
+      console.error("Failed to remove highlight:", err);
+    }
+  }, []);
 
   // Save progress
   const saveProgress = useCallback(async () => {

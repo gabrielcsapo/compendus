@@ -149,7 +149,7 @@ export interface MetadataSearchResult {
   coverUrl: string | null;
   coverUrlHQ: string | null; // High quality cover from Google Books
   coverUrls: string[]; // All available cover URLs to try in order
-  source: "openlibrary" | "googlebooks";
+  source: "openlibrary" | "googlebooks" | "manual";
   sourceId: string;
 }
 

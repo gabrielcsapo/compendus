@@ -23,7 +23,9 @@ export async function extractAudioMetadata(buffer: Buffer): Promise<AudioMetadat
 
   // Extract narrator - often stored in composer or albumartist
   const composer = metadata.common.composer;
-  const narratorStr = Array.isArray(composer) ? composer[0] : composer || metadata.common.albumartist;
+  const narratorStr = Array.isArray(composer)
+    ? composer[0]
+    : composer || metadata.common.albumartist;
 
   // Extract publisher - label can be an array
   const label = metadata.common.label;
@@ -61,9 +63,7 @@ function extractChapters(metadata: mm.IAudioMetadata): AudioChapter[] {
             const chapter = chapterList[i];
             const nextChapter = chapterList[i + 1];
 
-            const startTime = chapter.startTimeMs
-              ? chapter.startTimeMs / 1000
-              : 0;
+            const startTime = chapter.startTimeMs ? chapter.startTimeMs / 1000 : 0;
             const endTime = nextChapter?.startTimeMs
               ? nextChapter.startTimeMs / 1000
               : metadata.format.duration || startTime;

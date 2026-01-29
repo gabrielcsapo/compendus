@@ -7,7 +7,13 @@
  * - Potentially for runtime validation
  */
 
-import type { ApiBook, ApiSearchResult, ApiSearchResponse, ApiBookResponse, ApiErrorResponse } from "./search";
+import type {
+  ApiBook,
+  ApiSearchResult,
+  ApiSearchResponse,
+  ApiBookResponse,
+  ApiErrorResponse,
+} from "./search";
 
 // Re-export types for convenience
 export type { ApiBook, ApiSearchResult, ApiSearchResponse, ApiBookResponse, ApiErrorResponse };
@@ -73,7 +79,8 @@ export interface ApiSpec {
 export const apiSpec: ApiSpec = {
   title: "Compendus API",
   version: "1.0.0",
-  description: "REST API for managing your personal book library. Search, browse, and upload books.",
+  description:
+    "REST API for managing your personal book library. Search, browse, and upload books.",
   baseUrl: "/api",
   cors: {
     origins: "*",
@@ -86,7 +93,8 @@ export const apiSpec: ApiSpec = {
       method: "GET",
       path: "/api/search",
       summary: "Full-text search across books",
-      description: "Search your library by title, authors, description, and optionally book content. Returns relevance-scored results with highlighted matches.",
+      description:
+        "Search your library by title, authors, description, and optionally book content. Returns relevance-scored results with highlighted matches.",
       queryParams: [
         {
           name: "q",
@@ -142,7 +150,11 @@ export const apiSpec: ApiSpec = {
           },
         },
         errors: [
-          { status: 400, code: "INVALID_QUERY", description: "Query must be at least 2 characters" },
+          {
+            status: 400,
+            code: "INVALID_QUERY",
+            description: "Query must be at least 2 characters",
+          },
           { status: 400, code: "INVALID_LIMIT", description: "Limit cannot exceed 100" },
           { status: 500, code: "SEARCH_ERROR", description: "Internal search error" },
         ],
@@ -216,7 +228,8 @@ export const apiSpec: ApiSpec = {
       method: "GET",
       path: "/api/books/isbn/:isbn",
       summary: "Look up a book by ISBN",
-      description: "Find a book using its ISBN-10 or ISBN-13. Hyphens and spaces are automatically removed.",
+      description:
+        "Find a book using its ISBN-10 or ISBN-13. Hyphens and spaces are automatically removed.",
       pathParams: [
         {
           name: "isbn",
@@ -255,7 +268,8 @@ export const apiSpec: ApiSpec = {
       method: "POST",
       path: "/api/upload",
       summary: "Upload a book file",
-      description: "Upload and process a book file. The book will be indexed for search automatically.",
+      description:
+        "Upload and process a book file. The book will be indexed for search automatically.",
       requestBody: {
         contentType: "multipart/form-data",
         description: "Book file to upload",
@@ -341,7 +355,8 @@ export const apiSpec: ApiSpec = {
       method: "GET",
       path: "/api/wishlist",
       summary: "Get wishlist items",
-      description: "Retrieve all books in your wishlist with optional filtering by status or series. Books that are now in your library are automatically removed from the wishlist.",
+      description:
+        "Retrieve all books in your wishlist with optional filtering by status or series. Books that are now in your library are automatically removed from the wishlist.",
       queryParams: [
         {
           name: "status",
@@ -395,7 +410,8 @@ export const apiSpec: ApiSpec = {
       method: "POST",
       path: "/api/wishlist/isbn/:isbn",
       summary: "Add a book to wishlist by ISBN",
-      description: "Look up a book by its ISBN from Google Books and Open Library, then add it to your wishlist. The book metadata is automatically fetched from external sources.",
+      description:
+        "Look up a book by its ISBN from Google Books and Open Library, then add it to your wishlist. The book metadata is automatically fetched from external sources.",
       pathParams: [
         {
           name: "isbn",
@@ -451,9 +467,21 @@ export const apiSpec: ApiSpec = {
           },
         },
         errors: [
-          { status: 400, code: "INVALID_ISBN", description: "Invalid ISBN format. Must be 10 or 13 digits." },
-          { status: 404, code: "BOOK_NOT_FOUND", description: "Could not find metadata for this ISBN" },
-          { status: 409, code: "ALREADY_IN_WISHLIST", description: "Book is already in your wanted list" },
+          {
+            status: 400,
+            code: "INVALID_ISBN",
+            description: "Invalid ISBN format. Must be 10 or 13 digits.",
+          },
+          {
+            status: 404,
+            code: "BOOK_NOT_FOUND",
+            description: "Could not find metadata for this ISBN",
+          },
+          {
+            status: 409,
+            code: "ALREADY_IN_WISHLIST",
+            description: "Book is already in your wanted list",
+          },
           { status: 409, code: "ALREADY_OWNED", description: "You already own this book" },
           { status: 500, code: "WISHLIST_ERROR", description: "Failed to add book to wishlist" },
         ],
@@ -628,7 +656,12 @@ export const staticEndpoints = [
     description: "Stream or download the original book file.",
     pathParams: [
       { name: "id", type: "uuid" as const, description: "Book ID", required: true },
-      { name: "format", type: "string" as const, description: "File format (pdf, epub, mobi, cbr, cbz)", required: true },
+      {
+        name: "format",
+        type: "string" as const,
+        description: "File format (pdf, epub, mobi, cbr, cbz)",
+        required: true,
+      },
     ],
   },
   {
@@ -636,9 +669,7 @@ export const staticEndpoints = [
     path: "/covers/:id.jpg",
     summary: "Get cover image",
     description: "Retrieve the book's cover image as JPEG.",
-    pathParams: [
-      { name: "id", type: "uuid" as const, description: "Book ID", required: true },
-    ],
+    pathParams: [{ name: "id", type: "uuid" as const, description: "Book ID", required: true }],
   },
   {
     method: "GET" as const,
@@ -647,7 +678,12 @@ export const staticEndpoints = [
     description: "Get page count and other metadata for a comic book.",
     pathParams: [
       { name: "id", type: "uuid" as const, description: "Book ID", required: true },
-      { name: "format", type: "string" as const, description: "Comic format (cbr or cbz)", required: true },
+      {
+        name: "format",
+        type: "string" as const,
+        description: "Comic format (cbr or cbz)",
+        required: true,
+      },
     ],
   },
   {
@@ -657,8 +693,18 @@ export const staticEndpoints = [
     description: "Retrieve a specific page from a comic book as an image.",
     pathParams: [
       { name: "id", type: "uuid" as const, description: "Book ID", required: true },
-      { name: "format", type: "string" as const, description: "Comic format (cbr or cbz)", required: true },
-      { name: "pageNum", type: "integer" as const, description: "Page number (0-indexed)", required: true },
+      {
+        name: "format",
+        type: "string" as const,
+        description: "Comic format (cbr or cbz)",
+        required: true,
+      },
+      {
+        name: "pageNum",
+        type: "integer" as const,
+        description: "Page number (0-indexed)",
+        required: true,
+      },
     ],
   },
 ];

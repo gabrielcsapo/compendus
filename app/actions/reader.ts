@@ -4,37 +4,31 @@ import { db, books, bookmarks, highlights } from "../lib/db";
 import { eq, sql } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
 import { getContent, paginationEngine } from "../lib/reader";
-import type { ViewportConfig, TocEntry, PageContent, ReaderInfoResponse, ReaderPageResponse } from "../lib/reader/types";
+import type {
+  ViewportConfig,
+  TocEntry,
+  PageContent,
+  ReaderInfoResponse,
+  ReaderPageResponse,
+  ReaderBookmark,
+  ReaderHighlight,
+} from "../lib/reader/types";
 
 // ============================================
 // BOOKMARKS
 // ============================================
 
-export interface Bookmark {
-  id: string;
-  bookId: string;
-  position: number;
-  title: string | null;
-  note: string | null;
-  color: string | null;
-  createdAt?: string;
-}
-
-export async function getBookmarks(bookId: string): Promise<Bookmark[]> {
-  const bookmarksList = await db
-    .select()
-    .from(bookmarks)
-    .where(eq(bookmarks.bookId, bookId))
-    .all();
+export async function getBookmarks(bookId: string): Promise<ReaderBookmark[]> {
+  const bookmarksList = await db.select().from(bookmarks).where(eq(bookmarks.bookId, bookId)).all();
 
   return bookmarksList.map((b) => ({
     id: b.id,
     bookId: b.bookId,
     position: parseFloat(b.position),
-    title: b.title,
-    note: b.note,
-    color: b.color,
-    createdAt: b.createdAt?.toISOString(),
+    title: b.title ?? undefined,
+    note: b.note ?? undefined,
+    color: b.color ?? undefined,
+    createdAt: b.createdAt ?? new Date(),
   }));
 }
 
@@ -44,8 +38,9 @@ export async function addBookmark(
   title?: string,
   note?: string,
   color?: string,
-): Promise<Bookmark> {
+): Promise<ReaderBookmark> {
   const id = uuid();
+  const createdAt = new Date();
   await db.insert(bookmarks).values({
     id,
     bookId,
@@ -55,7 +50,7 @@ export async function addBookmark(
     color: color || null,
   });
 
-  return { id, bookId, position, title: title || null, note: note || null, color: color || null };
+  return { id, bookId, position, title, note, color, createdAt };
 }
 
 export async function deleteBookmark(bookmarkId: string): Promise<void> {
@@ -66,18 +61,7 @@ export async function deleteBookmark(bookmarkId: string): Promise<void> {
 // HIGHLIGHTS
 // ============================================
 
-export interface Highlight {
-  id: string;
-  bookId: string;
-  startPosition: number;
-  endPosition: number;
-  text: string;
-  note: string | null;
-  color: string;
-  createdAt?: string;
-}
-
-export async function getHighlights(bookId: string): Promise<Highlight[]> {
+export async function getHighlights(bookId: string): Promise<ReaderHighlight[]> {
   const highlightsList = await db
     .select()
     .from(highlights)
@@ -90,9 +74,9 @@ export async function getHighlights(bookId: string): Promise<Highlight[]> {
     startPosition: parseFloat(h.startPosition),
     endPosition: parseFloat(h.endPosition),
     text: h.text,
-    note: h.note,
-    color: h.color,
-    createdAt: h.createdAt?.toISOString(),
+    note: h.note ?? undefined,
+    color: h.color ?? "#ffff00",
+    createdAt: h.createdAt ?? new Date(),
   }));
 }
 
@@ -103,9 +87,10 @@ export async function addHighlight(
   text: string,
   note?: string,
   color?: string,
-): Promise<Highlight> {
+): Promise<ReaderHighlight> {
   const id = uuid();
   const highlightColor = color || "#ffff00";
+  const createdAt = new Date();
 
   await db.insert(highlights).values({
     id,
@@ -123,8 +108,9 @@ export async function addHighlight(
     startPosition,
     endPosition,
     text,
-    note: note || null,
+    note,
     color: highlightColor,
+    createdAt,
   };
 }
 

@@ -116,15 +116,34 @@ function TextContent({
       }}
     >
       <div
-        className="mx-auto prose prose-neutral dark:prose-invert"
-        style={{
-          maxWidth: `${settings.maxWidth}px`,
-          fontFamily: font.value,
-          fontSize: `${settings.fontSize}px`,
-          lineHeight: settings.lineHeight,
-          textAlign: settings.textAlign,
-          padding: `0 ${settings.margins}%`,
-        }}
+        className="mx-auto prose max-w-none"
+        style={
+          {
+            maxWidth: `${settings.maxWidth}px`,
+            fontFamily: font.value,
+            fontSize: `${settings.fontSize}px`,
+            lineHeight: settings.lineHeight,
+            textAlign: settings.textAlign,
+            padding: `0 ${settings.margins}%`,
+            // Override Tailwind prose colors with theme colors
+            "--tw-prose-body": theme.foreground,
+            "--tw-prose-headings": theme.foreground,
+            "--tw-prose-lead": theme.foreground,
+            "--tw-prose-links": theme.accent,
+            "--tw-prose-bold": theme.foreground,
+            "--tw-prose-counters": theme.muted,
+            "--tw-prose-bullets": theme.muted,
+            "--tw-prose-hr": theme.muted,
+            "--tw-prose-quotes": theme.foreground,
+            "--tw-prose-quote-borders": theme.muted,
+            "--tw-prose-captions": theme.muted,
+            "--tw-prose-code": theme.foreground,
+            "--tw-prose-pre-code": theme.foreground,
+            "--tw-prose-pre-bg": theme.background,
+            "--tw-prose-th-borders": theme.muted,
+            "--tw-prose-td-borders": theme.muted,
+          } as React.CSSProperties
+        }
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
         dangerouslySetInnerHTML={{ __html: content.html || "" }}
       />
@@ -140,6 +159,20 @@ function TextContent({
         onClick={onNextPage}
         aria-label="Next page"
       />
+    </div>
+  );
+}
+
+/**
+ * Loading placeholder for images
+ */
+function ImageLoadingPlaceholder() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-muted-foreground/20 border-t-muted-foreground rounded-full animate-spin" />
+        <span className="text-sm text-muted-foreground animate-pulse">Loading...</span>
+      </div>
     </div>
   );
 }
@@ -165,6 +198,31 @@ function ImageContent({
 }) {
   const theme = THEMES[settings.theme];
   const showSpread = isSpreadMode && rightContent?.imageUrl;
+
+  // Refs to check if images are already cached
+  const leftImgRef = useRef<HTMLImageElement>(null);
+  const rightImgRef = useRef<HTMLImageElement>(null);
+
+  // Track loading state for images
+  const [leftLoaded, setLeftLoaded] = useState(false);
+  const [rightLoaded, setRightLoaded] = useState(false);
+
+  // Reset loading state when content changes, but check for cached images
+  useEffect(() => {
+    setLeftLoaded(false);
+    setRightLoaded(false);
+
+    // Check if images are already cached (complete) after a microtask
+    // This handles the case where onLoad fires before the handler is attached
+    queueMicrotask(() => {
+      if (leftImgRef.current?.complete && leftImgRef.current?.naturalHeight > 0) {
+        setLeftLoaded(true);
+      }
+      if (rightImgRef.current?.complete && rightImgRef.current?.naturalHeight > 0) {
+        setRightLoaded(true);
+      }
+    });
+  }, [content.imageUrl, rightContent?.imageUrl]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -199,7 +257,7 @@ function ImageContent({
 
   // Common image styles
   const imageStyle = {
-    objectFit: settings.comicFitMode === "contain" ? "contain" as const : undefined,
+    objectFit: settings.comicFitMode === "contain" ? ("contain" as const) : undefined,
     height: "100%",
     maxHeight: "100%",
   };
@@ -214,33 +272,58 @@ function ImageContent({
         // Two-page spread view
         <div className="h-full flex items-center justify-center gap-1">
           {content.imageUrl && (
-            <img
-              src={content.imageUrl}
-              alt={content.chapterTitle || "Left Page"}
-              style={imageStyle}
-            />
+            <div className="relative h-full flex items-center justify-center">
+              {!leftLoaded && <ImageLoadingPlaceholder />}
+              <img
+                ref={leftImgRef}
+                src={content.imageUrl}
+                alt={content.chapterTitle || "Left Page"}
+                style={{
+                  ...imageStyle,
+                  opacity: leftLoaded ? 1 : 0,
+                  transition: "opacity 0.2s ease-in-out",
+                }}
+                onLoad={() => setLeftLoaded(true)}
+              />
+            </div>
           )}
           {rightContent.imageUrl && (
-            <img
-              src={rightContent.imageUrl}
-              alt={rightContent.chapterTitle || "Right Page"}
-              style={imageStyle}
-            />
+            <div className="relative h-full flex items-center justify-center">
+              {!rightLoaded && <ImageLoadingPlaceholder />}
+              <img
+                ref={rightImgRef}
+                src={rightContent.imageUrl}
+                alt={rightContent.chapterTitle || "Right Page"}
+                style={{
+                  ...imageStyle,
+                  opacity: rightLoaded ? 1 : 0,
+                  transition: "opacity 0.2s ease-in-out",
+                }}
+                onLoad={() => setRightLoaded(true)}
+              />
+            </div>
           )}
         </div>
       ) : (
         // Single page view
         content.imageUrl && (
-          <img
-            src={content.imageUrl}
-            alt={content.chapterTitle || "Page"}
-            className="max-h-full"
-            style={{
-              objectFit: settings.comicFitMode === "contain" ? "contain" : undefined,
-              width: settings.comicFitMode === "width" ? "100%" : "auto",
-              height: settings.comicFitMode === "height" ? "100%" : "auto",
-            }}
-          />
+          <div className="relative h-full flex items-center justify-center">
+            {!leftLoaded && <ImageLoadingPlaceholder />}
+            <img
+              ref={leftImgRef}
+              src={content.imageUrl}
+              alt={content.chapterTitle || "Page"}
+              className="max-h-full"
+              style={{
+                objectFit: settings.comicFitMode === "contain" ? "contain" : undefined,
+                width: settings.comicFitMode === "width" ? "100%" : "auto",
+                height: settings.comicFitMode === "height" ? "100%" : "auto",
+                opacity: leftLoaded ? 1 : 0,
+                transition: "opacity 0.2s ease-in-out",
+              }}
+              onLoad={() => setLeftLoaded(true)}
+            />
+          </div>
         )
       )}
     </div>
@@ -386,7 +469,9 @@ function AudioContent({
         >
           <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
-            <text x="9" y="15" fontSize="6" fontWeight="bold">15</text>
+            <text x="9" y="15" fontSize="6" fontWeight="bold">
+              15
+            </text>
           </svg>
         </button>
 
@@ -413,7 +498,9 @@ function AudioContent({
         >
           <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z" />
-            <text x="9" y="15" fontSize="6" fontWeight="bold">30</text>
+            <text x="9" y="15" fontSize="6" fontWeight="bold">
+              30
+            </text>
           </svg>
         </button>
       </div>

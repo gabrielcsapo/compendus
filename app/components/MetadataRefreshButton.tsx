@@ -128,9 +128,7 @@ export function MetadataRefreshButton({
                         <h4 className="font-medium truncate text-foreground">{result.title}</h4>
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded ${
-                            result.source === "googlebooks"
-                              ? "badge-primary"
-                              : "badge-success"
+                            result.source === "googlebooks" ? "badge-primary" : "badge-success"
                           }`}
                         >
                           {result.source === "googlebooks" ? "Google" : "OpenLib"}
@@ -144,10 +142,14 @@ export function MetadataRefreshButton({
                       )}
                       <div className="flex items-center gap-2 mt-1">
                         {result.publishedDate && (
-                          <span className="text-xs text-foreground-muted/70">{result.publishedDate}</span>
+                          <span className="text-xs text-foreground-muted/70">
+                            {result.publishedDate}
+                          </span>
                         )}
                         {result.pageCount && (
-                          <span className="text-xs text-foreground-muted/70">{result.pageCount} pages</span>
+                          <span className="text-xs text-foreground-muted/70">
+                            {result.pageCount} pages
+                          </span>
                         )}
                         {result.series && (
                           <span className="text-xs text-accent">{result.series}</span>

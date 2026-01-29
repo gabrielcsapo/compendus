@@ -145,7 +145,9 @@ export async function processBook(
       mimeType,
       title: meta?.title || metadata.title || titleFromFilename,
       subtitle: metadata.subtitle,
-      authors: meta?.authors ? JSON.stringify(meta.authors) : JSON.stringify(metadata.authors || []),
+      authors: meta?.authors
+        ? JSON.stringify(meta.authors)
+        : JSON.stringify(metadata.authors || []),
       publisher: meta?.publisher || metadata.publisher,
       publishedDate: meta?.publishedDate || metadata.publishedDate,
       description: meta?.description || metadata.description,

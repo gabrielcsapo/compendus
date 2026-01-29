@@ -59,7 +59,12 @@ export function ReaderSettings({
             aria-label="Close settings"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -75,8 +80,10 @@ export function ReaderSettings({
                   onClick={() => onUpdateSetting("theme", themeName)}
                   className="flex flex-col items-center gap-1 p-2 rounded-md border transition-colors"
                   style={{
-                    borderColor: settings.theme === themeName ? theme.accent : `${theme.foreground}20`,
-                    backgroundColor: settings.theme === themeName ? `${theme.accent}10` : "transparent",
+                    borderColor:
+                      settings.theme === themeName ? theme.accent : `${theme.foreground}20`,
+                    backgroundColor:
+                      settings.theme === themeName ? `${theme.accent}10` : "transparent",
                   }}
                 >
                   <div
@@ -102,8 +109,10 @@ export function ReaderSettings({
                   className="w-full text-left px-3 py-2 rounded-md border transition-colors"
                   style={{
                     fontFamily: FONTS[fontKey].value,
-                    borderColor: settings.fontFamily === fontKey ? theme.accent : `${theme.foreground}20`,
-                    backgroundColor: settings.fontFamily === fontKey ? `${theme.accent}10` : "transparent",
+                    borderColor:
+                      settings.fontFamily === fontKey ? theme.accent : `${theme.foreground}20`,
+                    backgroundColor:
+                      settings.fontFamily === fontKey ? `${theme.accent}10` : "transparent",
                   }}
                 >
                   <div className="font-medium">{FONTS[fontKey].name}</div>
@@ -173,8 +182,10 @@ export function ReaderSettings({
                 onClick={() => onUpdateSetting("textAlign", "left")}
                 className="flex-1 px-3 py-2 rounded-md border transition-colors"
                 style={{
-                  borderColor: settings.textAlign === "left" ? theme.accent : `${theme.foreground}20`,
-                  backgroundColor: settings.textAlign === "left" ? `${theme.accent}10` : "transparent",
+                  borderColor:
+                    settings.textAlign === "left" ? theme.accent : `${theme.foreground}20`,
+                  backgroundColor:
+                    settings.textAlign === "left" ? `${theme.accent}10` : "transparent",
                 }}
               >
                 Left
@@ -183,8 +194,10 @@ export function ReaderSettings({
                 onClick={() => onUpdateSetting("textAlign", "justify")}
                 className="flex-1 px-3 py-2 rounded-md border transition-colors"
                 style={{
-                  borderColor: settings.textAlign === "justify" ? theme.accent : `${theme.foreground}20`,
-                  backgroundColor: settings.textAlign === "justify" ? `${theme.accent}10` : "transparent",
+                  borderColor:
+                    settings.textAlign === "justify" ? theme.accent : `${theme.foreground}20`,
+                  backgroundColor:
+                    settings.textAlign === "justify" ? `${theme.accent}10` : "transparent",
                 }}
               >
                 Justify
@@ -201,8 +214,10 @@ export function ReaderSettings({
                   onClick={() => onUpdateSetting("comicFitMode", mode)}
                   className="w-full text-left px-3 py-2 rounded-md border transition-colors"
                   style={{
-                    borderColor: settings.comicFitMode === mode ? theme.accent : `${theme.foreground}20`,
-                    backgroundColor: settings.comicFitMode === mode ? `${theme.accent}10` : "transparent",
+                    borderColor:
+                      settings.comicFitMode === mode ? theme.accent : `${theme.foreground}20`,
+                    backgroundColor:
+                      settings.comicFitMode === mode ? `${theme.accent}10` : "transparent",
                   }}
                 >
                   <div className="font-medium">{COMIC_FIT_MODES[mode].name}</div>
@@ -249,8 +264,12 @@ export function ReaderSettings({
                   onClick={() => onUpdateSetting("audioPlaybackSpeed", speed)}
                   className="px-3 py-1 rounded-md border transition-colors"
                   style={{
-                    borderColor: settings.audioPlaybackSpeed === speed ? theme.accent : `${theme.foreground}20`,
-                    backgroundColor: settings.audioPlaybackSpeed === speed ? `${theme.accent}10` : "transparent",
+                    borderColor:
+                      settings.audioPlaybackSpeed === speed
+                        ? theme.accent
+                        : `${theme.foreground}20`,
+                    backgroundColor:
+                      settings.audioPlaybackSpeed === speed ? `${theme.accent}10` : "transparent",
                   }}
                 >
                   {speed}x
@@ -264,13 +283,7 @@ export function ReaderSettings({
   );
 }
 
-function SettingSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <h3 className="text-sm font-medium mb-2">{title}</h3>

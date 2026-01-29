@@ -147,7 +147,9 @@ export function MobiReader({ bookPath, position, onPositionChange }: MobiReaderP
                 setShowToc(false);
               }}
               className={`w-full text-left p-2 text-sm hover:bg-surface rounded ${
-                chapter.index === currentChapter ? "bg-primary-light text-primary" : "text-foreground"
+                chapter.index === currentChapter
+                  ? "bg-primary-light text-primary"
+                  : "text-foreground"
               }`}
             >
               {chapter.title}
@@ -202,7 +204,11 @@ export function MobiReader({ bookPath, position, onPositionChange }: MobiReaderP
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div ref={contentRef} onScroll={handleScroll} className="flex-1 overflow-y-auto bg-surface">
+          <div
+            ref={contentRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto bg-surface"
+          >
             <div
               className="max-w-2xl mx-auto p-8 prose prose-lg"
               dangerouslySetInnerHTML={{ __html: content }}

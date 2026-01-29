@@ -117,9 +117,7 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
         onToggleSidebar={() => toggleSidebar()}
         onToggleSettings={() => setSettingsOpen((prev) => !prev)}
         onAddBookmark={handleAddBookmark}
-        hasBookmark={reader.bookmarks.some(
-          (b) => Math.abs(b.position - reader.position) < 0.001,
-        )}
+        hasBookmark={reader.bookmarks.some((b) => Math.abs(b.position - reader.position) < 0.001)}
         theme={theme}
       />
 
@@ -165,10 +163,7 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
       </div>
 
       {/* Footer with progress */}
-      <div
-        className="h-1 bg-black/10"
-        style={{ backgroundColor: `${theme.foreground}10` }}
-      >
+      <div className="h-1 bg-black/10" style={{ backgroundColor: `${theme.foreground}10` }}>
         <div
           className="h-full transition-all duration-300"
           style={{

@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { apiSpec, staticEndpoints, supportedFormats, type EndpointSpec, type ParamSpec } from "../lib/api/spec";
+import {
+  apiSpec,
+  staticEndpoints,
+  supportedFormats,
+  type EndpointSpec,
+  type ParamSpec,
+} from "../lib/api/spec";
 
 type TabId = "overview" | "endpoints" | "static" | "types";
 
@@ -39,7 +45,9 @@ function MethodBadge({ method }: { method: string }) {
   };
 
   return (
-    <span className={`px-2 py-1 text-xs font-mono font-semibold rounded ${colors[method] || colors.GET}`}>
+    <span
+      className={`px-2 py-1 text-xs font-mono font-semibold rounded ${colors[method] || colors.GET}`}
+    >
       {method}
     </span>
   );
@@ -52,17 +60,22 @@ function ParamTable({ params, title }: { params: ParamSpec[]; title: string }) {
       <div className="space-y-2">
         {params.map((param) => (
           <div key={param.name} className="flex items-start gap-2 text-sm flex-wrap">
-            <code className="bg-surface-elevated px-1.5 py-0.5 rounded text-foreground">{param.name}</code>
+            <code className="bg-surface-elevated px-1.5 py-0.5 rounded text-foreground">
+              {param.name}
+            </code>
             <span className="text-foreground-muted">({param.type})</span>
             {param.required && <span className="text-danger text-xs font-medium">required</span>}
             {param.default !== undefined && (
-              <span className="text-foreground-muted/70 text-xs">default: {String(param.default)}</span>
+              <span className="text-foreground-muted/70 text-xs">
+                default: {String(param.default)}
+              </span>
             )}
             {param.constraints && (
               <span className="text-foreground-muted/70 text-xs">
                 {param.constraints.min !== undefined && `min: ${param.constraints.min}`}
                 {param.constraints.max !== undefined && ` max: ${param.constraints.max}`}
-                {param.constraints.minLength !== undefined && `minLength: ${param.constraints.minLength}`}
+                {param.constraints.minLength !== undefined &&
+                  `minLength: ${param.constraints.minLength}`}
               </span>
             )}
             <span className="text-foreground-muted w-full">— {param.description}</span>
@@ -111,9 +124,14 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
             <div>
               <h4 className="text-sm font-semibold text-foreground mb-2">Request Body</h4>
               <p className="text-sm text-foreground-muted mb-2">
-                Content-Type: <code className="bg-surface px-1 rounded border border-border">{endpoint.requestBody.contentType}</code>
+                Content-Type:{" "}
+                <code className="bg-surface px-1 rounded border border-border">
+                  {endpoint.requestBody.contentType}
+                </code>
               </p>
-              <p className="text-sm text-foreground-muted mb-2">{endpoint.requestBody.description}</p>
+              <p className="text-sm text-foreground-muted mb-2">
+                {endpoint.requestBody.description}
+              </p>
               {endpoint.requestBody.fields && (
                 <ParamTable params={endpoint.requestBody.fields} title="Fields" />
               )}
@@ -123,11 +141,18 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-2">Success Response</h4>
             <p className="text-sm text-foreground-muted mb-2">
-              Status: <code className="badge-success px-1 rounded">{endpoint.responses.success.status}</code>
-              {" — "}{endpoint.responses.success.description}
+              Status:{" "}
+              <code className="badge-success px-1 rounded">
+                {endpoint.responses.success.status}
+              </code>
+              {" — "}
+              {endpoint.responses.success.description}
             </p>
             <p className="text-sm text-foreground-muted mb-2">
-              Returns: <code className="bg-surface-elevated px-1 rounded">{endpoint.responses.success.schema}</code>
+              Returns:{" "}
+              <code className="bg-surface-elevated px-1 rounded">
+                {endpoint.responses.success.schema}
+              </code>
             </p>
             {endpoint.responses.success.example && (
               <CodeBlock>{JSON.stringify(endpoint.responses.success.example, null, 2)}</CodeBlock>
@@ -182,7 +207,9 @@ function TabButton({
     <button
       onClick={onClick}
       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-        active ? "bg-primary-light text-primary" : "text-foreground-muted hover:text-foreground hover:bg-surface-elevated"
+        active
+          ? "bg-primary-light text-primary"
+          : "text-foreground-muted hover:text-foreground hover:bg-surface-elevated"
       }`}
     >
       {children}
@@ -228,7 +255,8 @@ export function Component() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">Authentication</h2>
             <p className="text-foreground">
-              The API currently does not require authentication. It is designed for local/self-hosted deployments.
+              The API currently does not require authentication. It is designed for
+              local/self-hosted deployments.
             </p>
           </section>
 
@@ -244,7 +272,10 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
             <h2 className="text-xl font-semibold text-foreground mb-3">Supported File Formats</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {Object.entries(supportedFormats.books.mimeTypes).map(([format, mimeType]) => (
-                <div key={format} className="p-4 bg-surface-elevated rounded-lg border border-border">
+                <div
+                  key={format}
+                  className="p-4 bg-surface-elevated rounded-lg border border-border"
+                >
                   <h3 className="font-semibold text-foreground uppercase">{format}</h3>
                   <p className="text-xs text-foreground-muted font-mono">{mimeType}</p>
                 </div>
@@ -264,7 +295,8 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
       {activeTab === "endpoints" && (
         <div>
           <p className="text-foreground mb-6">
-            All API endpoints are prefixed with <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
+            All API endpoints are prefixed with{" "}
+            <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
           </p>
           {apiSpec.endpoints.map((endpoint, i) => (
             <EndpointCard key={i} endpoint={endpoint} />
@@ -276,14 +308,18 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
       {activeTab === "static" && (
         <div>
           <p className="text-foreground mb-6">
-            Static file endpoints serve book files, covers, and comic pages directly. These are not prefixed with <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
+            Static file endpoints serve book files, covers, and comic pages directly. These are not
+            prefixed with{" "}
+            <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
           </p>
           {staticEndpoints.map((endpoint, i) => (
             <div key={i} className="border border-border rounded-lg mb-4 overflow-hidden">
               <div className="px-4 py-3 flex items-center gap-3 bg-surface-elevated">
                 <MethodBadge method={endpoint.method} />
                 <code className="text-sm font-mono text-foreground flex-1">{endpoint.path}</code>
-                <span className="text-foreground-muted text-sm hidden sm:block">{endpoint.summary}</span>
+                <span className="text-foreground-muted text-sm hidden sm:block">
+                  {endpoint.summary}
+                </span>
               </div>
               <div className="px-4 py-3 border-t border-border">
                 <p className="text-sm text-foreground-muted mb-2">{endpoint.description}</p>
