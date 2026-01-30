@@ -1,4 +1,4 @@
-export type BookFormat = "pdf" | "epub" | "mobi" | "cbr" | "cbz" | "m4b" | "mp3" | "m4a";
+export type BookFormat = "pdf" | "epub" | "mobi" | "azw3" | "cbr" | "cbz" | "m4b" | "mp3" | "m4a";
 
 export interface BookMetadata {
   title: string | null;

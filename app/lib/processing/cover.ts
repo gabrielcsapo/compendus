@@ -118,6 +118,7 @@ export async function extractCover(
         coverBuffer = await extractEpubCover(buffer);
         break;
       case "mobi":
+      case "azw3":
         coverBuffer = await extractMobiCover(buffer);
         break;
       case "cbz":

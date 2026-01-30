@@ -40,8 +40,14 @@ export class PaginationEngine {
 
   /**
    * Calculate text pages based on estimated characters per page
+   * For image-based content (0 characters), use one page per chapter
    */
   private calculateTextPages(content: TextContent, viewport: ViewportConfig): number {
+    // For image-based content with no text, use one page per chapter
+    if (content.totalCharacters === 0 && content.chapters.length > 0) {
+      return content.chapters.length;
+    }
+
     const charsPerPage = this.estimateCharsPerPage(viewport);
     if (charsPerPage <= 0) return 1;
     return Math.max(1, Math.ceil(content.totalCharacters / charsPerPage));
@@ -170,9 +176,25 @@ export class PaginationEngine {
   private getTextPage(
     content: TextContent,
     pageNum: number,
-    _totalPages: number,
+    totalPages: number,
     viewport: ViewportConfig,
   ): PageContent {
+    // For image-based content (0 characters), each page is one chapter
+    if (content.totalCharacters === 0 && content.chapters.length > 0) {
+      const chapterIndex = Math.min(pageNum - 1, content.chapters.length - 1);
+      const chapter = content.chapters[chapterIndex];
+      const position = chapterIndex / Math.max(1, content.chapters.length);
+      const endPosition = (chapterIndex + 1) / Math.max(1, content.chapters.length);
+
+      return {
+        type: "text",
+        html: chapter?.html || "",
+        position,
+        endPosition,
+        chapterTitle: chapter?.title,
+      };
+    }
+
     const charsPerPage = this.estimateCharsPerPage(viewport);
     const startChar = (pageNum - 1) * charsPerPage;
     const endChar = startChar + charsPerPage;
@@ -262,6 +284,11 @@ export class PaginationEngine {
       }
 
       case "text": {
+        // For image-based content (0 characters), map position to chapter
+        if (content.totalCharacters === 0 && content.chapters.length > 0) {
+          return Math.max(1, Math.ceil(clampedPosition * content.chapters.length));
+        }
+
         // Map position to character, then to page
         const charPosition = Math.floor(clampedPosition * content.totalCharacters);
         const charsPerPage = this.estimateCharsPerPage(viewport);

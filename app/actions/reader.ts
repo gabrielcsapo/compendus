@@ -3,7 +3,7 @@
 import { db, books, bookmarks, highlights } from "../lib/db";
 import { eq, sql } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
-import { getContent, paginationEngine } from "../lib/reader";
+import { getContent, paginationEngine, invalidateContent } from "../lib/reader";
 import type {
   ViewportConfig,
   TocEntry,
@@ -13,6 +13,7 @@ import type {
   ReaderBookmark,
   ReaderHighlight,
 } from "../lib/reader/types";
+import type { BookFormat } from "../lib/types";
 
 // ============================================
 // BOOKMARKS
@@ -175,6 +176,13 @@ export async function getReaderInfo(
   const content = await getContent(bookId);
   if (!content) return null;
 
+  // Check for empty content (indicates parsing failure)
+  // For text content, check both totalCharacters and chapters length (image-based books have chapters but 0 chars)
+  if (content.type === "text" && content.totalCharacters === 0 && content.chapters.length === 0) {
+    console.error(`[Reader] Empty content for book ${bookId} (format: ${book.format})`);
+    return null;
+  }
+
   // Calculate total pages for viewport
   const totalPages = paginationEngine.calculateTotalPages(content, viewport);
 
@@ -187,7 +195,7 @@ export async function getReaderInfo(
   const response: ReaderInfoResponse = {
     id: book.id,
     title: book.title,
-    format: book.format,
+    format: book.format as BookFormat,
     totalPages,
     toc,
     coverPath: book.coverPath || undefined,
@@ -259,4 +267,11 @@ export async function searchInBook(
   if (!content) return [];
 
   return paginationEngine.searchContent(content, query, viewport);
+}
+
+/**
+ * Invalidate cached content for a book (forces re-parse on next load)
+ */
+export async function invalidateBookContent(bookId: string): Promise<void> {
+  invalidateContent(bookId);
 }
