@@ -14,6 +14,7 @@ const FORMAT_EXTENSIONS: Record<BookFormat, string> = {
   pdf: ".pdf",
   epub: ".epub",
   mobi: ".mobi",
+  azw3: ".azw3",
   cbr: ".cbr",
   cbz: ".cbz",
   m4b: ".m4b",

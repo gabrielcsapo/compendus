@@ -12,9 +12,24 @@ export const books = sqliteTable(
     fileName: text("file_name").notNull(),
     fileSize: integer("file_size").notNull(),
     fileHash: text("file_hash").notNull(),
-    format: text("format", {
-      enum: ["pdf", "epub", "mobi", "cbr", "cbz", "m4b", "mp3", "m4a"],
-    }).notNull(),
+    // Format is derived from fileName extension (virtual generated column)
+    format: text("format")
+      .notNull()
+      .generatedAlwaysAs(
+        sql`CASE
+          WHEN file_name LIKE '%.pdf' THEN 'pdf'
+          WHEN file_name LIKE '%.epub' THEN 'epub'
+          WHEN file_name LIKE '%.mobi' THEN 'mobi'
+          WHEN file_name LIKE '%.azw3' THEN 'azw3'
+          WHEN file_name LIKE '%.azw' THEN 'mobi'
+          WHEN file_name LIKE '%.cbr' THEN 'cbr'
+          WHEN file_name LIKE '%.cbz' THEN 'cbz'
+          WHEN file_name LIKE '%.m4b' THEN 'm4b'
+          WHEN file_name LIKE '%.mp3' THEN 'mp3'
+          WHEN file_name LIKE '%.m4a' THEN 'm4a'
+          ELSE 'unknown'
+        END`,
+      ),
     mimeType: text("mime_type").notNull(),
 
     // Metadata

@@ -119,7 +119,7 @@ export function ReaderContainer({ book }: ReaderContainerProps) {
             onPositionChange={handlePositionChange}
           />
         )}
-        {book.format === "mobi" && (
+        {(book.format === "mobi" || book.format === "azw3") && (
           <MobiReader
             bookPath={bookUrl}
             position={book.lastPosition || undefined}

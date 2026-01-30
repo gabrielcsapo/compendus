@@ -3,7 +3,6 @@ import { existsSync } from "fs";
 import { eq } from "drizzle-orm";
 
 import { db, books } from "../db";
-import { getBookFilePath } from "../storage";
 import type { NormalizedContent } from "./types";
 import type { BookFormat } from "../types";
 
@@ -34,16 +33,19 @@ export async function getContent(bookId: string): Promise<NormalizedContent | nu
     return null;
   }
 
-  // Read book file
-  const filePath = getBookFilePath(bookId, book.format);
+  // Read book file using the stored filePath directly
+  // (filePath is the actual path on disk, format is derived from original fileName which may differ)
+  const format = book.format as BookFormat;
+  const filePath = book.filePath;
   if (!existsSync(filePath)) {
+    console.error(`[Content Store] Book file not found: ${filePath}`);
     return null;
   }
 
   const buffer = await readFile(filePath);
 
   // Parse based on format
-  const content = await parseByFormat(buffer, book.format, bookId);
+  const content = await parseByFormat(buffer, format, bookId);
 
   // Cache the result
   cacheContent(bookId, content);
@@ -68,9 +70,10 @@ async function parseByFormat(
       const { parsePdf } = await import("./parsers/pdf");
       return parsePdf(buffer, bookId);
     }
-    case "mobi": {
+    case "mobi":
+    case "azw3": {
       const { parseMobi } = await import("./parsers/mobi");
-      return parseMobi(buffer, bookId);
+      return parseMobi(buffer, bookId, format);
     }
     case "cbr":
     case "cbz": {

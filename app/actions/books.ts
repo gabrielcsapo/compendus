@@ -7,6 +7,7 @@ import { removeBookIndex, indexBookMetadata } from "../lib/search/indexer";
 import { findBestMetadata, searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { processAndStoreCover } from "../lib/processing/cover";
 import type { Book } from "../lib/db/schema";
+import type { BookFormat } from "../lib/types";
 import { v4 as uuid } from "uuid";
 
 /**
@@ -668,11 +669,12 @@ export async function extractCoverFromBook(
     const { storeCoverImage } = await import("../lib/storage");
 
     // Read the book file
-    const filePath = getBookFilePath(bookId, book.format);
+    const format = book.format as BookFormat;
+    const filePath = getBookFilePath(bookId, format);
     const buffer = await readFile(filePath);
 
     // Extract cover from the file
-    const coverResult = await extractCover(buffer, book.format);
+    const coverResult = await extractCover(buffer, format);
 
     if (!coverResult) {
       return { success: false, message: "No cover found in book file" };

@@ -323,7 +323,7 @@ export default function UnmatchedBooks() {
               </div>
 
               {/* Search and results */}
-              <div>
+              <div className="min-w-0 overflow-hidden">
                 {/* Search bar */}
                 <div className="flex gap-2 mb-2">
                   <input

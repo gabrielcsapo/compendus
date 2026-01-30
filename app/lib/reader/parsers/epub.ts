@@ -1,6 +1,6 @@
 import { initEpubFile } from "@lingo-reader/epub-parser";
 import { resolve } from "path";
-import { mkdirSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import type { TextContent, NormalizedChapter, TocEntry } from "../types";
 
 /**
@@ -107,6 +107,7 @@ function sanitizeHtml(html: string, bookId: string): string {
 export async function parseEpub(buffer: Buffer, bookId: string): Promise<TextContent> {
   // Validate ZIP structure
   if (!isValidZipBuffer(buffer)) {
+    console.error(`[EPUB Parser] Book ${bookId}: Invalid ZIP structure`);
     return createEmptyContent(bookId);
   }
 
@@ -117,7 +118,14 @@ export async function parseEpub(buffer: Buffer, bookId: string): Promise<TextCon
   let epub;
   try {
     epub = await initEpubFile(buffer, resourceDir);
-  } catch {
+  } catch (error) {
+    console.error(`[EPUB Parser] Book ${bookId}: Failed to init EPUB file:`, error);
+    // Try fallback parser for EPUBs with malformed navigation
+    console.log(`[EPUB Parser] Book ${bookId}: Trying fallback parser...`);
+    const fallbackResult = await parseEpubFallback(buffer, bookId, resourceDir);
+    if (fallbackResult) {
+      return fallbackResult;
+    }
     return createEmptyContent(bookId);
   }
 
@@ -126,7 +134,8 @@ export async function parseEpub(buffer: Buffer, bookId: string): Promise<TextCon
   try {
     spine = epub.getSpine();
     toc = epub.getToc();
-  } catch {
+  } catch (error) {
+    console.error(`[EPUB Parser] Book ${bookId}: Failed to get spine/toc:`, error);
     return createEmptyContent(bookId);
   }
 
@@ -203,6 +212,133 @@ function buildToc(
 
     return entry;
   });
+}
+
+/**
+ * Fallback EPUB parser using JSZip for EPUBs with malformed navigation
+ * This handles cases where the @lingo-reader/epub-parser fails due to invalid NCX
+ */
+async function parseEpubFallback(buffer: Buffer, bookId: string, resourceDir: string): Promise<TextContent | null> {
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
+
+    // Find container.xml to get the root file path
+    const containerXml = await zip.file("META-INF/container.xml")?.async("string");
+    if (!containerXml) {
+      console.error(`[EPUB Fallback] Book ${bookId}: No container.xml found`);
+      return null;
+    }
+
+    // Extract root file path from container.xml
+    const rootFileMatch = containerXml.match(/full-path="([^"]+)"/);
+    if (!rootFileMatch) {
+      console.error(`[EPUB Fallback] Book ${bookId}: Could not find root file path`);
+      return null;
+    }
+    const rootFilePath = rootFileMatch[1];
+    const rootDir = rootFilePath.substring(0, rootFilePath.lastIndexOf("/") + 1);
+
+    // Read the OPF file
+    const opfContent = await zip.file(rootFilePath)?.async("string");
+    if (!opfContent) {
+      console.error(`[EPUB Fallback] Book ${bookId}: Could not read OPF file at ${rootFilePath}`);
+      return null;
+    }
+
+    // Parse manifest items - extract each <item> tag and then parse its attributes
+    const manifestItems = new Map<string, { href: string; mediaType: string }>();
+    const itemTagMatches = opfContent.matchAll(/<item\s+([^>]+)\/?>/gi);
+    for (const tagMatch of itemTagMatches) {
+      const attrs = tagMatch[1];
+      // Extract id, href, and media-type attributes in any order
+      const idMatch = attrs.match(/id\s*=\s*["']([^"']+)["']/i);
+      const hrefMatch = attrs.match(/href\s*=\s*["']([^"']+)["']/i);
+      const mediaTypeMatch = attrs.match(/media-type\s*=\s*["']([^"']+)["']/i);
+
+      if (idMatch && hrefMatch) {
+        manifestItems.set(idMatch[1], {
+          href: hrefMatch[1],
+          mediaType: mediaTypeMatch ? mediaTypeMatch[1] : "application/xhtml+xml",
+        });
+      }
+    }
+
+    // Parse spine
+    const spineMatches = opfContent.matchAll(/<itemref\s+[^>]*idref="([^"]+)"[^>]*\/?>/gi);
+    const spineItems: string[] = [];
+    for (const match of spineMatches) {
+      spineItems.push(match[1]);
+    }
+
+    if (spineItems.length === 0) {
+      console.error(`[EPUB Fallback] Book ${bookId}: No spine items found`);
+      return null;
+    }
+
+    const chapters: NormalizedChapter[] = [];
+    let totalCharacters = 0;
+
+    // Extract images to resource directory
+    for (const [, item] of manifestItems) {
+      if (item.mediaType.startsWith("image/")) {
+        const imagePath = rootDir + item.href;
+        const imageFile = zip.file(imagePath) || zip.file(item.href);
+        if (imageFile) {
+          try {
+            const imageData = await imageFile.async("nodebuffer");
+            const filename = item.href.split("/").pop() || item.href;
+            writeFileSync(resolve(resourceDir, filename), imageData);
+          } catch {
+            // Skip failed image extractions
+          }
+        }
+      }
+    }
+
+    // Process spine items
+    for (let i = 0; i < spineItems.length; i++) {
+      const itemId = spineItems[i];
+      const item = manifestItems.get(itemId);
+      if (!item || !item.mediaType.includes("html")) continue;
+
+      const filePath = rootDir + item.href;
+      const fileContent = await zip.file(filePath)?.async("string") ||
+                          await zip.file(item.href)?.async("string");
+
+      if (!fileContent) continue;
+
+      const html = sanitizeHtml(fileContent, bookId);
+      const text = stripHtml(fileContent);
+
+      chapters.push({
+        id: itemId,
+        title: `Chapter ${i + 1}`,
+        html,
+        text,
+        characterStart: totalCharacters,
+        characterEnd: totalCharacters + text.length,
+      });
+
+      totalCharacters += text.length;
+    }
+
+    if (chapters.length === 0) {
+      return null;
+    }
+
+    return {
+      bookId,
+      format: "epub",
+      type: "text",
+      chapters,
+      totalCharacters,
+      toc: [], // No TOC available in fallback mode
+    };
+  } catch (error) {
+    console.error(`[EPUB Fallback] Book ${bookId}: Fallback parser failed:`, error);
+    return null;
+  }
 }
 
 /**
