@@ -32,7 +32,7 @@ export function UnmatchedBookCard({ book, position, total }: UnmatchedBookCardPr
     setMessage(null);
 
     try {
-      const results = await searchMetadata(searchQuery, authors[0]);
+      const results = await searchMetadata(searchQuery, authors[0], book.format);
       setSearchResults(results);
       if (results.length === 0) {
         setMessage("No results found. Try different search terms.");

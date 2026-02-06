@@ -53,6 +53,38 @@ sqlite.exec(`
   );
 `);
 
+// Sync books_fts with books table (add any missing entries)
+console.log("Syncing FTS index with books table...");
+const missingBooks = sqlite
+  .prepare(
+    `SELECT b.id, b.title, b.subtitle, b.authors, b.description
+     FROM books b
+     LEFT JOIN books_fts f ON b.id = f.book_id
+     WHERE f.book_id IS NULL`,
+  )
+  .all() as Array<{
+  id: string;
+  title: string;
+  subtitle: string | null;
+  authors: string | null;
+  description: string | null;
+}>;
+
+if (missingBooks.length > 0) {
+  console.log(`  Found ${missingBooks.length} books not in FTS index, adding...`);
+  const insertFts = sqlite.prepare(
+    `INSERT INTO books_fts (book_id, title, subtitle, authors, description)
+     VALUES (?, ?, ?, ?, ?)`,
+  );
+
+  for (const book of missingBooks) {
+    insertFts.run(book.id, book.title, book.subtitle || "", book.authors || "", book.description || "");
+  }
+  console.log(`  Added ${missingBooks.length} books to FTS index`);
+} else {
+  console.log("  FTS index is in sync with books table");
+}
+
 // Add new columns (safe to run multiple times)
 console.log("Adding new columns...");
 const columnsToAdd = [

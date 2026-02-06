@@ -3,6 +3,7 @@ import { getBook, getLinkedFormats } from "../actions/books";
 import { getTagsForBook } from "../actions/tags";
 import { getCollectionsForBook } from "../actions/collections";
 import { MetadataRefreshButton } from "../components/MetadataRefreshButton";
+import type { BookFormat } from "../lib/types";
 import { CoverUploadButton } from "../components/CoverUploadButton";
 import { CoverExtractButton } from "../components/CoverExtractButton";
 import { CoverDropZone } from "../components/CoverDropZone";
@@ -257,7 +258,7 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
             </dl>
 
             {/* Metadata refresh */}
-            <MetadataRefreshButton bookId={book.id} bookTitle={book.title} bookAuthors={authors} />
+            <MetadataRefreshButton bookId={book.id} bookTitle={book.title} bookAuthors={authors} bookFormat={book.format as BookFormat} />
           </div>
         </div>
       </div>

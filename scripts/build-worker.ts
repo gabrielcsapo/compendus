@@ -39,6 +39,8 @@ async function buildWorker() {
       "better-sqlite3",
       "canvas",
       "sharp",
+      // CBR/RAR parsing - has dynamic requires that don't work when bundled
+      "node-unrar-js",
     ],
     // Ensure we can resolve all internal modules
     resolveExtensions: [".ts", ".js", ".mjs"],

@@ -12,6 +12,7 @@ import {
 } from "../actions/books";
 import { getReaderInfo, getReaderPage } from "../actions/reader";
 import type { PageContent } from "../lib/reader/types";
+import type { BookFormat } from "../lib/types";
 import { THEMES } from "../lib/reader/settings";
 import { ClickableCoverPlaceholder } from "../components/CoverExtractButton";
 import type { Book } from "../lib/db/schema";
@@ -115,7 +116,7 @@ export default function UnmatchedBooks() {
 
     try {
       const authors = currentBook.authors ? JSON.parse(currentBook.authors) : [];
-      const results = await searchMetadata(searchQuery, authors[0]);
+      const results = await searchMetadata(searchQuery, authors[0], currentBook.format as BookFormat);
       setSearchResults(results);
       if (results.length === 0) {
         setMessage("No results found. Try different search terms.");

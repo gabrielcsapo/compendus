@@ -2,6 +2,8 @@ import { Link } from "react-router";
 import { getBooks, getBooksCount, getRecentBooks, getUnmatchedBooksCount } from "../actions/books";
 import { BookGrid } from "../components/BookGrid";
 import { SortDropdown, type SortOption } from "../components/SortDropdown";
+import { TypeTabs, type TypeFilter } from "../components/TypeTabs";
+import type { BookType } from "../lib/book-types";
 
 const BOOKS_PER_PAGE = 24;
 
@@ -26,12 +28,16 @@ export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
   const sort = (url.searchParams.get("sort") as SortOption) || "recent";
+  const typeParam = url.searchParams.get("type") as BookType | null;
+  const type: TypeFilter = typeParam && ["audiobook", "ebook", "comic"].includes(typeParam) ? typeParam : "all";
   const offset = (page - 1) * BOOKS_PER_PAGE;
   const { orderBy, order } = getSortParams(sort);
 
+  const typeFilter = type !== "all" ? type : undefined;
+
   const [books, totalCount, recentBooks, unmatchedCount] = await Promise.all([
-    getBooks({ limit: BOOKS_PER_PAGE, offset, orderBy, order }),
-    getBooksCount(),
+    getBooks({ limit: BOOKS_PER_PAGE, offset, orderBy, order, type: typeFilter }),
+    getBooksCount(typeFilter),
     getRecentBooks(5),
     getUnmatchedBooksCount(),
   ]);
@@ -46,6 +52,7 @@ export async function loader({ request }: { request: Request }) {
     currentPage: page,
     totalPages,
     currentSort: sort,
+    currentType: type,
   };
 }
 
@@ -55,15 +62,18 @@ function Pagination({
   currentPage,
   totalPages,
   currentSort,
+  currentType,
 }: {
   currentPage: number;
   totalPages: number;
   currentSort: SortOption;
+  currentType: TypeFilter;
 }) {
   if (totalPages <= 1) return null;
 
   const pages: (number | "...")[] = [];
   const sortParam = currentSort !== "recent" ? `&sort=${currentSort}` : "";
+  const typeParam = currentType !== "all" ? `&type=${currentType}` : "";
 
   // Always show first page
   pages.push(1);
@@ -95,7 +105,7 @@ function Pagination({
       {/* Previous button */}
       {currentPage > 1 ? (
         <Link
-          to={`/?page=${currentPage - 1}${sortParam}`}
+          to={`/?page=${currentPage - 1}${sortParam}${typeParam}`}
           className="px-3 py-2 rounded-lg border border-border hover:bg-surface-elevated text-foreground transition-colors"
         >
           &larr; Prev
@@ -116,7 +126,7 @@ function Pagination({
           ) : (
             <Link
               key={page}
-              to={`/?page=${page}${sortParam}`}
+              to={`/?page=${page}${sortParam}${typeParam}`}
               className={`px-3 py-2 rounded-lg border transition-colors ${
                 page === currentPage
                   ? "bg-primary text-white border-primary"
@@ -132,7 +142,7 @@ function Pagination({
       {/* Next button */}
       {currentPage < totalPages ? (
         <Link
-          to={`/?page=${currentPage + 1}${sortParam}`}
+          to={`/?page=${currentPage + 1}${sortParam}${typeParam}`}
           className="px-3 py-2 rounded-lg border border-border hover:bg-surface-elevated text-foreground transition-colors"
         >
           Next &rarr;
@@ -147,7 +157,7 @@ function Pagination({
 }
 
 export default function Home({ loaderData }: { loaderData: LoaderData }) {
-  const { books, totalCount, recentBooks, unmatchedCount, currentPage, totalPages, currentSort } =
+  const { books, totalCount, recentBooks, unmatchedCount, currentPage, totalPages, currentSort, currentType } =
     loaderData;
 
   return (
@@ -160,7 +170,8 @@ export default function Home({ loaderData }: { loaderData: LoaderData }) {
             {totalCount} {totalCount === 1 ? "book" : "books"}
           </p>
         </div>
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4 items-center flex-wrap">
+          <TypeTabs currentType={currentType} currentSort={currentSort} />
           {unmatchedCount > 0 && (
             <Link
               to="/unmatched"
@@ -205,7 +216,7 @@ export default function Home({ loaderData }: { loaderData: LoaderData }) {
           books={books}
           emptyMessage="Your library is empty. Drop some books above to get started!"
         />
-        <Pagination currentPage={currentPage} totalPages={totalPages} currentSort={currentSort} />
+        <Pagination currentPage={currentPage} totalPages={totalPages} currentSort={currentSort} currentType={currentType} />
       </section>
     </main>
   );

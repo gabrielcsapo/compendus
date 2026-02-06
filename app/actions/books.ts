@@ -10,6 +10,7 @@ import { writeMetadataToFile } from "../lib/processing/metadata-writer";
 import type { Book } from "../lib/db/schema";
 import type { BookFormat } from "../lib/types";
 import { v4 as uuid } from "uuid";
+import { getFormatsByType, type BookType } from "../lib/book-types";
 
 /**
  * Generate a clean filename from title and authors
@@ -38,6 +39,7 @@ export interface GetBooksOptions {
   orderBy?: "title" | "createdAt" | "lastReadAt";
   order?: "asc" | "desc";
   format?: "pdf" | "epub" | "mobi";
+  type?: BookType;
   collectionId?: string;
   tagId?: string;
   search?: string;
@@ -50,6 +52,7 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
     orderBy = "createdAt",
     order = "desc",
     format,
+    type,
     collectionId,
     tagId,
     search,
@@ -62,6 +65,11 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
 
   if (format) {
     conditions.push(eq(books.format, format));
+  }
+
+  if (type) {
+    const formats = getFormatsByType(type);
+    conditions.push(inArray(books.format, formats));
   }
 
   if (search) {
@@ -215,6 +223,53 @@ export async function deleteBook(id: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Delete an orphaned file from disk (file that has no database entry)
+ * Used by admin data page to clean up files without matching records
+ */
+export async function deleteOrphanedFile(filePath: string): Promise<{ success: boolean; message: string }> {
+  // Security: ensure the file is in the expected books directory
+  const { BOOKS_DIR } = await import("../lib/storage");
+  const { resolve } = await import("path");
+
+  const normalizedPath = resolve(filePath);
+  const normalizedBooksDir = resolve(BOOKS_DIR);
+
+  if (!normalizedPath.startsWith(normalizedBooksDir)) {
+    return { success: false, message: "Invalid file path - must be in books directory" };
+  }
+
+  const deleted = deleteBookFile(filePath);
+  if (deleted) {
+    return { success: true, message: "File deleted successfully" };
+  }
+  return { success: false, message: "Failed to delete file - file may not exist" };
+}
+
+/**
+ * Delete a database record that has no corresponding file on disk
+ * Used by admin data page to clean up orphaned database entries
+ */
+export async function deleteMissingFileRecord(bookId: string): Promise<{ success: boolean; message: string }> {
+  const book = await getBook(bookId);
+  if (!book) {
+    return { success: false, message: "Book not found in database" };
+  }
+
+  // Delete from search index
+  await removeBookIndex(bookId);
+
+  // Delete from database (cascades to junctions)
+  await db.delete(books).where(eq(books.id, bookId));
+
+  // Also try to delete cover if it exists
+  if (book.coverPath) {
+    deleteCoverImage(book.coverPath);
+  }
+
+  return { success: true, message: "Database record deleted successfully" };
+}
+
 export async function getRecentBooks(limit: number = 10): Promise<Book[]> {
   return db
     .select()
@@ -224,7 +279,16 @@ export async function getRecentBooks(limit: number = 10): Promise<Book[]> {
     .limit(limit);
 }
 
-export async function getBooksCount(): Promise<number> {
+export async function getBooksCount(type?: BookType): Promise<number> {
+  if (type) {
+    const formats = getFormatsByType(type);
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(books)
+      .where(inArray(books.format, formats))
+      .get();
+    return result?.count || 0;
+  }
   const result = await db
     .select({ count: sql<number>`count(*)` })
     .from(books)
@@ -331,13 +395,15 @@ export async function getLinkedFormats(bookId: string): Promise<Book[]> {
 }
 
 /**
- * Search for metadata matches from external sources (Google Books + Open Library)
+ * Search for metadata matches from external sources
+ * For comics (CBR/CBZ), includes Metron Comic Database results
  */
 export async function searchMetadata(
   title: string,
   author?: string,
+  format?: BookFormat,
 ): Promise<MetadataSearchResult[]> {
-  return searchAllSources(title, author);
+  return searchAllSources(title, author, format);
 }
 
 /**

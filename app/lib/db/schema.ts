@@ -243,7 +243,7 @@ export const wantedBooks = sqliteTable(
     coverUrl: text("cover_url"),
 
     // External source tracking
-    source: text("source", { enum: ["openlibrary", "googlebooks", "manual"] }).notNull(),
+    source: text("source", { enum: ["openlibrary", "googlebooks", "metron", "manual"] }).notNull(),
     sourceId: text("source_id"),
 
     // Status tracking
