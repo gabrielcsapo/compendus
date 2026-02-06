@@ -19,7 +19,11 @@ interface ParseRequest {
 }
 
 async function parseBook(request: ParseRequest): Promise<NormalizedContent> {
-  const { buffer, format, bookId } = request;
+  const { format, bookId } = request;
+  // Ensure buffer is a proper Buffer - workerData serialization converts to Uint8Array
+  const buffer = Buffer.isBuffer(request.buffer)
+    ? request.buffer
+    : Buffer.from(request.buffer);
   const startTime = performance.now();
   const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(1);
 
