@@ -6,9 +6,26 @@ import type { PdfContent, TocEntry } from "../types";
  *
  * Uses pdfjs-dist to get accurate page count and outline
  */
-export async function parsePdf(buffer: Buffer, bookId: string): Promise<PdfContent> {
+export async function parsePdf(buffer: Buffer | Uint8Array, bookId: string): Promise<PdfContent> {
   try {
-    const data = new Uint8Array(buffer);
+    // pdfjs-dist explicitly requires a pure Uint8Array, NOT a Buffer
+    // Buffer is a subclass of Uint8Array in Node.js, but pdfjs rejects it
+    // We must create a fresh Uint8Array from the buffer's underlying ArrayBuffer
+    let data: Uint8Array;
+    if (Buffer.isBuffer(buffer)) {
+      // Create a pure Uint8Array from the Buffer's underlying ArrayBuffer
+      data = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    } else if (buffer instanceof Uint8Array) {
+      // Already a pure Uint8Array
+      data = buffer;
+    } else {
+      // Handle case where buffer is a serialized object (e.g., from worker threads)
+      const b = Buffer.from(buffer as unknown as ArrayLike<number>);
+      data = new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    }
+
+    console.log(`[PDF Parser] Loading PDF for ${bookId}, buffer size: ${data.length} bytes`);
+
     const loadingTask = pdfjsLib.getDocument({
       data,
       useSystemFonts: true,
@@ -17,6 +34,8 @@ export async function parsePdf(buffer: Buffer, bookId: string): Promise<PdfConte
 
     const pdfDoc = await loadingTask.promise;
     const pageCount = pdfDoc.numPages;
+
+    console.log(`[PDF Parser] PDF loaded for ${bookId}, numPages: ${pageCount}`);
 
     // Try to extract TOC from PDF outline
     const toc = await extractPdfToc(pdfDoc);
@@ -32,15 +51,9 @@ export async function parsePdf(buffer: Buffer, bookId: string): Promise<PdfConte
       toc,
     };
   } catch (error) {
-    console.error("PDF parse error:", error);
-    // If parsing fails, return minimal content
-    return {
-      bookId,
-      format: "pdf",
-      type: "pdf",
-      pageCount: 1,
-      toc: [],
-    };
+    console.error(`[PDF Parser] Error parsing PDF for ${bookId}:`, error);
+    // Re-throw the error so it can be handled properly upstream
+    throw error;
   }
 }
 
