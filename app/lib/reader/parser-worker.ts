@@ -48,6 +48,14 @@ async function parseBook(request: ParseRequest): Promise<NormalizedContent> {
       result = await parseComic(buffer, bookId, format);
       break;
     }
+    case "m4b":
+    case "m4a":
+    case "mp3": {
+      // Audio formats should not be parsed in worker - they need DB access for metadata
+      throw new Error(
+        `Audio format ${format} should be parsed on main thread (requires DB metadata)`,
+      );
+    }
     default:
       throw new Error(`Unsupported format: ${format}`);
   }

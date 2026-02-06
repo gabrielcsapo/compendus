@@ -3,17 +3,20 @@
 import { useState } from "react";
 import { refreshMetadata, searchMetadata, applyMetadata } from "../actions/books";
 import type { MetadataSearchResult } from "../lib/metadata";
+import type { BookFormat } from "../lib/types";
 
 interface MetadataRefreshButtonProps {
   bookId: string;
   bookTitle: string;
   bookAuthors: string[];
+  bookFormat?: BookFormat;
 }
 
 export function MetadataRefreshButton({
   bookId,
   bookTitle,
   bookAuthors,
+  bookFormat,
 }: MetadataRefreshButtonProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function MetadataRefreshButton({
     setMessage(null);
 
     try {
-      const results = await searchMetadata(searchQuery, bookAuthors[0]);
+      const results = await searchMetadata(searchQuery, bookAuthors[0], bookFormat);
       setSearchResults(results);
       if (results.length === 0) {
         setMessage("No results found. Try different search terms.");
@@ -128,10 +131,18 @@ export function MetadataRefreshButton({
                         <h4 className="font-medium truncate text-foreground">{result.title}</h4>
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded ${
-                            result.source === "googlebooks" ? "badge-primary" : "badge-success"
+                            result.source === "googlebooks"
+                              ? "badge-primary"
+                              : result.source === "metron"
+                                ? "badge-warning"
+                                : "badge-success"
                           }`}
                         >
-                          {result.source === "googlebooks" ? "Google" : "OpenLib"}
+                          {result.source === "googlebooks"
+                            ? "Google"
+                            : result.source === "metron"
+                              ? "Metron"
+                              : "OpenLib"}
                         </span>
                       </div>
                       {result.subtitle && (

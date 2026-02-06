@@ -1,7 +1,7 @@
 import { fetchServer } from "./entry.rsc";
-import { readFile } from "fs/promises";
+import { readFile, open } from "fs/promises";
 import { resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, statSync, createReadStream } from "fs";
 import { eq } from "drizzle-orm";
 import { apiSearchBooks, apiLookupByIsbn, apiGetBook, apiListBooks } from "../app/lib/api/search";
 import { getComicPage, getComicPageCount } from "../app/lib/processing/comic";
@@ -68,8 +68,9 @@ async function handleApiRequest(
   if (pathname === "/api/books") {
     const limit = parseInt(searchParams.get("limit") || "20", 10);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
+    const type = searchParams.get("type") as "ebook" | "audiobook" | "comic" | null;
 
-    const result = await apiListBooks({ limit, offset }, baseUrl);
+    const result = await apiListBooks({ limit, offset, type: type || undefined }, baseUrl);
     return jsonResponse(result, result.success ? 200 : 400);
   }
 
@@ -239,6 +240,161 @@ async function handleApiRequest(
       return jsonResponse(result, result.success ? 200 : 400);
     } catch (error) {
       console.error("Upload error:", error);
+      return jsonResponse({ success: false, error: "upload_failed" }, 500);
+    }
+  }
+
+  // GET /api/jobs/:id/progress - SSE endpoint for job progress
+  const jobProgressMatch = pathname.match(/^\/api\/jobs\/([a-zA-Z0-9_-]+)\/progress$/);
+  if (jobProgressMatch && request.method === "GET") {
+    const jobId = jobProgressMatch[1];
+    const { getJob, subscribeToJob } = await import("../app/lib/jobs");
+
+    // Check if job exists
+    const job = getJob(jobId);
+    if (!job) {
+      return jsonResponse({ success: false, error: "job_not_found" }, 404);
+    }
+
+    // Create SSE response
+    const encoder = new TextEncoder();
+    let isClosed = false;
+    let unsubscribe: (() => void) | null = null;
+
+    const stream = new ReadableStream({
+      start(controller) {
+        // Send event only if stream is still open
+        const sendEvent = (data: unknown) => {
+          if (isClosed) return;
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            // Controller may be closed, ignore error
+            isClosed = true;
+            unsubscribe?.();
+          }
+        };
+
+        // Send current job state immediately
+        sendEvent(job);
+
+        // If job is already complete, close the stream
+        if (job.status === "completed" || job.status === "error") {
+          isClosed = true;
+          controller.close();
+          return;
+        }
+
+        // Subscribe to updates
+        unsubscribe = subscribeToJob(jobId, (updatedJob) => {
+          if (isClosed) return;
+          sendEvent(updatedJob);
+
+          // Close stream when job completes
+          if (updatedJob.status === "completed" || updatedJob.status === "error") {
+            isClosed = true;
+            unsubscribe?.();
+            try {
+              controller.close();
+            } catch {
+              // Already closed
+            }
+          }
+        });
+      },
+      cancel() {
+        // Called when client disconnects
+        isClosed = true;
+        unsubscribe?.();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        ...corsHeaders,
+      },
+    });
+  }
+
+  // POST /api/upload-multifile - upload multiple audio files as a single audiobook
+  if (pathname === "/api/upload-multifile" && request.method === "POST") {
+    try {
+      const { processMultiFileAudiobookWithProgress } = await import("../app/lib/processing");
+      const { isFFmpegAvailable } = await import("../app/lib/processing/audio");
+
+      // Check if ffmpeg is available first
+      if (!(await isFFmpegAvailable())) {
+        return jsonResponse(
+          { success: false, error: "ffmpeg_not_installed" },
+          400,
+        );
+      }
+
+      const formData = await request.formData();
+      const folderName = formData.get("folderName") as string;
+
+      if (!folderName) {
+        return jsonResponse({ success: false, error: "no_folder_name" }, 400);
+      }
+
+      // Extract files from form data
+      const files: Array<{ buffer: Buffer; fileName: string }> = [];
+      const validExtensions = [".mp3", ".m4a", ".m4b"];
+
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith("file_") && value instanceof File) {
+          const hasValidExtension = validExtensions.some((ext) =>
+            value.name.toLowerCase().endsWith(ext),
+          );
+          if (hasValidExtension) {
+            const arrayBuffer = await value.arrayBuffer();
+            files.push({
+              buffer: Buffer.from(arrayBuffer),
+              fileName: value.name,
+            });
+          }
+        }
+      }
+
+      if (files.length < 2) {
+        return jsonResponse(
+          { success: false, error: "need_multiple_files" },
+          400,
+        );
+      }
+
+      // Create job ID immediately so we can return it to the client
+      const { createJob } = await import("../app/lib/jobs");
+      const jobId = `merge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      createJob(jobId);
+
+      // Start processing in the background (don't await)
+      // This allows the client to subscribe to SSE for progress updates
+      processMultiFileAudiobookWithProgress(files, folderName, {}, jobId)
+        .then(async (result) => {
+          if (result.success && result.bookId) {
+            // Index metadata after successful import
+            const book = await db.select().from(books).where(eq(books.id, result.bookId)).get();
+            if (book) {
+              await indexBookMetadata(book.id, book.title, book.subtitle, book.authors || "[]", book.description);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Background merge error:", error);
+        });
+
+      // Return immediately with jobId so client can subscribe to SSE
+      return jsonResponse({
+        success: true,
+        jobId,
+        pending: true,
+      });
+    } catch (error) {
+      console.error("Multi-file upload error:", error);
       return jsonResponse({ success: false, error: "upload_failed" }, 500);
     }
   }
@@ -538,12 +694,16 @@ async function handleApiRequest(
 }
 
 // Serve static files from data directory
-async function serveStaticFile(pathname: string): Promise<Response | null> {
+async function serveStaticFile(pathname: string, request?: Request): Promise<Response | null> {
+  // Log all requests to this handler
+  if (pathname.includes("/comic/")) {
+    console.log(`[serveStaticFile] Comic request: ${pathname}`);
+  }
+
   // Handle /books/:id.:format requests
   if (pathname.startsWith("/books/")) {
     const filePath = resolve(process.cwd(), "data", pathname.slice(1));
     if (existsSync(filePath)) {
-      const buffer = await readFile(filePath);
       const ext = pathname.split(".").pop();
       const contentType =
         {
@@ -557,6 +717,86 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
           mp3: "audio/mpeg",
         }[ext || ""] || "application/octet-stream";
 
+      // Check if this is an audio file that needs range request support
+      const isAudioFile = ["m4b", "m4a", "mp3"].includes(ext || "");
+
+      if (isAudioFile && request) {
+        const stat = statSync(filePath);
+        const fileSize = stat.size;
+        const rangeHeader = request.headers.get("range");
+
+        if (rangeHeader) {
+          // Parse range header (e.g., "bytes=0-1000" or "bytes=1000-")
+          const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+          if (match) {
+            const start = match[1] ? parseInt(match[1], 10) : 0;
+            const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+            // Validate range
+            if (start >= fileSize || end >= fileSize || start > end) {
+              return new Response("Range Not Satisfiable", {
+                status: 416,
+                headers: {
+                  "Content-Range": `bytes */${fileSize}`,
+                },
+              });
+            }
+
+            const chunkSize = end - start + 1;
+
+            // Read only the requested portion using file handle
+            const fileHandle = await open(filePath, "r");
+            const buffer = Buffer.alloc(chunkSize);
+            await fileHandle.read(buffer, 0, chunkSize, start);
+            await fileHandle.close();
+
+            return new Response(buffer, {
+              status: 206,
+              headers: {
+                "Content-Type": contentType,
+                "Content-Length": String(chunkSize),
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=3600",
+              },
+            });
+          }
+        }
+
+        // No range header - stream the full file with Accept-Ranges header
+        // Use streaming for large files to avoid memory issues
+        const stream = createReadStream(filePath);
+        const readableStream = new ReadableStream({
+          start(controller) {
+            stream.on("data", (chunk: Buffer) => {
+              controller.enqueue(new Uint8Array(chunk));
+            });
+            stream.on("end", () => {
+              controller.close();
+            });
+            stream.on("error", (err) => {
+              controller.error(err);
+            });
+          },
+          cancel() {
+            stream.destroy();
+          },
+        });
+
+        return new Response(readableStream, {
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": String(fileSize),
+            "Accept-Ranges": "bytes",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+
+      // Non-audio files: return full file
+      const buffer = await readFile(filePath);
       return new Response(buffer, {
         headers: {
           "Content-Type": contentType,
@@ -649,10 +889,15 @@ async function serveStaticFile(pathname: string): Promise<Response | null> {
     const [, bookId, format] = comicInfoMatch;
     const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.${format}`);
 
+    console.log(`[Comic Info] Checking path: ${bookPath}, exists: ${existsSync(bookPath)}`);
+
     if (existsSync(bookPath)) {
       try {
+        console.log(`[Comic Info] Reading ${format} file...`);
         const buffer = await readFile(bookPath);
+        console.log(`[Comic Info] Read ${(buffer.length / 1024 / 1024).toFixed(1)}MB, getting page count...`);
         const pageCount = await getComicPageCount(buffer, format as BookFormat);
+        console.log(`[Comic Info] Page count: ${pageCount}`);
 
         return new Response(JSON.stringify({ pageCount }), {
           headers: { "Content-Type": "application/json" },
@@ -715,7 +960,7 @@ export default async function handler(request: Request) {
     }
 
     // Check for static file requests
-    const staticResponse = await serveStaticFile(url.pathname);
+    const staticResponse = await serveStaticFile(url.pathname, request);
     if (staticResponse) {
       return staticResponse;
     }

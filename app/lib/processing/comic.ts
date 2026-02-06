@@ -1,38 +1,8 @@
-import AdmZip from "adm-zip";
 import { createExtractorFromData } from "node-unrar-js";
 import type { BookFormat } from "../types";
 
 // Image extensions for comic book archives
-const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-
-/**
- * Validate that a buffer looks like a valid ZIP file by checking:
- * 1. PK signature at the start
- * 2. End of Central Directory signature somewhere in the file
- */
-function isValidZipBuffer(buffer: Buffer): boolean {
-  // Check minimum size (ZIP needs at least 22 bytes for EOCD)
-  if (buffer.length < 22) return false;
-
-  // Check PK signature at start
-  if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) return false;
-
-  // Check for End of Central Directory signature (PK\x05\x06)
-  // Search in the last 65KB + 22 bytes (max comment size + EOCD size)
-  const searchStart = Math.max(0, buffer.length - 65557);
-  for (let i = buffer.length - 22; i >= searchStart; i--) {
-    if (
-      buffer[i] === 0x50 &&
-      buffer[i + 1] === 0x4b &&
-      buffer[i + 2] === 0x05 &&
-      buffer[i + 3] === 0x06
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
 
 export interface ComicPage {
   index: number;
@@ -56,6 +26,8 @@ function getMimeType(filename: string): string {
       return "image/gif";
     case "webp":
       return "image/webp";
+    case "bmp":
+      return "image/bmp";
     default:
       return "image/jpeg";
   }
@@ -70,23 +42,24 @@ function isImageFile(filename: string): boolean {
 }
 
 /**
- * Get sorted list of image entries from a CBZ file (without extracting data)
+ * Get sorted list of image file names from a CBZ file (without extracting data)
  * Returns empty array if the archive is corrupted
  */
-function getCbzImageEntries(buffer: Buffer) {
-  // Validate ZIP structure before parsing
-  if (!isValidZipBuffer(buffer)) {
-    console.error("CBZ file is not a valid ZIP archive");
-    return [];
-  }
-
+async function getCbzImageFileList(buffer: Buffer): Promise<string[]> {
   try {
-    const zip = new AdmZip(buffer);
-    const entries = zip.getEntries();
+    console.log(`[CBZ] Parsing CBZ archive, buffer size: ${buffer.length} bytes`);
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
 
-    return entries
-      .filter((entry) => !entry.isDirectory && isImageFile(entry.entryName))
-      .sort((a, b) => a.entryName.localeCompare(b.entryName, undefined, { numeric: true }));
+    const allFiles = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+    const imageFiles = allFiles.filter((name) => isImageFile(name));
+
+    console.log(`[CBZ] Found ${allFiles.length} total files, ${imageFiles.length} images`);
+    if (imageFiles.length === 0 && allFiles.length > 0) {
+      console.log(`[CBZ] All files in archive:`, allFiles.slice(0, 10));
+    }
+
+    return imageFiles.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   } catch (error) {
     console.error("Error reading CBZ archive:", error);
     return [];
@@ -97,40 +70,71 @@ function getCbzImageEntries(buffer: Buffer) {
  * Extract a single page from a CBZ (ZIP) file
  */
 export async function extractCbzPage(buffer: Buffer, pageIndex: number): Promise<ComicPage | null> {
-  const imageEntries = getCbzImageEntries(buffer);
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const imageFiles = Object.keys(zip.files)
+      .filter((name) => !zip.files[name].dir && isImageFile(name))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  if (pageIndex < 0 || pageIndex >= imageEntries.length) {
+    if (pageIndex < 0 || pageIndex >= imageFiles.length) {
+      return null;
+    }
+
+    const fileName = imageFiles[pageIndex];
+    const file = zip.files[fileName];
+    const data = await file.async("nodebuffer");
+
+    return {
+      index: pageIndex,
+      name: fileName,
+      data,
+      mimeType: getMimeType(fileName),
+    };
+  } catch (error) {
+    console.error("Error extracting CBZ page:", error);
     return null;
   }
-
-  const entry = imageEntries[pageIndex];
-  return {
-    index: pageIndex,
-    name: entry.entryName,
-    data: entry.getData(),
-    mimeType: getMimeType(entry.entryName),
-  };
 }
 
 /**
  * Get page count from a CBZ file (without extracting data)
  */
-export function getCbzPageCount(buffer: Buffer): number {
-  return getCbzImageEntries(buffer).length;
+export async function getCbzPageCount(buffer: Buffer): Promise<number> {
+  const imageFiles = await getCbzImageFileList(buffer);
+  return imageFiles.length;
 }
 
 /**
  * Extract all pages from a CBZ (ZIP) file
  */
 export async function extractCbzPages(buffer: Buffer): Promise<ComicPage[]> {
-  const imageEntries = getCbzImageEntries(buffer);
+  try {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const imageFiles = Object.keys(zip.files)
+      .filter((name) => !zip.files[name].dir && isImageFile(name))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  return imageEntries.map((entry, index) => ({
-    index,
-    name: entry.entryName,
-    data: entry.getData(),
-    mimeType: getMimeType(entry.entryName),
-  }));
+    const pages: ComicPage[] = [];
+    for (let index = 0; index < imageFiles.length; index++) {
+      const fileName = imageFiles[index];
+      const file = zip.files[fileName];
+      const data = await file.async("nodebuffer");
+
+      pages.push({
+        index,
+        name: fileName,
+        data,
+        mimeType: getMimeType(fileName),
+      });
+    }
+
+    return pages;
+  } catch (error) {
+    console.error("Error extracting CBZ pages:", error);
+    return [];
+  }
 }
 
 /**
@@ -149,14 +153,22 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
  */
 async function getCbrImageFileList(buffer: Buffer): Promise<string[]> {
   try {
+    console.log(`[CBR] Parsing CBR archive, buffer size: ${buffer.length} bytes`);
     const extractor = await createExtractorFromData({ data: bufferToArrayBuffer(buffer) });
     const list = extractor.getFileList();
 
+    const allFiles: string[] = [];
     const imageFiles: string[] = [];
     for (const fileHeader of list.fileHeaders) {
+      allFiles.push(fileHeader.name);
       if (fileHeader.flags.directory) continue;
       if (!isImageFile(fileHeader.name)) continue;
       imageFiles.push(fileHeader.name);
+    }
+
+    console.log(`[CBR] Found ${allFiles.length} total files, ${imageFiles.length} images`);
+    if (imageFiles.length === 0 && allFiles.length > 0) {
+      console.log(`[CBR] All files in archive:`, allFiles.slice(0, 10));
     }
 
     return imageFiles.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));

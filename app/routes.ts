@@ -24,4 +24,6 @@ export default [
 
   route("about", "routes/about.tsx"),
   route("docs", "routes/docs.tsx"),
+
+  route("admin/data", "routes/admin.data.tsx"),
 ] satisfies RouteConfig;

@@ -5,6 +5,7 @@
 
 @theme {
   --animate-progress: progress 1s infinite linear;
+  --animate-indeterminate-progress: indeterminate-progress 1.5s infinite ease-in-out;
 
   @keyframes progress {
     0% {
@@ -15,6 +16,20 @@
     }
     100% {
       transform: translateX(100%) scaleX(0.5);
+    }
+  }
+
+  @keyframes indeterminate-progress {
+    0% {
+      transform: translateX(-100%);
+      width: 40%;
+    }
+    50% {
+      width: 60%;
+    }
+    100% {
+      transform: translateX(250%);
+      width: 40%;
     }
   }
 }

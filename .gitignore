@@ -28,6 +28,7 @@ npm-debug.log*
 # Runtime data
 data/
 images/
+xcuserdata/
 
 # Temporary files
 *.tmp

@@ -8,9 +8,124 @@ interface UploadItem {
   fileName: string;
   fileSize: number;
   progress: number;
-  status: "uploading" | "processing" | "done" | "error";
+  mergeProgress?: number; // Separate progress for merge phase (0-100)
+  status: "uploading" | "processing" | "merging" | "done" | "error";
   error?: string;
   bookId?: number;
+  jobId?: string; // Job ID for SSE progress tracking
+}
+
+const AUDIO_EXTENSIONS = [".mp3", ".m4a", ".m4b"];
+
+function isAudioFile(name: string): boolean {
+  return AUDIO_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
+}
+
+/**
+ * Get a File from a FileSystemFileEntry
+ */
+function getFileFromEntry(entry: FileSystemFileEntry): Promise<File> {
+  return new Promise((resolve, reject) => {
+    entry.file(resolve, reject);
+  });
+}
+
+/**
+ * Read all entries from a directory (handles batching)
+ */
+async function readAllDirectoryEntries(
+  reader: FileSystemDirectoryReader,
+): Promise<FileSystemEntry[]> {
+  const entries: FileSystemEntry[] = [];
+  let batch: FileSystemEntry[];
+
+  do {
+    batch = await new Promise((resolve, reject) => {
+      reader.readEntries(resolve, reject);
+    });
+    entries.push(...batch);
+  } while (batch.length > 0);
+
+  return entries;
+}
+
+/**
+ * Extract all audio files from a directory entry
+ */
+async function getAudioFilesFromDirectory(dirEntry: FileSystemDirectoryEntry): Promise<File[]> {
+  const files: File[] = [];
+  const reader = dirEntry.createReader();
+  const entries = await readAllDirectoryEntries(reader);
+
+  for (const entry of entries) {
+    if (entry.isFile && isAudioFile(entry.name)) {
+      try {
+        const file = await getFileFromEntry(entry as FileSystemFileEntry);
+        files.push(file);
+      } catch {
+        // Skip files that can't be read
+      }
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Upload multiple audio files as a single audiobook
+ */
+function uploadMultiFileAudiobook(
+  files: File[],
+  folderName: string,
+  onProgress: (progress: number) => void,
+  onMergeStart: (jobId: string) => void,
+): Promise<{
+  success: boolean;
+  error?: string;
+  jobId?: string;
+  pending?: boolean;
+  book?: { id: number; title: string; format: string };
+}> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+
+    // Add folder name
+    formData.append("folderName", folderName);
+
+    // Add all files with index for ordering
+    files.forEach((file, index) => {
+      formData.append(`file_${index}`, file);
+    });
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        onProgress(percent);
+      }
+    });
+
+    xhr.upload.addEventListener("load", () => {
+      // Upload complete, server-side merging will start
+      onMergeStart("pending");
+    });
+
+    xhr.addEventListener("load", () => {
+      try {
+        const response = JSON.parse(xhr.responseText);
+        resolve(response);
+      } catch {
+        resolve({ success: false, error: "parse_error" });
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      resolve({ success: false, error: "network_error" });
+    });
+
+    xhr.open("POST", "/api/upload-multifile");
+    xhr.send(formData);
+  });
 }
 
 function formatFileSize(bytes: number): string {
@@ -68,6 +183,150 @@ export function GlobalUploadDropzone() {
   const updateUpload = useCallback((id: string, updates: Partial<UploadItem>) => {
     setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...updates } : u)));
   }, []);
+
+  const handleMultiFileAudiobook = useCallback(
+    async (files: File[], folderName: string) => {
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+      // Create upload item for the merged audiobook
+      const uploadId = `multifile-${folderName}-${Date.now()}`;
+      const uploadItem: UploadItem = {
+        id: uploadId,
+        fileName: `${folderName} (${files.length} files)`,
+        fileSize: totalSize,
+        progress: 0,
+        status: "uploading",
+      };
+
+      setUploads((prev) => [...prev, uploadItem]);
+      setShowToast(true);
+
+      // Clear any existing timeout
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+
+      let eventSource: EventSource | null = null;
+
+      // Helper to auto-hide toast after completion (defined outside try for catch access)
+      const scheduleAutoHide = () => {
+        if (toastTimeoutRef.current) {
+          clearTimeout(toastTimeoutRef.current);
+        }
+        toastTimeoutRef.current = setTimeout(() => {
+          setUploads((prev) => {
+            const hasActive = prev.some(
+              (u) => u.status === "uploading" || u.status === "processing" || u.status === "merging",
+            );
+            if (!hasActive) {
+              const successCount = prev.filter((u) => u.status === "done").length;
+              if (successCount > 0) {
+                window.dispatchEvent(new CustomEvent("library-updated"));
+              }
+              setShowToast(false);
+              return [];
+            }
+            return prev;
+          });
+        }, 3000);
+      };
+
+      try {
+        const result = await uploadMultiFileAudiobook(
+          files,
+          folderName,
+          (progress) => {
+            updateUpload(uploadId, {
+              progress,
+              status: progress === 100 ? "merging" : "uploading",
+            });
+          },
+          () => {
+            // Upload complete, switch to merging status
+            updateUpload(uploadId, { status: "merging", mergeProgress: 0 });
+          },
+        );
+
+        // Handle error responses immediately
+        if (result.error === "duplicate") {
+          updateUpload(uploadId, { status: "error", error: "Already in library" });
+          scheduleAutoHide();
+          return;
+        } else if (result.error === "ffmpeg_not_installed") {
+          updateUpload(uploadId, { status: "error", error: "ffmpeg not installed" });
+          scheduleAutoHide();
+          return;
+        } else if (!result.success && !result.pending) {
+          updateUpload(uploadId, { status: "error", error: result.error || "Upload failed" });
+          scheduleAutoHide();
+          return;
+        }
+
+        // If we got a jobId, subscribe to SSE for real-time merge progress
+        if (result.jobId) {
+          // Set up SSE connection for progress updates
+          eventSource = new EventSource(`/api/jobs/${result.jobId}/progress`);
+
+          eventSource.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.status === "running") {
+                updateUpload(uploadId, {
+                  mergeProgress: data.progress || 0,
+                  status: "merging",
+                });
+              } else if (data.status === "completed") {
+                eventSource?.close();
+                // Job completed - update UI with success
+                updateUpload(uploadId, {
+                  status: "done",
+                  progress: 100,
+                  mergeProgress: 100,
+                  bookId: data.result?.bookId,
+                });
+                // Schedule auto-hide now that job is complete
+                scheduleAutoHide();
+              } else if (data.status === "error") {
+                eventSource?.close();
+                const errorMsg = data.result?.error;
+                if (errorMsg === "duplicate") {
+                  updateUpload(uploadId, { status: "error", error: "Already in library" });
+                } else {
+                  updateUpload(uploadId, { status: "error", error: errorMsg || "Merge failed" });
+                }
+                // Schedule auto-hide for error
+                scheduleAutoHide();
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          };
+
+          eventSource.onerror = () => {
+            eventSource?.close();
+            // Only set error if still merging (use setUploads for conditional update)
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === uploadId && u.status === "merging"
+                  ? { ...u, status: "error" as const, error: "Connection lost" }
+                  : u,
+              ),
+            );
+            scheduleAutoHide();
+          };
+        } else if (result.success && result.book) {
+          // Immediate success (no background job)
+          updateUpload(uploadId, { status: "done", progress: 100, mergeProgress: 100, bookId: result.book.id });
+          scheduleAutoHide();
+        }
+      } catch {
+        eventSource?.close();
+        updateUpload(uploadId, { status: "error", error: "Upload failed" });
+        scheduleAutoHide();
+      }
+    },
+    [updateUpload],
+  );
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -209,7 +468,7 @@ export function GlobalUploadDropzone() {
       }
     };
 
-    const handleDrop = (e: DragEvent) => {
+    const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       dragCounterRef.current = 0;
       setIsDragging(false);
@@ -220,6 +479,26 @@ export function GlobalUploadDropzone() {
         return;
       }
 
+      const items = e.dataTransfer?.items;
+
+      // Check for folder drops with audio files
+      if (items) {
+        for (const item of Array.from(items)) {
+          const entry = item.webkitGetAsEntry?.();
+          if (entry?.isDirectory) {
+            const audioFiles = await getAudioFilesFromDirectory(
+              entry as FileSystemDirectoryEntry,
+            );
+            if (audioFiles.length > 1) {
+              // Multi-file audiobook - merge and upload
+              handleMultiFileAudiobook(audioFiles, entry.name);
+              return;
+            }
+          }
+        }
+      }
+
+      // Fall back to existing single-file handling
       const files = e.dataTransfer?.files;
       if (files && files.length > 0) {
         handleFiles(files);
@@ -240,7 +519,7 @@ export function GlobalUploadDropzone() {
   }, [handleFiles]);
 
   const activeCount = uploads.filter(
-    (u) => u.status === "uploading" || u.status === "processing",
+    (u) => u.status === "uploading" || u.status === "processing" || u.status === "merging",
   ).length;
   const doneCount = uploads.filter((u) => u.status === "done").length;
   const errorCount = uploads.filter((u) => u.status === "error").length;
@@ -413,14 +692,34 @@ export function GlobalUploadDropzone() {
                     {upload.status === "processing" && (
                       <span className="text-xs text-primary">Processing...</span>
                     )}
+                    {upload.status === "merging" && (
+                      <span className="text-xs text-accent">
+                        {upload.mergeProgress !== undefined && upload.mergeProgress > 0
+                          ? `Merging: ${upload.mergeProgress}%`
+                          : "Merging audio files..."}
+                      </span>
+                    )}
                     {upload.error && <span className="text-xs text-error">{upload.error}</span>}
                   </div>
-                  {(upload.status === "uploading" || upload.status === "processing") && (
-                    <div className="w-full bg-surface-elevated rounded-full h-1 mt-1">
-                      <div
-                        className="bg-primary h-1 rounded-full transition-all duration-150"
-                        style={{ width: `${upload.progress}%` }}
-                      />
+                  {(upload.status === "uploading" ||
+                    upload.status === "processing" ||
+                    upload.status === "merging") && (
+                    <div className="w-full bg-surface-elevated rounded-full h-1 mt-1 overflow-hidden">
+                      {upload.status === "merging" ? (
+                        upload.mergeProgress !== undefined && upload.mergeProgress > 0 ? (
+                          <div
+                            className="h-1 bg-accent rounded-full transition-all duration-150"
+                            style={{ width: `${upload.mergeProgress}%` }}
+                          />
+                        ) : (
+                          <div className="h-1 bg-accent rounded-full animate-indeterminate-progress" />
+                        )
+                      ) : (
+                        <div
+                          className="h-1 rounded-full transition-all duration-150 bg-primary"
+                          style={{ width: `${upload.progress}%` }}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

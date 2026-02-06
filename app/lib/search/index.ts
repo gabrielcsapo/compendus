@@ -177,8 +177,10 @@ function buildFtsQuery(query: string): string {
 
   if (terms.length === 0) return "";
 
-  // Create prefix search for each term
-  return terms.map((term) => `${term}*`).join(" ");
+  // Join terms with spaces - FTS5 with Porter stemmer will handle stemming
+  // Don't use prefix operator (*) as it doesn't work well with stemming
+  // (e.g., "walking*" won't match stemmed "walk")
+  return terms.join(" ");
 }
 
 export { buildFtsQuery };

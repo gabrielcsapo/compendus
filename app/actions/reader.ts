@@ -173,8 +173,13 @@ export async function getReaderInfo(
   if (!book) return null;
 
   // Get normalized content
+  console.log(`[getReaderInfo] Getting content for book ${bookId} (format: ${book.format})`);
   const content = await getContent(bookId);
-  if (!content) return null;
+  if (!content) {
+    console.log(`[getReaderInfo] No content returned for book ${bookId}`);
+    return null;
+  }
+  console.log(`[getReaderInfo] Content type: ${content.type}, pageCount: ${'pageCount' in content ? content.pageCount : 'N/A'}`);
 
   // Check for empty content (indicates parsing failure)
   // For text content, check both totalCharacters and chapters length (image-based books have chapters but 0 chars)

@@ -1,14 +1,41 @@
 import { Link } from "react-router";
 import type { Book } from "../lib/db/schema";
 import { AuthorLinks } from "./AuthorLink";
+import { getBookType, type BookType } from "../lib/book-types";
 
 interface BookCardProps {
   book: Book;
 }
 
+function TypeIcon({ type }: { type: BookType }) {
+  if (type === "audiobook") {
+    return (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828-2.828"
+        />
+        <circle cx="12" cy="17" r="1.5" strokeWidth={2} />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5V9" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+function getBadgeStyles(type: BookType): string {
+  if (type === "audiobook") {
+    return "bg-accent-light text-accent";
+  }
+  return "bg-primary-light text-primary";
+}
+
 export function BookCard({ book }: BookCardProps) {
   const authors = book.authors ? JSON.parse(book.authors) : [];
   const progressPercent = Math.round((book.readingProgress || 0) * 100);
+  const bookType = getBookType(book.format);
 
   return (
     <Link
@@ -59,7 +86,8 @@ export function BookCard({ book }: BookCardProps) {
 
         {/* Format badge */}
         <div className="mt-3">
-          <span className="inline-block px-2.5 py-1 text-xs font-medium rounded-full bg-primary-light text-primary uppercase tracking-wide">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full uppercase tracking-wide ${getBadgeStyles(bookType)}`}>
+            <TypeIcon type={bookType} />
             {book.format}
           </span>
         </div>

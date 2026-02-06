@@ -1,4 +1,5 @@
-import type { BookMetadata } from "../types";
+import type { BookMetadata, BookFormat } from "../types";
+import { searchMetronComics, isMetronConfigured } from "./comics";
 
 /**
  * Simple in-memory cache with TTL for API responses
@@ -149,7 +150,7 @@ export interface MetadataSearchResult {
   coverUrl: string | null;
   coverUrlHQ: string | null; // High quality cover from Google Books
   coverUrls: string[]; // All available cover URLs to try in order
-  source: "openlibrary" | "googlebooks" | "manual";
+  source: "openlibrary" | "googlebooks" | "metron" | "manual";
   sourceId: string;
 }
 
@@ -157,7 +158,9 @@ export interface MetadataSearchResult {
  * Search Google Books API for high-quality covers and metadata
  * Set GOOGLE_BOOKS_API_KEY environment variable to increase rate limits
  */
-export async function searchGoogleBooks(query: string): Promise<MetadataSearchResult[]> {
+export async function searchGoogleBooks(
+  query: string,
+): Promise<MetadataSearchResult[]> {
   // Check cache first
   const cacheKey = `google:${query.toLowerCase().trim()}`;
   const cached = metadataCache.get<MetadataSearchResult[]>(cacheKey);
@@ -189,8 +192,12 @@ export async function searchGoogleBooks(query: string): Promise<MetadataSearchRe
 
     const results = data.items.map((item) => {
       const vol = item.volumeInfo;
-      const isbn13 = vol.industryIdentifiers?.find((id) => id.type === "ISBN_13")?.identifier;
-      const isbn10 = vol.industryIdentifiers?.find((id) => id.type === "ISBN_10")?.identifier;
+      const isbn13 = vol.industryIdentifiers?.find(
+        (id) => id.type === "ISBN_13",
+      )?.identifier;
+      const isbn10 = vol.industryIdentifiers?.find(
+        (id) => id.type === "ISBN_10",
+      )?.identifier;
 
       // Get best available cover URL - prefer larger sizes
       // Google Books provides multiple sizes: extraLarge > large > medium > small > thumbnail > smallThumbnail
@@ -217,7 +224,8 @@ export async function searchGoogleBooks(query: string): Promise<MetadataSearchRe
 
         // If no zoom parameter exists, add it
         if (!coverUrlHQ.includes("zoom=")) {
-          coverUrlHQ = coverUrl + (coverUrl.includes("?") ? "&" : "?") + "zoom=3";
+          coverUrlHQ =
+            coverUrl + (coverUrl.includes("?") ? "&" : "?") + "zoom=3";
         }
       }
 
@@ -262,7 +270,9 @@ export async function searchGoogleBooks(query: string): Promise<MetadataSearchRe
 /**
  * Look up book on Google Books by ISBN
  */
-export async function lookupGoogleBooksByISBN(isbn: string): Promise<MetadataSearchResult | null> {
+export async function lookupGoogleBooksByISBN(
+  isbn: string,
+): Promise<MetadataSearchResult | null> {
   const cleanIsbn = isbn.replace(/[-\s]/g, "");
   const results = await searchGoogleBooks(`isbn:${cleanIsbn}`);
   return results[0] || null;
@@ -286,7 +296,9 @@ export async function searchBookMetadata(
 
   const encodedQuery = encodeURIComponent(query);
 
-  const response = await fetch(`https://openlibrary.org/search.json?q=${encodedQuery}&limit=10`);
+  const response = await fetch(
+    `https://openlibrary.org/search.json?q=${encodedQuery}&limit=10`,
+  );
 
   if (!response.ok) {
     console.error("Open Library search failed:", response.statusText);
@@ -331,7 +343,9 @@ export async function searchBookMetadata(
 /**
  * Look up book by ISBN on Open Library
  */
-export async function lookupByISBN(isbn: string): Promise<MetadataSearchResult | null> {
+export async function lookupByISBN(
+  isbn: string,
+): Promise<MetadataSearchResult | null> {
   const cleanIsbn = isbn.replace(/[-\s]/g, "");
 
   // Check cache first
@@ -341,7 +355,9 @@ export async function lookupByISBN(isbn: string): Promise<MetadataSearchResult |
     return cached;
   }
 
-  const response = await fetch(`https://openlibrary.org/isbn/${cleanIsbn}.json`);
+  const response = await fetch(
+    `https://openlibrary.org/isbn/${cleanIsbn}.json`,
+  );
 
   if (!response.ok) {
     console.error("Open Library ISBN lookup failed:", response.statusText);
@@ -357,7 +373,9 @@ export async function lookupByISBN(isbn: string): Promise<MetadataSearchResult |
   if (book.authors) {
     for (const authorRef of book.authors) {
       try {
-        const authorResponse = await fetch(`https://openlibrary.org${authorRef.key}.json`);
+        const authorResponse = await fetch(
+          `https://openlibrary.org${authorRef.key}.json`,
+        );
         if (authorResponse.ok) {
           const author: OpenLibraryAuthor = await authorResponse.json();
           authors.push(author.name);
@@ -371,7 +389,10 @@ export async function lookupByISBN(isbn: string): Promise<MetadataSearchResult |
   // Get description
   let description: string | null = null;
   if (book.description) {
-    description = typeof book.description === "string" ? book.description : book.description.value;
+    description =
+      typeof book.description === "string"
+        ? book.description
+        : book.description.value;
   }
 
   // Get cover URL
@@ -424,7 +445,9 @@ export async function lookupByISBN(isbn: string): Promise<MetadataSearchResult |
 /**
  * Get detailed book information from Open Library work key
  */
-export async function getBookDetails(workKey: string): Promise<MetadataSearchResult | null> {
+export async function getBookDetails(
+  workKey: string,
+): Promise<MetadataSearchResult | null> {
   // Check cache first
   const cacheKey = `openlibrary:work:${workKey}`;
   const cached = metadataCache.get<MetadataSearchResult | null>(cacheKey);
@@ -445,7 +468,10 @@ export async function getBookDetails(workKey: string): Promise<MetadataSearchRes
   // Get description
   let description: string | null = null;
   if (work.description) {
-    description = typeof work.description === "string" ? work.description : work.description.value;
+    description =
+      typeof work.description === "string"
+        ? work.description
+        : work.description.value;
   }
 
   // Fetch authors
@@ -455,7 +481,9 @@ export async function getBookDetails(workKey: string): Promise<MetadataSearchRes
       const authorKey = authorRef.author?.key || authorRef.key;
       if (authorKey) {
         try {
-          const authorResponse = await fetch(`https://openlibrary.org${authorKey}.json`);
+          const authorResponse = await fetch(
+            `https://openlibrary.org${authorKey}.json`,
+          );
           if (authorResponse.ok) {
             const author: OpenLibraryAuthor = await authorResponse.json();
             authors.push(author.name);
@@ -544,8 +572,10 @@ export async function findBestMetadata(
       searchBookMetadata(currentMetadata.title, currentMetadata.authors?.[0]),
     ]);
 
-    const googleResults = searchResults[0].status === "fulfilled" ? searchResults[0].value : [];
-    const olResults = searchResults[1].status === "fulfilled" ? searchResults[1].value : [];
+    const googleResults =
+      searchResults[0].status === "fulfilled" ? searchResults[0].value : [];
+    const olResults =
+      searchResults[1].status === "fulfilled" ? searchResults[1].value : [];
 
     // Prefer Google for covers, OL for metadata
     if (googleResults.length > 0) {
@@ -594,7 +624,10 @@ function mergeMetadata(
     isbn10: primary.isbn10 || secondary.isbn10,
     language: primary.language || secondary.language,
     // Combine and dedupe subjects
-    subjects: [...new Set([...primary.subjects, ...secondary.subjects])].slice(0, 20),
+    subjects: [...new Set([...primary.subjects, ...secondary.subjects])].slice(
+      0,
+      20,
+    ),
     series: primary.series || secondary.series,
     seriesNumber: primary.seriesNumber || secondary.seriesNumber,
     // Prefer HQ cover from primary (Google), fallback to secondary
@@ -607,24 +640,69 @@ function mergeMetadata(
 }
 
 /**
- * Search both Google Books and Open Library, returning combined results
+ * Check if a format is a comic format (CBR/CBZ)
+ */
+function isComicFormat(format?: BookFormat): boolean {
+  return format === "cbr" || format === "cbz";
+}
+
+/**
+ * Search all sources, returning combined results
+ * For comics (CBR/CBZ), includes Metron Comic Database results
  */
 export async function searchAllSources(
   title: string,
   author?: string,
+  format?: BookFormat,
 ): Promise<MetadataSearchResult[]> {
   const query = author ? `${title} ${author}` : title;
 
-  // Use allSettled so one API failure doesn't break the whole search
-  const results = await Promise.allSettled([
+  // Build list of search promises based on format
+  const searchPromises: Promise<MetadataSearchResult[]>[] = [
     searchGoogleBooks(query),
     searchBookMetadata(title, author),
-  ]);
+  ];
 
-  const googleResults = results[0].status === "fulfilled" ? results[0].value : [];
+  // Add Metron search for comics if configured
+  if (isComicFormat(format) && isMetronConfigured()) {
+    searchPromises.push(searchMetronComics(title));
+  }
+
+  // Use allSettled so one API failure doesn't break the whole search
+  const results = await Promise.allSettled(searchPromises);
+
+  const googleResults =
+    results[0].status === "fulfilled" ? results[0].value : [];
   const olResults = results[1].status === "fulfilled" ? results[1].value : [];
+  const metronResults =
+    results[2]?.status === "fulfilled" ? results[2].value : [];
 
-  // Interleave results, prioritizing Google for better covers
+  // For comics, prioritize Metron results
+  if (isComicFormat(format) && metronResults.length > 0) {
+    // Interleave: Metron first, then Google, then Open Library
+    const combined: MetadataSearchResult[] = [];
+    const maxLen = Math.max(
+      metronResults.length,
+      googleResults.length,
+      olResults.length,
+    );
+
+    for (let i = 0; i < maxLen; i++) {
+      if (i < metronResults.length) {
+        combined.push(metronResults[i]);
+      }
+      if (i < googleResults.length) {
+        combined.push(googleResults[i]);
+      }
+      if (i < olResults.length) {
+        combined.push(olResults[i]);
+      }
+    }
+
+    return combined.slice(0, 20);
+  }
+
+  // For non-comics, interleave Google and Open Library results
   const combined: MetadataSearchResult[] = [];
   const maxLen = Math.max(googleResults.length, olResults.length);
 
@@ -639,3 +717,31 @@ export async function searchAllSources(
 
   return combined.slice(0, 20);
 }
+
+/**
+ * Search specifically for comics using Metron
+ * Falls back to Google Books if Metron is not configured
+ */
+export async function searchComics(
+  title: string,
+): Promise<MetadataSearchResult[]> {
+  if (isMetronConfigured()) {
+    const metronResults = await searchMetronComics(title);
+    if (metronResults.length > 0) {
+      return metronResults;
+    }
+  }
+
+  // Fallback to Google Books for graphic novels/comics
+  return searchGoogleBooks(`${title} comic`);
+}
+
+// Re-export comic metadata functions
+export {
+  searchMetronComics,
+  searchMetronIssues,
+  searchMetronSeries,
+  getMetronIssue,
+  getMetronSeriesIssues,
+  isMetronConfigured,
+} from "./comics";

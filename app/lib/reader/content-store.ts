@@ -19,12 +19,6 @@ const MAX_CACHE_SIZE = 10;
 // LRU tracking - most recently used at the end
 const cacheOrder: string[] = [];
 
-// Formats that benefit from worker thread parsing (CPU-intensive)
-const HEAVY_FORMATS: BookFormat[] = ["mobi", "azw3", "pdf"];
-
-// File size threshold for using worker (5MB)
-const WORKER_SIZE_THRESHOLD = 5 * 1024 * 1024;
-
 /**
  * Get the path to the built worker file
  */
@@ -132,6 +126,9 @@ export async function getContent(
   return content;
 }
 
+// Audio formats don't need buffer parsing - they use metadata from DB
+const AUDIO_FORMATS: BookFormat[] = ["m4b", "m4a", "mp3"];
+
 /**
  * Parse book content based on format
  * Uses worker thread for CPU-intensive formats on large files
@@ -141,15 +138,19 @@ async function parseByFormat(
   format: BookFormat,
   bookId: string,
 ): Promise<NormalizedContent> {
-  // Use worker thread for heavy formats on large files to avoid blocking
-  const useWorker = true;
+  // Skip worker for audio formats - they don't parse the buffer, just use DB metadata
+  const useWorker = !AUDIO_FORMATS.includes(format);
 
   if (useWorker) {
     try {
       console.log(
         `[Content Store] Using worker thread for ${format} file (${(buffer.length / 1024 / 1024).toFixed(1)}MB)`,
       );
-      return await parseInWorker(buffer, format, bookId);
+      const result = await parseInWorker(buffer, format, bookId);
+      console.log(
+        `[Content Store] Worker returned content type: ${result.type}, pageCount: ${'pageCount' in result ? result.pageCount : 'N/A'}`,
+      );
+      return result;
     } catch (error) {
       // Fall back to main thread parsing if worker fails
       console.error(

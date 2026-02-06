@@ -1,5 +1,5 @@
 import { db, books } from "../db";
-import { eq, or } from "drizzle-orm";
+import { eq, or, inArray } from "drizzle-orm";
 import { searchBooks as searchBooksLib } from "../search";
 import type { Book } from "../db/schema";
 
@@ -25,6 +25,17 @@ export interface ApiBook {
   format: string;
   coverUrl: string | null;
   addedAt: string;
+  fileSize: number;
+  // Audiobook-specific fields
+  duration: number | null;
+  narrator: string | null;
+  chapters: ApiChapter[] | null;
+}
+
+export interface ApiChapter {
+  title: string;
+  startTime: number;
+  endTime: number | null;
 }
 
 export interface ApiSearchResult {
@@ -63,6 +74,16 @@ export interface ApiErrorResponse {
  * Transform internal Book to public API format
  */
 function toApiBook(book: Book, baseUrl: string): ApiBook {
+  // Parse chapters JSON if present
+  let chapters: ApiChapter[] | null = null;
+  if (book.chapters) {
+    try {
+      chapters = JSON.parse(book.chapters);
+    } catch {
+      chapters = null;
+    }
+  }
+
   return {
     id: book.id,
     title: book.title,
@@ -81,6 +102,10 @@ function toApiBook(book: Book, baseUrl: string): ApiBook {
     format: book.format,
     coverUrl: book.coverPath ? `${baseUrl}/covers/${book.id}.jpg` : null,
     addedAt: book.importedAt?.toISOString() || new Date().toISOString(),
+    fileSize: book.fileSize,
+    duration: book.duration,
+    narrator: book.narrator,
+    chapters,
   };
 }
 
@@ -239,16 +264,17 @@ export async function apiGetBook(
 }
 
 /**
- * List all books with pagination
+ * List all books with pagination and optional type filtering
  */
 export async function apiListBooks(
   options: {
     limit?: number;
     offset?: number;
+    type?: "ebook" | "audiobook" | "comic";
   },
   baseUrl: string,
 ): Promise<ApiSearchResponse | ApiErrorResponse> {
-  const { limit = 20, offset = 0 } = options;
+  const { limit = 20, offset = 0, type } = options;
 
   if (limit > 100) {
     return {
@@ -259,7 +285,22 @@ export async function apiListBooks(
   }
 
   try {
-    const results = await db.select().from(books).limit(limit).offset(offset);
+    let query = db.select().from(books).$dynamic();
+
+    // Filter by type if specified
+    if (type) {
+      const formatMap: Record<string, string[]> = {
+        ebook: ["pdf", "epub", "mobi", "azw3"],
+        audiobook: ["m4b", "mp3", "m4a"],
+        comic: ["cbr", "cbz"],
+      };
+      const formats = formatMap[type];
+      if (formats) {
+        query = query.where(inArray(books.format, formats));
+      }
+    }
+
+    const results = await query.limit(limit).offset(offset);
 
     return {
       success: true,

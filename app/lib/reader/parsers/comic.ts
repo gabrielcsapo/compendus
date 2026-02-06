@@ -59,13 +59,16 @@ async function parseCbz(buffer: Buffer, bookId: string): Promise<ComicContent> {
  * Parse CBR (RAR) file into normalized content
  */
 async function parseCbr(buffer: Buffer, bookId: string): Promise<ComicContent> {
+  console.log(`[parseCbr] Starting CBR parse, buffer size: ${buffer.length}`);
   const { createExtractorFromData } = await import("node-unrar-js");
 
   // Convert Buffer to ArrayBuffer for node-unrar-js
   const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  console.log(`[parseCbr] ArrayBuffer size: ${arrayBuffer.byteLength}`);
   const extractor = await createExtractorFromData({ data: arrayBuffer as ArrayBuffer });
   const list = extractor.getFileList();
   const fileHeaders = [...list.fileHeaders];
+  console.log(`[parseCbr] Found ${fileHeaders.length} file headers`);
 
   // Get all image files, sorted naturally
   const imageFiles = fileHeaders
@@ -122,7 +125,8 @@ export async function parseComic(
       pageCount: 0,
       pages: [],
     };
-  } catch {
+  } catch (error) {
+    console.error(`[parseComic] Error parsing ${format}:`, error);
     return {
       bookId,
       format: format as "cbr" | "cbz",
