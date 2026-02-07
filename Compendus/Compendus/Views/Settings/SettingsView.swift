@@ -14,12 +14,14 @@ struct SettingsView: View {
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(\.modelContext) private var modelContext
 
+    @State private var appSettings = AppSettings()
     @State private var editedServerURL = ""
     @State private var isTestingConnection = false
     @State private var connectionStatus: ConnectionStatus = .unknown
     @State private var showingDeleteAllConfirmation = false
     @State private var showingClearCacheConfirmation = false
     @State private var showingDisconnectConfirmation = false
+    @State private var showingStorageChart = false
 
     enum ConnectionStatus {
         case unknown, testing, connected, failed
@@ -50,6 +52,15 @@ struct SettingsView: View {
                         connectionStatusView
                     }
 
+                    if let lastSync = appSettings.lastSyncTime {
+                        HStack {
+                            Text("Last Synced")
+                            Spacer()
+                            Text(lastSync.relativeString)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     Button("Test Connection") {
                         testConnection()
                     }
@@ -60,8 +71,44 @@ struct SettingsView: View {
                     Text("Enter the IP address or hostname of your Compendus server (e.g., 192.168.1.100:5173)")
                 }
 
+                // Appearance section
+                Section {
+                    Picker("Theme", selection: $appSettings.colorSchemePreference) {
+                        ForEach(ColorSchemePreference.allCases) { scheme in
+                            Label(scheme.displayName, systemImage: scheme.icon)
+                                .tag(scheme)
+                        }
+                    }
+
+                    Picker("Grid Density", selection: $appSettings.gridDensity) {
+                        ForEach(GridDensity.allCases) { density in
+                            Text(density.displayName)
+                                .tag(density)
+                        }
+                    }
+
+                    Toggle("Haptic Feedback", isOn: $appSettings.hapticsEnabled)
+                } header: {
+                    Text("Appearance")
+                }
+
                 // Storage section
                 Section {
+                    Button {
+                        showingStorageChart = true
+                    } label: {
+                        HStack {
+                            Text("Storage Breakdown")
+                            Spacer()
+                            Text(storageManager.totalStorageUsedDisplay())
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .foregroundStyle(.primary)
+                    }
+
                     HStack {
                         Text("Books")
                         Spacer()
@@ -74,14 +121,6 @@ struct SettingsView: View {
                         Spacer()
                         Text(ByteCountFormatter.string(fromByteCount: storageManager.comicCacheSize(), countStyle: .file))
                             .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Text("Total")
-                        Spacer()
-                        Text(storageManager.totalStorageUsedDisplay())
-                            .foregroundStyle(.secondary)
-                            .fontWeight(.medium)
                     }
 
                     HStack {
@@ -174,6 +213,36 @@ struct SettingsView: View {
             } message: {
                 Text("This will clear the server URL. Your downloaded books will be preserved.")
             }
+            .sheet(isPresented: $showingStorageChart) {
+                NavigationStack {
+                    StorageRingChart(
+                        segments: [
+                            StorageSegment(
+                                category: "Books",
+                                bytes: storageManager.totalBooksStorageUsed(),
+                                color: .blue
+                            ),
+                            StorageSegment(
+                                category: "Comic Cache",
+                                bytes: storageManager.comicCacheSize(),
+                                color: .purple
+                            )
+                        ],
+                        availableBytes: storageManager.availableDiskSpace()
+                    )
+                    .navigationTitle("Storage")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") {
+                                showingStorageChart = false
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
+            .preferredColorScheme(appSettings.colorScheme)
         }
     }
 
@@ -217,6 +286,9 @@ struct SettingsView: View {
 
             await MainActor.run {
                 connectionStatus = success ? .connected : .failed
+                if success {
+                    appSettings.updateLastSyncTime()
+                }
             }
         }
     }

@@ -37,7 +37,19 @@ enum BookFilter: String, CaseIterable {
 struct LibraryView: View {
     @Environment(APIService.self) private var apiService
     @Environment(ServerConfig.self) private var serverConfig
+    @Environment(DownloadManager.self) private var downloadManager
     @Environment(\.modelContext) private var modelContext
+
+    // Query for recently read books (for Continue Reading section)
+    @Query(
+        filter: #Predicate<DownloadedBook> { $0.lastReadAt != nil },
+        sort: \DownloadedBook.lastReadAt,
+        order: .reverse
+    )
+    private var recentlyReadBooks: [DownloadedBook]
+
+    // Query for all downloaded books (to check download status)
+    @Query private var downloadedBooks: [DownloadedBook]
 
     @State private var books: [Book] = []
     @State private var isLoading = false
@@ -48,35 +60,39 @@ struct LibraryView: View {
     @State private var totalCount: Int = 0
     @State private var selectedBook: Book?
     @State private var selectedFilter: BookFilter = .all
+    @State private var bookToRead: DownloadedBook?
+    @State private var downloadingBooks: Set<String> = []
 
     private let limit = 50
     private let columns = [
-        GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
+        GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
     ]
 
     var body: some View {
         NavigationStack {
             Group {
                 if books.isEmpty && isLoading {
-                    ProgressView("Loading library...")
+                    SkeletonBookGrid(count: 8)
                 } else if books.isEmpty && errorMessage != nil {
-                    ContentUnavailableView {
-                        Label("Error", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(errorMessage ?? "Unknown error")
-                    } actions: {
-                        Button("Try Again") {
-                            Task { await loadBooks() }
-                        }
+                    ErrorStateView(message: errorMessage ?? "Unknown error") {
+                        Task { await loadBooks() }
                     }
                 } else if books.isEmpty {
-                    ContentUnavailableView {
-                        Label(selectedFilter == .all ? "No Books" : "No \(selectedFilter.rawValue)", systemImage: selectedFilter.icon)
-                    } description: {
-                        Text(selectedFilter == .all ? "Your library is empty" : "No \(selectedFilter.rawValue.lowercased()) found in your library")
-                    }
+                    LibraryEmptyStateView(
+                        state: emptyState,
+                        refreshAction: selectedFilter == .all ? { Task { await loadBooks() } } : nil
+                    )
                 } else {
                     ScrollView {
+                        // Continue Reading section (only show when not searching or filtering)
+                        if !recentlyReadBooks.isEmpty && searchText.isEmpty && selectedFilter == .all {
+                            ContinueReadingSection(books: recentlyReadBooks) { book in
+                                bookToRead = book
+                            }
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+                        }
+
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(Array(books.enumerated()), id: \.element.id) { index, book in
                                 BookGridItem(book: book)
@@ -89,9 +105,38 @@ struct LibraryView: View {
                                             Task { await loadMoreBooks() }
                                         }
                                     }
+                                    .contextMenu {
+                                        if let downloaded = downloadedBook(for: book.id) {
+                                            Button {
+                                                bookToRead = downloaded
+                                            } label: {
+                                                Label("Read", systemImage: "book.fill")
+                                            }
+                                        } else if downloadingBooks.contains(book.id) {
+                                            Button(role: .destructive) {
+                                                downloadManager.cancelDownload(bookId: book.id)
+                                                downloadingBooks.remove(book.id)
+                                            } label: {
+                                                Label("Cancel Download", systemImage: "xmark.circle")
+                                            }
+                                        } else {
+                                            Button {
+                                                downloadBook(book)
+                                            } label: {
+                                                Label("Download", systemImage: "arrow.down.circle")
+                                            }
+                                        }
+
+                                        Button {
+                                            selectedBook = book
+                                        } label: {
+                                            Label("View Details", systemImage: "info.circle")
+                                        }
+                                    }
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
 
                         if isLoading && !books.isEmpty {
                             ProgressView()
@@ -144,6 +189,9 @@ struct LibraryView: View {
             }
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book)
+            }
+            .fullScreenCover(item: $bookToRead) { book in
+                ReaderContainerView(book: book)
             }
         }
     }
@@ -206,6 +254,43 @@ struct LibraryView: View {
         }
 
         isLoading = false
+    }
+
+    /// Determine the appropriate empty state based on the current filter
+    private var emptyState: LibraryEmptyState {
+        switch selectedFilter {
+        case .all:
+            return .empty
+        case .ebooks:
+            return .noEbooks
+        case .audiobooks:
+            return .noAudiobooks
+        case .comics:
+            return .noComics
+        }
+    }
+
+    /// Check if a book is downloaded
+    private func downloadedBook(for id: String) -> DownloadedBook? {
+        downloadedBooks.first { $0.id == id }
+    }
+
+    /// Download a book
+    private func downloadBook(_ book: Book) {
+        downloadingBooks.insert(book.id)
+
+        Task {
+            do {
+                _ = try await downloadManager.downloadBook(book, modelContext: modelContext)
+                await MainActor.run {
+                    downloadingBooks.remove(book.id)
+                }
+            } catch {
+                await MainActor.run {
+                    downloadingBooks.remove(book.id)
+                }
+            }
+        }
     }
 }
 

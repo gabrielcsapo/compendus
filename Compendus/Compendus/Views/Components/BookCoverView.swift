@@ -13,13 +13,16 @@ struct BookCoverView: View {
 
     @Environment(ServerConfig.self) private var serverConfig
 
+    /// Standard book cover aspect ratio (2:3)
+    private let bookAspectRatio: CGFloat = 2/3
+
     var body: some View {
         AsyncImage(url: serverConfig.coverURL(for: bookId)) { phase in
             switch phase {
             case .empty:
                 placeholder
                     .overlay {
-                        ProgressView()
+                        ShimmerRectangle(cornerRadius: 8)
                     }
             case .success(let image):
                 image
@@ -36,6 +39,9 @@ struct BookCoverView: View {
                 placeholder
             }
         }
+        .aspectRatio(bookAspectRatio, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
     }
 
     private var placeholder: some View {
@@ -61,6 +67,9 @@ struct BookCoverView: View {
 struct DownloadedBookCoverView: View {
     let book: DownloadedBook
 
+    /// Standard book cover aspect ratio (2:3)
+    private let bookAspectRatio: CGFloat = 2/3
+
     var body: some View {
         Group {
             if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
@@ -77,6 +86,9 @@ struct DownloadedBookCoverView: View {
                     }
             }
         }
+        .aspectRatio(bookAspectRatio, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
     }
 
     private var iconForFormat: String {

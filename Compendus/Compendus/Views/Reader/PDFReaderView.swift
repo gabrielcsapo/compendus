@@ -13,11 +13,16 @@ struct PDFReaderView: View {
     let book: DownloadedBook
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @State private var pdfDocument: PDFDocument?
     @State private var currentPage: Int = 0
     @State private var totalPages: Int = 0
-    @State private var showingPageSlider = false
+    @State private var showingControls = false
+    @State private var showingThumbnails = false
     @State private var errorMessage: String?
+    @State private var brightness: Double = Double(UIScreen.main.brightness)
+    @State private var originalBrightness: Double = Double(UIScreen.main.brightness)
 
     var body: some View {
         Group {
@@ -28,16 +33,43 @@ struct PDFReaderView: View {
                     Text(error)
                 }
             } else if let document = pdfDocument {
-                PDFKitView(document: document, currentPage: $currentPage)
-                    .ignoresSafeArea(edges: .bottom)
-                    .overlay(alignment: .bottom) {
-                        pageIndicator
-                    }
-                    .onTapGesture {
-                        withAnimation {
-                            showingPageSlider.toggle()
+                ZStack {
+                    PDFKitView(document: document, currentPage: $currentPage)
+                        .ignoresSafeArea(edges: .bottom)
+
+                    // Controls overlay
+                    VStack(spacing: 0) {
+                        Spacer()
+
+                        // Thumbnail scrubber
+                        if showingThumbnails {
+                            PDFThumbnailScrubber(
+                                document: document,
+                                currentPage: $currentPage
+                            )
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        // Main controls
+                        if showingControls {
+                            controlsOverlay
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        // Page indicator (always visible when controls shown)
+                        if showingControls || !showingThumbnails {
+                            pageIndicator
                         }
                     }
+                }
+                .onTapGesture {
+                    withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
+                        showingControls.toggle()
+                        if !showingControls {
+                            showingThumbnails = false
+                        }
+                    }
+                }
             } else {
                 ProgressView("Loading PDF...")
             }
@@ -50,31 +82,85 @@ struct PDFReaderView: View {
         .onChange(of: currentPage) { _, newValue in
             saveProgress(page: newValue)
         }
+        .onDisappear {
+            // Restore original brightness when leaving
+            UIScreen.main.brightness = CGFloat(originalBrightness)
+        }
+    }
+
+    @ViewBuilder
+    private var controlsOverlay: some View {
+        VStack(spacing: 16) {
+            // Brightness control
+            HStack(spacing: 12) {
+                Image(systemName: "sun.min")
+                    .foregroundStyle(.secondary)
+
+                Slider(value: $brightness, in: 0...1)
+                    .onChange(of: brightness) { _, newValue in
+                        UIScreen.main.brightness = CGFloat(newValue)
+                    }
+
+                Image(systemName: "sun.max")
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal)
+
+            // Page slider
+            if totalPages > 1 {
+                VStack(spacing: 4) {
+                    Slider(
+                        value: Binding(
+                            get: { Double(currentPage) },
+                            set: { currentPage = Int($0) }
+                        ),
+                        in: 0...Double(max(0, totalPages - 1)),
+                        step: 1
+                    )
+
+                    HStack {
+                        Text("1")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(totalPages)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            // Thumbnail toggle button
+            Button {
+                withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
+                    showingThumbnails.toggle()
+                }
+            } label: {
+                Label(
+                    showingThumbnails ? "Hide Thumbnails" : "Show Thumbnails",
+                    systemImage: showingThumbnails ? "rectangle.grid.1x2.fill" : "rectangle.grid.1x2"
+                )
+                .font(.subheadline)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
 
     @ViewBuilder
     private var pageIndicator: some View {
-        VStack(spacing: 8) {
-            if showingPageSlider && totalPages > 1 {
-                Slider(
-                    value: Binding(
-                        get: { Double(currentPage) },
-                        set: { currentPage = Int($0) }
-                    ),
-                    in: 0...Double(max(0, totalPages - 1)),
-                    step: 1
-                )
-                .padding(.horizontal)
-            }
-
-            Text("Page \(currentPage + 1) of \(totalPages)")
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-        }
-        .padding(.bottom, 8)
+        Text("\(currentPage + 1) / \(totalPages)")
+            .font(.subheadline.monospacedDigit())
+            .fontWeight(.medium)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+            .padding(.bottom, 16)
     }
 
     private func loadPDF() {

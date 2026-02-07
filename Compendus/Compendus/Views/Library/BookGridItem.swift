@@ -11,6 +11,9 @@ struct BookGridItem: View {
     let book: Book
     @Environment(ServerConfig.self) private var serverConfig
 
+    /// Standard book cover aspect ratio (2:3)
+    private let bookAspectRatio: CGFloat = 2/3
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover image - only load if server has a cover
@@ -21,13 +24,11 @@ struct BookGridItem: View {
                         case .empty:
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.gray.opacity(0.2))
-                                .overlay {
-                                    ProgressView()
-                                }
+                                .shimmer()
                         case .success(let image):
                             image
                                 .resizable()
-                                .aspectRatio(contentMode: .fill)
+                                .aspectRatio(contentMode: .fit)
                         case .failure:
                             placeholderCover
                         @unknown default:
@@ -38,9 +39,9 @@ struct BookGridItem: View {
                     placeholderCover
                 }
             }
-            .frame(height: 200)
+            .aspectRatio(bookAspectRatio, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .shadow(radius: 2)
+            .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
 
             // Title and author
             VStack(alignment: .leading, spacing: 2) {
@@ -65,6 +66,9 @@ struct BookGridItem: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format")
+        .accessibilityHint("Double tap to view details")
     }
 
     private var bookIcon: String {
@@ -90,14 +94,36 @@ struct BookGridItem: View {
 
     @ViewBuilder
     private var formatBadge: some View {
-        Text(book.formatDisplay)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(formatColor.opacity(0.2))
-            .foregroundStyle(formatColor)
-            .clipShape(Capsule())
+        HStack(spacing: 3) {
+            Image(systemName: formatIcon)
+                .font(.system(size: 9))
+            Text(book.formatDisplay)
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(formatColor.opacity(0.2))
+        .foregroundStyle(formatColor)
+        .clipShape(Capsule())
+        .accessibilityLabel("\(book.formatDisplay) format")
+    }
+
+    private var formatIcon: String {
+        switch book.format.lowercased() {
+        case "epub":
+            return "book.closed.fill"
+        case "pdf":
+            return "doc.fill"
+        case "mobi", "azw", "azw3":
+            return "book.fill"
+        case "cbr", "cbz":
+            return "book.pages.fill"
+        case "m4b", "mp3", "m4a":
+            return "headphones"
+        default:
+            return "doc.fill"
+        }
     }
 
     private var formatColor: Color {
@@ -122,28 +148,30 @@ struct BookGridItem: View {
 struct DownloadedBookGridItem: View {
     let book: DownloadedBook
 
+    /// Standard book cover aspect ratio (2:3)
+    private let bookAspectRatio: CGFloat = 2/3
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover image
-            if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 2)
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 200)
-                    .overlay {
-                        VStack {
+            Group {
+                if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay {
                             Image(systemName: bookIcon)
                                 .font(.largeTitle)
                                 .foregroundStyle(.secondary)
                         }
-                    }
+                }
             }
+            .aspectRatio(bookAspectRatio, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
 
             // Title and author
             VStack(alignment: .leading, spacing: 2) {
@@ -168,6 +196,9 @@ struct DownloadedBookGridItem: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format, \(Int(book.readingProgress * 100))% complete")
+        .accessibilityHint("Double tap to view details")
     }
 
     private var bookIcon: String {
@@ -182,14 +213,36 @@ struct DownloadedBookGridItem: View {
 
     @ViewBuilder
     private var formatBadge: some View {
-        Text(book.formatDisplay)
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(formatColor.opacity(0.2))
-            .foregroundStyle(formatColor)
-            .clipShape(Capsule())
+        HStack(spacing: 3) {
+            Image(systemName: formatIcon)
+                .font(.system(size: 9))
+            Text(book.formatDisplay)
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(formatColor.opacity(0.2))
+        .foregroundStyle(formatColor)
+        .clipShape(Capsule())
+        .accessibilityLabel("\(book.formatDisplay) format")
+    }
+
+    private var formatIcon: String {
+        switch book.format.lowercased() {
+        case "epub":
+            return "book.closed.fill"
+        case "pdf":
+            return "doc.fill"
+        case "mobi", "azw", "azw3":
+            return "book.fill"
+        case "cbr", "cbz":
+            return "book.pages.fill"
+        case "m4b", "mp3", "m4a":
+            return "headphones"
+        default:
+            return "doc.fill"
+        }
     }
 
     private var formatColor: Color {
