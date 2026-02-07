@@ -59,12 +59,19 @@ export function AuthorLinks({
 }: AuthorLinksProps) {
   if (authors.length === 0) return null;
 
+  // Filter to only valid string authors (handles corrupted data gracefully)
+  const validAuthors = authors.filter(
+    (author): author is string => typeof author === "string" && author.length > 0
+  );
+
+  if (validAuthors.length === 0) return null;
+
   return (
     <>
-      {authors.map((author, index) => (
-        <span key={author}>
+      {validAuthors.map((author, index) => (
+        <span key={`${author}-${index}`}>
           <AuthorLink name={author} className={className} asSpan={asSpan} />
-          {index < authors.length - 1 && separator}
+          {index < validAuthors.length - 1 && separator}
         </span>
       ))}
     </>

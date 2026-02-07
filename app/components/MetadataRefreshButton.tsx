@@ -133,16 +133,10 @@ export function MetadataRefreshButton({
                           className={`text-xs px-1.5 py-0.5 rounded ${
                             result.source === "googlebooks"
                               ? "badge-primary"
-                              : result.source === "metron"
-                                ? "badge-warning"
-                                : "badge-success"
+                              : "badge-success"
                           }`}
                         >
-                          {result.source === "googlebooks"
-                            ? "Google"
-                            : result.source === "metron"
-                              ? "Metron"
-                              : "OpenLib"}
+                          {result.source === "googlebooks" ? "Google" : "OpenLib"}
                         </span>
                       </div>
                       {result.subtitle && (

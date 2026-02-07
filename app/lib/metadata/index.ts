@@ -1,5 +1,4 @@
 import type { BookMetadata, BookFormat } from "../types";
-import { searchMetronComics, isMetronConfigured } from "./comics";
 
 /**
  * Simple in-memory cache with TTL for API responses
@@ -150,7 +149,7 @@ export interface MetadataSearchResult {
   coverUrl: string | null;
   coverUrlHQ: string | null; // High quality cover from Google Books
   coverUrls: string[]; // All available cover URLs to try in order
-  source: "openlibrary" | "googlebooks" | "metron" | "manual";
+  source: "openlibrary" | "googlebooks" | "manual";
   sourceId: string;
 }
 
@@ -640,69 +639,26 @@ function mergeMetadata(
 }
 
 /**
- * Check if a format is a comic format (CBR/CBZ)
- */
-function isComicFormat(format?: BookFormat): boolean {
-  return format === "cbr" || format === "cbz";
-}
-
-/**
  * Search all sources, returning combined results
- * For comics (CBR/CBZ), includes Metron Comic Database results
  */
 export async function searchAllSources(
   title: string,
   author?: string,
-  format?: BookFormat,
+  _format?: BookFormat,
 ): Promise<MetadataSearchResult[]> {
   const query = author ? `${title} ${author}` : title;
 
-  // Build list of search promises based on format
-  const searchPromises: Promise<MetadataSearchResult[]>[] = [
+  // Search Google Books and Open Library in parallel
+  const results = await Promise.allSettled([
     searchGoogleBooks(query),
     searchBookMetadata(title, author),
-  ];
-
-  // Add Metron search for comics if configured
-  if (isComicFormat(format) && isMetronConfigured()) {
-    searchPromises.push(searchMetronComics(title));
-  }
-
-  // Use allSettled so one API failure doesn't break the whole search
-  const results = await Promise.allSettled(searchPromises);
+  ]);
 
   const googleResults =
     results[0].status === "fulfilled" ? results[0].value : [];
   const olResults = results[1].status === "fulfilled" ? results[1].value : [];
-  const metronResults =
-    results[2]?.status === "fulfilled" ? results[2].value : [];
 
-  // For comics, prioritize Metron results
-  if (isComicFormat(format) && metronResults.length > 0) {
-    // Interleave: Metron first, then Google, then Open Library
-    const combined: MetadataSearchResult[] = [];
-    const maxLen = Math.max(
-      metronResults.length,
-      googleResults.length,
-      olResults.length,
-    );
-
-    for (let i = 0; i < maxLen; i++) {
-      if (i < metronResults.length) {
-        combined.push(metronResults[i]);
-      }
-      if (i < googleResults.length) {
-        combined.push(googleResults[i]);
-      }
-      if (i < olResults.length) {
-        combined.push(olResults[i]);
-      }
-    }
-
-    return combined.slice(0, 20);
-  }
-
-  // For non-comics, interleave Google and Open Library results
+  // Interleave Google and Open Library results
   const combined: MetadataSearchResult[] = [];
   const maxLen = Math.max(googleResults.length, olResults.length);
 
@@ -719,29 +675,10 @@ export async function searchAllSources(
 }
 
 /**
- * Search specifically for comics using Metron
- * Falls back to Google Books if Metron is not configured
+ * Search specifically for comics using Google Books
  */
 export async function searchComics(
   title: string,
 ): Promise<MetadataSearchResult[]> {
-  if (isMetronConfigured()) {
-    const metronResults = await searchMetronComics(title);
-    if (metronResults.length > 0) {
-      return metronResults;
-    }
-  }
-
-  // Fallback to Google Books for graphic novels/comics
   return searchGoogleBooks(`${title} comic`);
 }
-
-// Re-export comic metadata functions
-export {
-  searchMetronComics,
-  searchMetronIssues,
-  searchMetronSeries,
-  getMetronIssue,
-  getMetronSeriesIssues,
-  isMetronConfigured,
-} from "./comics";

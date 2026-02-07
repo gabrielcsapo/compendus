@@ -30,6 +30,7 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
   const [pageCount, setPageCount] = useState(book.pageCount?.toString() || "");
   const [series, setSeries] = useState(book.series || "");
   const [seriesNumber, setSeriesNumber] = useState(book.seriesNumber || "");
+  const [bookTypeOverride, setBookTypeOverride] = useState(book.bookTypeOverride || "");
 
   const [bookTags, setBookTags] = useState<Tag[]>(currentTags);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -67,6 +68,7 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
     setPageCount(book.pageCount?.toString() || "");
     setSeries(book.series || "");
     setSeriesNumber(book.seriesNumber || "");
+    setBookTypeOverride(book.bookTypeOverride || "");
     setBookTags(currentTags);
   }, [book, currentTags]);
 
@@ -100,6 +102,7 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
         pageCount: pageCount ? parseInt(pageCount, 10) : undefined,
         series: series.trim() || undefined,
         seriesNumber: seriesNumber.trim() || undefined,
+        bookTypeOverride: bookTypeOverride || null,
       });
 
       onClose();
@@ -356,6 +359,34 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               />
+            </div>
+
+            {/* Book Type Override */}
+            <div className="md:col-span-2">
+              <label
+                htmlFor="bookTypeOverride"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                Book Type{" "}
+                <span className="text-foreground-muted text-xs">
+                  (override how this book is categorized)
+                </span>
+              </label>
+              <select
+                id="bookTypeOverride"
+                value={bookTypeOverride}
+                onChange={(e) => setBookTypeOverride(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={isSubmitting}
+              >
+                <option value="">Auto (based on file format: {book.format})</option>
+                <option value="ebook">eBook</option>
+                <option value="comic">Comic</option>
+                <option value="audiobook">Audiobook</option>
+              </select>
+              <p className="mt-1 text-xs text-foreground-muted">
+                Use this to treat an EPUB as a comic, or change how the book appears in filters.
+              </p>
             </div>
 
             {/* Description */}

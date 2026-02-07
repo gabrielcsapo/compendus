@@ -1,8 +1,7 @@
 import sharp from "sharp";
 import AdmZip from "adm-zip";
 import { createExtractorFromData } from "node-unrar-js";
-import { createCanvas } from "canvas";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { fromBuffer } from "pdf2pic";
 import { extractEpubCover } from "./epub";
 import { extractMobiCover } from "./mobi";
 import { extractAudioCover } from "./audio";
@@ -346,40 +345,28 @@ async function extractCbrCover(buffer: Buffer): Promise<Buffer | null> {
 
 /**
  * Extract cover from PDF file by rendering the first page
+ * Uses pdf2pic with GraphicsMagick for reliable rendering
  */
 async function extractPdfCover(buffer: Buffer): Promise<Buffer | null> {
   try {
-    // Load the PDF document
-    const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
+    // Use pdf2pic with GraphicsMagick for reliable PDF rendering
+    // This avoids compatibility issues between pdfjs-dist and node-canvas
+    const converter = fromBuffer(buffer, {
+      density: 150, // DPI for rendering
+      format: "png",
+      width: COVER_WIDTH,
+      height: COVER_HEIGHT,
+      preserveAspectRatio: true,
+    });
 
-    if (pdf.numPages === 0) {
+    // Render the first page
+    const result = await converter(1, { responseType: "buffer" });
+
+    if (!result.buffer) {
       return null;
     }
 
-    // Get the first page
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 2.0 }); // 2x scale for better quality
-
-    // Create a canvas to render the page
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext("2d");
-
-    // Render the page to the canvas
-    await page.render({
-      // @ts-expect-error - pdfjs types don't perfectly match node-canvas
-      canvasContext: context,
-      viewport,
-    }).promise;
-
-    // Convert canvas to PNG buffer
-    const pngBuffer = canvas.toBuffer("image/png");
-
-    // Clean up
-    page.cleanup();
-    await pdf.cleanup();
-    await pdf.destroy();
-
-    return pngBuffer;
+    return result.buffer;
   } catch (error) {
     console.error("Error extracting PDF cover:", error);
     return null;

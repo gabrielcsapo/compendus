@@ -35,7 +35,7 @@ function getBadgeStyles(type: BookType): string {
 export function BookCard({ book }: BookCardProps) {
   const authors = book.authors ? JSON.parse(book.authors) : [];
   const progressPercent = Math.round((book.readingProgress || 0) * 100);
-  const bookType = getBookType(book.format);
+  const bookType = getBookType(book.format, book.bookTypeOverride);
 
   return (
     <Link

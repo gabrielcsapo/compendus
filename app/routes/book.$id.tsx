@@ -32,7 +32,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
   const { book, tags, collections, linkedFormats } = loaderData;
-  const authors = book.authors ? JSON.parse(book.authors) : [];
+  // Parse authors with defensive handling for corrupted data
+  const rawAuthors = book.authors ? JSON.parse(book.authors) : [];
+  const authors = Array.isArray(rawAuthors)
+    ? rawAuthors.filter((a): a is string => typeof a === "string")
+    : [];
   const progressPercent = Math.round((book.readingProgress || 0) * 100);
 
   return (
