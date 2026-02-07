@@ -26,6 +26,17 @@ struct ComicReaderView: View {
     @State private var isLoadingPage = false
     @State private var isOfflineMode = false
 
+    // Zoom state
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    // Tutorial state
+    @State private var showingTutorial = TapZoneOverlay.shouldShow
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -49,6 +60,8 @@ struct ComicReaderView: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
+                                .scaleEffect(scale)
+                                .offset(offset)
                                 .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                         } else if isLoadingPage {
                             ProgressView()
@@ -61,26 +74,79 @@ struct ComicReaderView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
+                    // Pinch to zoom gesture
                     .gesture(
-                        DragGesture(minimumDistance: 50)
-                            .onEnded { value in
-                                if value.translation.width < -50 {
-                                    // Swipe left - next page
-                                    goToNextPage()
-                                } else if value.translation.width > 50 {
-                                    // Swipe right - previous page
-                                    goToPreviousPage()
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let newScale = lastScale * value
+                                scale = min(max(newScale, 1.0), 4.0) // Clamp between 1x and 4x
+                            }
+                            .onEnded { _ in
+                                lastScale = scale
+                                // Reset if zoomed out below 1x
+                                if scale <= 1.0 {
+                                    withAnimation(reduceMotion ? .none : .spring(response: 0.3)) {
+                                        scale = 1.0
+                                        lastScale = 1.0
+                                        offset = .zero
+                                        lastOffset = .zero
+                                    }
                                 }
                             }
                     )
+                    // Pan gesture when zoomed
+                    .simultaneousGesture(
+                        scale > 1.0 ?
+                        DragGesture()
+                            .onChanged { value in
+                                offset = CGSize(
+                                    width: lastOffset.width + value.translation.width,
+                                    height: lastOffset.height + value.translation.height
+                                )
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                        : nil
+                    )
+                    // Swipe navigation (only when not zoomed)
+                    .gesture(
+                        scale <= 1.0 ?
+                        DragGesture(minimumDistance: 50)
+                            .onEnded { value in
+                                if value.translation.width < -50 {
+                                    goToNextPage()
+                                } else if value.translation.width > 50 {
+                                    goToPreviousPage()
+                                }
+                            }
+                        : nil
+                    )
+                    // Double tap to reset zoom
+                    .onTapGesture(count: 2) {
+                        withAnimation(reduceMotion ? .none : .spring(response: 0.3)) {
+                            if scale > 1.0 {
+                                scale = 1.0
+                                lastScale = 1.0
+                                offset = .zero
+                                lastOffset = .zero
+                            } else {
+                                scale = 2.0
+                                lastScale = 2.0
+                            }
+                        }
+                    }
                     .onTapGesture { location in
+                        // Only handle tap zones when not zoomed
+                        guard scale <= 1.0 else { return }
+
                         let width = geometry.size.width
                         if location.x < width * 0.3 {
                             goToPreviousPage()
                         } else if location.x > width * 0.7 {
                             goToNextPage()
                         } else {
-                            withAnimation {
+                            withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
                                 showingControls.toggle()
                             }
                         }
@@ -117,6 +183,11 @@ struct ComicReaderView: View {
                                             let page = Int(newValue)
                                             if page != currentPage {
                                                 currentPage = page
+                                                // Reset zoom when changing pages
+                                                scale = 1.0
+                                                lastScale = 1.0
+                                                offset = .zero
+                                                lastOffset = .zero
                                                 Task { await loadPage(page) }
                                             }
                                         }
@@ -126,17 +197,31 @@ struct ComicReaderView: View {
                                 )
                                 .tint(.white)
                             }
-
-                            // Page indicator
-                            Text("Page \(currentPage + 1) of \(totalPages)")
-                                .font(.subheadline)
-                                .foregroundStyle(.white)
                         }
                         .padding()
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .padding()
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+
+                        // Prominent page indicator pill at bottom
+                        Text("\(currentPage + 1) / \(totalPages)")
+                            .font(.subheadline.monospacedDigit())
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial.opacity(0.9))
+                            .clipShape(Capsule())
+                            .padding(.bottom, 16)
                     }
+                    .transition(.opacity)
+                }
+
+                // Tutorial overlay for first-time users
+                if showingTutorial {
+                    TapZoneOverlay(isShowing: $showingTutorial)
+                        .transition(.opacity)
                 }
             }
         }
@@ -316,13 +401,22 @@ struct ComicReaderView: View {
     private func goToNextPage() {
         guard currentPage < totalPages - 1 else { return }
         currentPage += 1
+        resetZoom()
         Task { await loadPage(currentPage) }
     }
 
     private func goToPreviousPage() {
         guard currentPage > 0 else { return }
         currentPage -= 1
+        resetZoom()
         Task { await loadPage(currentPage) }
+    }
+
+    private func resetZoom() {
+        scale = 1.0
+        lastScale = 1.0
+        offset = .zero
+        lastOffset = .zero
     }
 
     private func saveProgress() {

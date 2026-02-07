@@ -21,168 +21,181 @@ struct AudiobookPlayerView: View {
     @State private var showingSleepTimer = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Cover and info
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Cover image
-                    if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .shadow(radius: 8)
-                    } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(width: 250, height: 250)
-                            .overlay {
-                                Image(systemName: "headphones")
-                                    .font(.system(size: 60))
-                                    .foregroundStyle(.secondary)
+        GeometryReader { geometry in
+            ZStack {
+                // Background blur from cover art
+                if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .blur(radius: 60)
+                        .opacity(0.3)
+                        .clipped()
+                }
+
+                VStack(spacing: 0) {
+                    // Cover and info (scrollable, takes available space)
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // Cover image
+                            if let coverData = book.coverData, let uiImage = UIImage(data: coverData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: geometry.size.width - 80, maxHeight: 250)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
+                            } else {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 200, height: 200)
+                                    .overlay {
+                                        Image(systemName: "headphones")
+                                            .font(.system(size: 50))
+                                            .foregroundStyle(.secondary)
+                                    }
                             }
-                    }
 
-                    // Title and author
-                    VStack(spacing: 8) {
-                        Text(book.title)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .multilineTextAlignment(.center)
+                            // Title and author
+                            VStack(spacing: 4) {
+                                Text(book.title)
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
 
-                        Text(book.authorsDisplay)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                                Text(book.authorsDisplay)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
 
-                        if let narrator = book.narrator {
-                            Text("Narrated by \(narrator)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Current chapter
-                    if let chapter = player.currentChapter {
-                        Text(chapter.title)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                    }
-                }
-                .padding(.top)
-            }
-
-            Spacer()
-
-            // Progress
-            VStack(spacing: 8) {
-                Slider(
-                    value: Binding(
-                        get: { player.currentTime },
-                        set: { player.seek(to: $0) }
-                    ),
-                    in: 0...max(1, player.duration)
-                )
-                .tint(.primary)
-
-                HStack {
-                    Text(formatTime(player.currentTime))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-
-                    Spacer()
-
-                    Text("-\(formatTime(player.duration - player.currentTime))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
-            .padding(.horizontal)
-
-            // Controls
-            HStack(spacing: 40) {
-                // Skip back
-                Button {
-                    player.skipBackward()
-                } label: {
-                    Image(systemName: "gobackward.15")
-                        .font(.title)
-                }
-
-                // Play/Pause
-                Button {
-                    if player.isPlaying {
-                        player.pause()
-                    } else {
-                        player.play()
-                    }
-                } label: {
-                    Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 64))
-                }
-
-                // Skip forward
-                Button {
-                    player.skipForward()
-                } label: {
-                    Image(systemName: "goforward.30")
-                        .font(.title)
-                }
-            }
-            .padding(.vertical, 24)
-
-            // Speed and sleep timer
-            HStack {
-                // Playback speed
-                Menu {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0], id: \.self) { speed in
-                        Button {
-                            player.setPlaybackRate(Float(speed))
-                        } label: {
-                            HStack {
-                                Text("\(speed, specifier: "%.2g")x")
-                                if player.playbackRate == Float(speed) {
-                                    Image(systemName: "checkmark")
+                                if let narrator = book.narrator {
+                                    Text("Narrated by \(narrator)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
+                            .padding(.horizontal, 20)
+
+                            // Current chapter
+                            if let chapter = player.currentChapter {
+                                Text(chapter.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                    }
+
+                    // Player controls (fixed at bottom)
+                    VStack(spacing: 16) {
+                        // Progress slider
+                        VStack(spacing: 4) {
+                            Slider(
+                                value: Binding(
+                                    get: { player.currentTime },
+                                    set: { player.seek(to: $0) }
+                                ),
+                                in: 0...max(1, player.duration)
+                            )
+                            .tint(.primary)
+
+                            HStack {
+                                Text(formatTime(player.currentTime))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+
+                                Spacer()
+
+                                Text("-\(formatTime(player.duration - player.currentTime))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
+
+                        // Playback controls
+                        HStack(spacing: 40) {
+                            Button {
+                                player.skipBackward()
+                            } label: {
+                                Image(systemName: "gobackward.15")
+                                    .font(.title2)
+                            }
+
+                            Button {
+                                if player.isPlaying {
+                                    player.pause()
+                                } else {
+                                    player.play()
+                                }
+                            } label: {
+                                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                    .font(.system(size: 56))
+                            }
+
+                            Button {
+                                player.skipForward()
+                            } label: {
+                                Image(systemName: "goforward.30")
+                                    .font(.title2)
+                            }
+                        }
+
+                        // Speed and utilities
+                        HStack {
+                            Menu {
+                                ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0], id: \.self) { speed in
+                                    Button {
+                                        player.setPlaybackRate(Float(speed))
+                                    } label: {
+                                        HStack {
+                                            Text("\(speed, specifier: "%.2g")x")
+                                            if player.playbackRate == Float(speed) {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Text("\(player.playbackRate, specifier: "%.2g")x")
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color.gray.opacity(0.2))
+                                    .clipShape(Capsule())
+                            }
+
+                            Spacer()
+
+                            if let chapters = book.chapters, !chapters.isEmpty {
+                                Button {
+                                    showingChapters = true
+                                } label: {
+                                    Image(systemName: "list.bullet")
+                                        .font(.title3)
+                                }
+                            }
+
+                            Button {
+                                showingSleepTimer = true
+                            } label: {
+                                Image(systemName: sleepTimerMinutes != nil ? "moon.fill" : "moon")
+                                    .font(.title3)
+                            }
                         }
                     }
-                } label: {
-                    Text("\(player.playbackRate, specifier: "%.2g")x")
-                        .font(.subheadline)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.2))
-                        .clipShape(Capsule())
+                    .padding(.horizontal, 20)
+                    .padding(.bottom)
                 }
-
-                Spacer()
-
-                // Chapters
-                if let chapters = book.chapters, !chapters.isEmpty {
-                    Button {
-                        showingChapters = true
-                    } label: {
-                        Image(systemName: "list.bullet")
-                            .font(.title3)
-                    }
-                }
-
-                // Sleep timer
-                Button {
-                    showingSleepTimer = true
-                } label: {
-                    Image(systemName: sleepTimerMinutes != nil ? "moon.fill" : "moon")
-                        .font(.title3)
-                }
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal)
-            .padding(.bottom)
         }
+        .ignoresSafeArea(edges: .bottom)
         .navigationTitle("Now Playing")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -192,7 +205,11 @@ struct AudiobookPlayerView: View {
             saveProgress()
         }
         .sheet(isPresented: $showingChapters) {
-            ChaptersListView(chapters: book.chapters ?? [], currentTime: player.currentTime) { chapter in
+            ChaptersListView(
+                chapters: book.chapters ?? [],
+                currentTime: player.currentTime,
+                totalDuration: player.duration
+            ) { chapter in
                 player.seek(to: chapter.startTime)
                 showingChapters = false
             }
@@ -258,6 +275,7 @@ struct AudiobookPlayerView: View {
 struct ChaptersListView: View {
     let chapters: [Chapter]
     let currentTime: Double
+    let totalDuration: Double
     let onSelect: (Chapter) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -269,12 +287,22 @@ struct ChaptersListView: View {
                     onSelect(chapter)
                 } label: {
                     HStack {
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(chapter.title)
                                 .foregroundStyle(isCurrentChapter(chapter) ? .blue : .primary)
-                            Text(chapter.startTimeDisplay)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+
+                            HStack(spacing: 8) {
+                                Text(chapter.startTimeDisplay)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                // Chapter progress indicator
+                                if let progress = chapterProgress(chapter) {
+                                    ProgressView(value: progress)
+                                        .frame(width: 50)
+                                        .tint(.blue)
+                                }
+                            }
                         }
 
                         Spacer()
@@ -282,6 +310,7 @@ struct ChaptersListView: View {
                         if isCurrentChapter(chapter) {
                             Image(systemName: "speaker.wave.2.fill")
                                 .foregroundStyle(.blue)
+                                .symbolEffect(.variableColor.iterative, isActive: true)
                         }
                     }
                 }
@@ -302,6 +331,25 @@ struct ChaptersListView: View {
         guard let index = chapters.firstIndex(where: { $0.id == chapter.id }) else { return false }
         let nextChapterStart = index + 1 < chapters.count ? chapters[index + 1].startTime : Double.infinity
         return currentTime >= chapter.startTime && currentTime < nextChapterStart
+    }
+
+    /// Calculate the progress within a chapter (0.0 to 1.0)
+    private func chapterProgress(_ chapter: Chapter) -> Double? {
+        guard let index = chapters.firstIndex(where: { $0.id == chapter.id }) else { return nil }
+        let nextChapterStart = index + 1 < chapters.count ? chapters[index + 1].startTime : totalDuration
+        let chapterDuration = nextChapterStart - chapter.startTime
+
+        guard chapterDuration > 0 else { return nil }
+
+        if currentTime < chapter.startTime {
+            return nil // Chapter not started
+        } else if currentTime >= nextChapterStart {
+            return 1.0 // Chapter completed
+        } else {
+            // Currently in this chapter
+            let elapsed = currentTime - chapter.startTime
+            return elapsed / chapterDuration
+        }
     }
 }
 

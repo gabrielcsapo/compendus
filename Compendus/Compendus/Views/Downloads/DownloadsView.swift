@@ -50,7 +50,7 @@ struct DownloadsView: View {
     @State private var showingStorageBreakdown = false
 
     private let columns = [
-        GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)
+        GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
     ]
 
     private var filteredBooks: [DownloadedBook] {
@@ -77,20 +77,16 @@ struct DownloadsView: View {
         NavigationStack {
             Group {
                 if books.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Downloads", systemImage: "arrow.down.circle")
-                    } description: {
-                        Text("Downloaded books will appear here for offline reading")
-                    }
+                    DownloadsEmptyStateView()
                 } else if filteredBooks.isEmpty {
                     if !searchText.isEmpty {
-                        ContentUnavailableView.search(text: searchText)
+                        SearchEmptyStateView(query: searchText)
                     } else {
-                        ContentUnavailableView {
-                            Label("No \(selectedFilter.rawValue)", systemImage: selectedFilter.icon)
-                        } description: {
-                            Text("No \(selectedFilter.rawValue.lowercased()) found in your downloads")
-                        }
+                        EmptyStateView(
+                            icon: selectedFilter.icon,
+                            title: "No \(selectedFilter.rawValue)",
+                            description: "No \(selectedFilter.rawValue.lowercased()) found in your downloads."
+                        )
                     }
                 } else {
                     ScrollView {
@@ -99,8 +95,8 @@ struct DownloadsView: View {
                             StorageUsageView {
                                 showingStorageBreakdown = true
                             }
-                            .padding(.horizontal)
-                            .padding(.top)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
                         }
 
                         LazyVGrid(columns: columns, spacing: 16) {
@@ -119,7 +115,8 @@ struct DownloadsView: View {
                                 }
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
                     }
                 }
             }

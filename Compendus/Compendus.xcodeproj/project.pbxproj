@@ -11,10 +11,40 @@
 		F91E18512F3677670029A1F0 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = F91E18502F3677670029A1F0 /* ReadiumShared */; };
 		F91E18532F3677670029A1F0 /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = F91E18522F3677670029A1F0 /* ReadiumStreamer */; };
 		F91E18562F3678BE0029A1F0 /* ReadiumAdapterGCDWebServer in Frameworks */ = {isa = PBXBuildFile; productRef = F91E18552F3678BE0029A1F0 /* ReadiumAdapterGCDWebServer */; };
+		F91E18752F37E6270029A1F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F91E18742F37E6270029A1F0 /* WidgetKit.framework */; };
+		F91E18772F37E6270029A1F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F91E18762F37E6270029A1F0 /* SwiftUI.framework */; };
+		F91E18882F37E6280029A1F0 /* CompendusWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F91E18732F37E6270029A1F0 /* CompendusWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F91E18862F37E6280029A1F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F91E18022F366F9C0029A1F0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F91E18722F37E6270029A1F0;
+			remoteInfo = CompendusWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F91E188D2F37E6280029A1F0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F91E18882F37E6280029A1F0 /* CompendusWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		F91E180A2F366F9C0029A1F0 /* Compendus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Compendus.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F91E18732F37E6270029A1F0 /* CompendusWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CompendusWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F91E18742F37E6270029A1F0 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		F91E18762F37E6270029A1F0 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -25,6 +55,13 @@
 			);
 			target = F91E18092F366F9C0029A1F0 /* Compendus */;
 		};
+		F91E188C2F37E6280029A1F0 /* Exceptions for "CompendusWidget" folder in "CompendusWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F91E18722F37E6270029A1F0 /* CompendusWidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +71,14 @@
 				F91E18172F366F9E0029A1F0 /* Exceptions for "Compendus" folder in "Compendus" target */,
 			);
 			path = Compendus;
+			sourceTree = "<group>";
+		};
+		F91E18782F37E6270029A1F0 /* CompendusWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F91E188C2F37E6280029A1F0 /* Exceptions for "CompendusWidget" folder in "CompendusWidgetExtension" target */,
+			);
+			path = CompendusWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +95,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F91E18702F37E6270029A1F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F91E18772F37E6270029A1F0 /* SwiftUI.framework in Frameworks */,
+				F91E18752F37E6270029A1F0 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -57,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				F91E180C2F366F9C0029A1F0 /* Compendus */,
+				F91E18782F37E6270029A1F0 /* CompendusWidget */,
 				F91E18542F3678BE0029A1F0 /* Frameworks */,
 				F91E180B2F366F9C0029A1F0 /* Products */,
 			);
@@ -66,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				F91E180A2F366F9C0029A1F0 /* Compendus.app */,
+				F91E18732F37E6270029A1F0 /* CompendusWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -73,6 +129,8 @@
 		F91E18542F3678BE0029A1F0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F91E18742F37E6270029A1F0 /* WidgetKit.framework */,
+				F91E18762F37E6270029A1F0 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -87,10 +145,12 @@
 				F91E18062F366F9C0029A1F0 /* Sources */,
 				F91E18072F366F9C0029A1F0 /* Frameworks */,
 				F91E18082F366F9C0029A1F0 /* Resources */,
+				F91E188D2F37E6280029A1F0 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F91E18872F37E6280029A1F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F91E180C2F366F9C0029A1F0 /* Compendus */,
@@ -106,6 +166,28 @@
 			productReference = F91E180A2F366F9C0029A1F0 /* Compendus.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F91E18722F37E6270029A1F0 /* CompendusWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F91E18892F37E6280029A1F0 /* Build configuration list for PBXNativeTarget "CompendusWidgetExtension" */;
+			buildPhases = (
+				F91E186F2F37E6270029A1F0 /* Sources */,
+				F91E18702F37E6270029A1F0 /* Frameworks */,
+				F91E18712F37E6270029A1F0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F91E18782F37E6270029A1F0 /* CompendusWidget */,
+			);
+			name = CompendusWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = CompendusWidgetExtension;
+			productReference = F91E18732F37E6270029A1F0 /* CompendusWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -117,6 +199,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					F91E18092F366F9C0029A1F0 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					F91E18722F37E6270029A1F0 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -139,12 +224,20 @@
 			projectRoot = "";
 			targets = (
 				F91E18092F366F9C0029A1F0 /* Compendus */,
+				F91E18722F37E6270029A1F0 /* CompendusWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		F91E18082F366F9C0029A1F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F91E18712F37E6270029A1F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -161,7 +254,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F91E186F2F37E6270029A1F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F91E18872F37E6280029A1F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F91E18722F37E6270029A1F0 /* CompendusWidgetExtension */;
+			targetProxy = F91E18862F37E6280029A1F0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F91E18192F366F9E0029A1F0 /* Debug */ = {
@@ -390,6 +498,71 @@
 			};
 			name = Release;
 		};
+		F91E188A2F37E6280029A1F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LXUHPDSG76;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CompendusWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CompendusWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = gabrielcsapo.Path.Compendus.CompendusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F91E188B2F37E6280029A1F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LXUHPDSG76;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CompendusWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CompendusWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = gabrielcsapo.Path.Compendus.CompendusWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -407,6 +580,15 @@
 			buildConfigurations = (
 				F91E18192F366F9E0029A1F0 /* Debug */,
 				F91E181A2F366F9E0029A1F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F91E18892F37E6280029A1F0 /* Build configuration list for PBXNativeTarget "CompendusWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F91E188A2F37E6280029A1F0 /* Debug */,
+				F91E188B2F37E6280029A1F0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

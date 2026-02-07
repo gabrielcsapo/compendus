@@ -185,50 +185,32 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var downloadButton: some View {
-        if isDownloaded {
-            Button {
-                bookToRead = downloadedBook
-            } label: {
-                Label("Read Now", systemImage: "book.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-        } else if isDownloading {
-            VStack(spacing: 8) {
-                if let progress = downloadManager.activeDownloads[book.id] {
-                    ProgressView(value: progress.progress)
-                        .progressViewStyle(LinearProgressViewStyle())
-
-                    Text(progress.progressDisplay)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        AnimatedDownloadButton(
+            state: downloadButtonState,
+            onTap: {
+                if isDownloaded {
+                    bookToRead = downloadedBook
                 } else {
-                    ProgressView()
+                    downloadBook()
                 }
+            },
+            onCancel: {
+                downloadManager.cancelDownload(bookId: book.id)
+                isDownloading = false
+            }
+        )
+    }
 
-                Button("Cancel") {
-                    downloadManager.cancelDownload(bookId: book.id)
-                    isDownloading = false
-                }
-                .foregroundStyle(.red)
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+    private var downloadButtonState: AnimatedDownloadButton.State {
+        if isDownloaded {
+            return .completed
+        } else if isDownloading {
+            let progress = downloadManager.activeDownloads[book.id]?.progress ?? 0
+            return .downloading(progress: progress)
+        } else if downloadError != nil {
+            return .failed
         } else {
-            Button {
-                downloadBook()
-            } label: {
-                Label("Download", systemImage: "arrow.down.circle")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
+            return .idle
         }
     }
 

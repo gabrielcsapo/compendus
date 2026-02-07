@@ -245,12 +245,16 @@ extension DownloadManager: URLSessionDownloadDelegate {
             DispatchQueue.main.async {
                 self.activeDownloads[bookId]?.state = .completed
                 self.activeDownloads[bookId]?.progress = 1.0
+                // Trigger success haptic feedback
+                HapticFeedback.success()
             }
 
             completionHandlers[bookId]?(.success(tempURL))
         } catch {
             DispatchQueue.main.async {
                 self.activeDownloads[bookId]?.state = .failed(error)
+                // Trigger error haptic feedback
+                HapticFeedback.error()
             }
             completionHandlers[bookId]?(.failure(error))
         }
