@@ -59,6 +59,9 @@ export const books = sqliteTable(
     // Metadata matching
     matchSkipped: integer("match_skipped", { mode: "boolean" }).default(false),
 
+    // Book type override - allows treating a book as a different type (e.g., epub as comic)
+    bookTypeOverride: text("book_type_override"),
+
     // Reading state
     readingProgress: real("reading_progress").default(0),
     lastReadAt: integer("last_read_at", { mode: "timestamp" }),

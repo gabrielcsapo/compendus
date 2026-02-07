@@ -15,8 +15,25 @@ export function getFormatsByType(type: BookType): string[] {
   }
 }
 
-export function getBookType(format: string): BookType {
+/**
+ * Get the book type for a given format, with optional override
+ * @param format - The file format (e.g., 'epub', 'pdf', 'cbz')
+ * @param bookTypeOverride - Optional override to treat the book as a different type
+ */
+export function getBookType(format: string, bookTypeOverride?: string | null): BookType {
+  // If an override is set, use it (after validating it's a valid BookType)
+  if (bookTypeOverride && isValidBookType(bookTypeOverride)) {
+    return bookTypeOverride;
+  }
+  // Otherwise, derive from format
   if (AUDIOBOOK_FORMATS.includes(format)) return "audiobook";
   if (COMIC_FORMATS.includes(format)) return "comic";
   return "ebook";
+}
+
+/**
+ * Check if a string is a valid BookType
+ */
+export function isValidBookType(value: string): value is BookType {
+  return value === "audiobook" || value === "ebook" || value === "comic";
 }

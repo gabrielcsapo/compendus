@@ -69,7 +69,15 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
 
   if (type) {
     const formats = getFormatsByType(type);
-    conditions.push(inArray(books.format, formats));
+    // Include books that either:
+    // 1. Have the matching format AND no override, OR
+    // 2. Have the bookTypeOverride set to this type
+    conditions.push(
+      sql`(
+        (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+        OR ${books.bookTypeOverride} = ${type}
+      )`,
+    );
   }
 
   if (search) {
@@ -137,6 +145,7 @@ export async function updateBook(
     seriesNumber: string;
     readingProgress: number;
     lastPosition: string;
+    bookTypeOverride: string | null;
   }>,
 ): Promise<Book | null> {
   const book = await getBook(id);
@@ -282,10 +291,18 @@ export async function getRecentBooks(limit: number = 10): Promise<Book[]> {
 export async function getBooksCount(type?: BookType): Promise<number> {
   if (type) {
     const formats = getFormatsByType(type);
+    // Include books that either:
+    // 1. Have the matching format AND no override, OR
+    // 2. Have the bookTypeOverride set to this type
     const result = await db
       .select({ count: sql<number>`count(*)` })
       .from(books)
-      .where(inArray(books.format, formats))
+      .where(
+        sql`(
+          (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+          OR ${books.bookTypeOverride} = ${type}
+        )`,
+      )
       .get();
     return result?.count || 0;
   }
@@ -395,8 +412,7 @@ export async function getLinkedFormats(bookId: string): Promise<Book[]> {
 }
 
 /**
- * Search for metadata matches from external sources
- * For comics (CBR/CBZ), includes Metron Comic Database results
+ * Search for metadata matches from external sources (Google Books, Open Library)
  */
 export async function searchMetadata(
   title: string,
