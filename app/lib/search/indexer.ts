@@ -39,24 +39,6 @@ export async function removeBookIndex(bookId: string): Promise<void> {
   rawDb.prepare(`DELETE FROM books_fts WHERE book_id = ?`).run(bookId);
 }
 
-export async function reindexBook(bookId: string, content: ExtractedContent): Promise<void> {
-  // Remove existing index entries for content
-  rawDb.prepare(`DELETE FROM book_content_fts WHERE book_id = ?`).run(bookId);
-
-  // Re-index
-  await indexContent(bookId, content);
-}
-
-export function optimizeIndex(): void {
-  rawDb.exec(`INSERT INTO books_fts(books_fts) VALUES('optimize')`);
-  rawDb.exec(`INSERT INTO book_content_fts(book_content_fts) VALUES('optimize')`);
-}
-
-export function rebuildIndex(): void {
-  rawDb.exec(`INSERT INTO books_fts(books_fts) VALUES('rebuild')`);
-  rawDb.exec(`INSERT INTO book_content_fts(book_content_fts) VALUES('rebuild')`);
-}
-
 function chunkText(text: string, maxSize: number): string[] {
   const chunks: string[] = [];
   let start = 0;

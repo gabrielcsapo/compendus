@@ -61,6 +61,11 @@ class ServerConfig {
         apiURL("/books/\(bookId).\(format)")
     }
 
+    /// Build a URL for downloading a CBR as CBZ (for offline reading support)
+    func bookAsCbzURL(for bookId: String) -> URL? {
+        apiURL("/books/\(bookId)/as-cbz")
+    }
+
     /// Build a URL for a comic page
     func comicPageURL(for bookId: String, format: String, page: Int) -> URL? {
         apiURL("/comic/\(bookId)/\(format)/page/\(page)")

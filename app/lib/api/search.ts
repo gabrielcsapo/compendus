@@ -7,7 +7,7 @@ import type { Book } from "../db/schema";
  * Public API response format for a book
  * Excludes internal fields like file paths
  */
-export interface ApiBook {
+interface ApiBook {
   id: string;
   title: string;
   subtitle: string | null;
@@ -32,13 +32,13 @@ export interface ApiBook {
   chapters: ApiChapter[] | null;
 }
 
-export interface ApiChapter {
+interface ApiChapter {
   title: string;
   startTime: number;
   endTime: number | null;
 }
 
-export interface ApiSearchResult {
+interface ApiSearchResult {
   book: ApiBook;
   relevance: number;
   highlights: {
@@ -50,7 +50,7 @@ export interface ApiSearchResult {
   };
 }
 
-export interface ApiSearchResponse {
+interface ApiSearchResponse {
   success: true;
   query: string;
   total: number;
@@ -59,12 +59,12 @@ export interface ApiSearchResponse {
   results: ApiSearchResult[];
 }
 
-export interface ApiBookResponse {
+interface ApiBookResponse {
   success: true;
   book: ApiBook;
 }
 
-export interface ApiErrorResponse {
+interface ApiErrorResponse {
   success: false;
   error: string;
   code: string;

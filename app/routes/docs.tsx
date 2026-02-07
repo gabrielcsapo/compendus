@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type ReactNode } from "react";
 import {
   apiSpec,
   staticEndpoints,
@@ -11,7 +11,13 @@ import {
 
 type TabId = "overview" | "endpoints" | "static" | "types";
 
-function CodeBlock({ children, language = "json" }: { children: string; language?: string }) {
+function CodeBlock({
+  children,
+  language = "json",
+}: {
+  children: string;
+  language?: string;
+}): ReactNode {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -59,12 +65,17 @@ function ParamTable({ params, title }: { params: ParamSpec[]; title: string }) {
       <h4 className="text-sm font-semibold text-foreground mb-2">{title}</h4>
       <div className="space-y-2">
         {params.map((param) => (
-          <div key={param.name} className="flex items-start gap-2 text-sm flex-wrap">
+          <div
+            key={param.name}
+            className="flex items-start gap-2 text-sm flex-wrap"
+          >
             <code className="bg-surface-elevated px-1.5 py-0.5 rounded text-foreground">
               {param.name}
             </code>
             <span className="text-foreground-muted">({param.type})</span>
-            {param.required && <span className="text-danger text-xs font-medium">required</span>}
+            {param.required && (
+              <span className="text-danger text-xs font-medium">required</span>
+            )}
             {param.default !== undefined && (
               <span className="text-foreground-muted/70 text-xs">
                 default: {String(param.default)}
@@ -72,13 +83,17 @@ function ParamTable({ params, title }: { params: ParamSpec[]; title: string }) {
             )}
             {param.constraints && (
               <span className="text-foreground-muted/70 text-xs">
-                {param.constraints.min !== undefined && `min: ${param.constraints.min}`}
-                {param.constraints.max !== undefined && ` max: ${param.constraints.max}`}
+                {param.constraints.min !== undefined &&
+                  `min: ${param.constraints.min}`}
+                {param.constraints.max !== undefined &&
+                  ` max: ${param.constraints.max}`}
                 {param.constraints.minLength !== undefined &&
                   `minLength: ${param.constraints.minLength}`}
               </span>
             )}
-            <span className="text-foreground-muted w-full">— {param.description}</span>
+            <span className="text-foreground-muted w-full">
+              — {param.description}
+            </span>
           </div>
         ))}
       </div>
@@ -96,33 +111,49 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
         className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-elevated transition-colors text-left"
       >
         <MethodBadge method={endpoint.method} />
-        <code className="text-sm font-mono text-foreground flex-1">{endpoint.path}</code>
-        <span className="text-foreground-muted text-sm hidden sm:block">{endpoint.summary}</span>
+        <code className="text-sm font-mono text-foreground flex-1">
+          {endpoint.path}
+        </code>
+        <span className="text-foreground-muted text-sm hidden sm:block">
+          {endpoint.summary}
+        </span>
         <svg
           className={`w-5 h-5 text-foreground-muted transition-transform ${expanded ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </button>
 
       {expanded && (
         <div className="px-4 py-4 border-t border-border bg-surface-elevated space-y-4">
-          {endpoint.description && <p className="text-foreground">{endpoint.description}</p>}
+          {endpoint.description && (
+            <p className="text-foreground">{endpoint.description}</p>
+          )}
 
           {endpoint.pathParams && endpoint.pathParams.length > 0 && (
             <ParamTable params={endpoint.pathParams} title="Path Parameters" />
           )}
 
           {endpoint.queryParams && endpoint.queryParams.length > 0 && (
-            <ParamTable params={endpoint.queryParams} title="Query Parameters" />
+            <ParamTable
+              params={endpoint.queryParams}
+              title="Query Parameters"
+            />
           )}
 
           {endpoint.requestBody && (
             <div>
-              <h4 className="text-sm font-semibold text-foreground mb-2">Request Body</h4>
+              <h4 className="text-sm font-semibold text-foreground mb-2">
+                Request Body
+              </h4>
               <p className="text-sm text-foreground-muted mb-2">
                 Content-Type:{" "}
                 <code className="bg-surface px-1 rounded border border-border">
@@ -133,13 +164,18 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
                 {endpoint.requestBody.description}
               </p>
               {endpoint.requestBody.fields && (
-                <ParamTable params={endpoint.requestBody.fields} title="Fields" />
+                <ParamTable
+                  params={endpoint.requestBody.fields}
+                  title="Fields"
+                />
               )}
             </div>
           )}
 
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-2">Success Response</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-2">
+              Success Response
+            </h4>
             <p className="text-sm text-foreground-muted mb-2">
               Status:{" "}
               <code className="badge-success px-1 rounded">
@@ -154,14 +190,18 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
                 {endpoint.responses.success.schema}
               </code>
             </p>
-            {endpoint.responses.success.example && (
-              <CodeBlock>{JSON.stringify(endpoint.responses.success.example, null, 2)}</CodeBlock>
-            )}
+            {endpoint.responses.success.example ? (
+              <CodeBlock>
+                {JSON.stringify(endpoint.responses.success.example, null, 2)}
+              </CodeBlock>
+            ) : null}
           </div>
 
           {endpoint.responses.errors.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-foreground mb-2">Error Responses</h4>
+              <h4 className="text-sm font-semibold text-foreground mb-2">
+                Error Responses
+              </h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
@@ -175,12 +215,18 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
                     {endpoint.responses.errors.map((error) => (
                       <tr key={error.code}>
                         <td className="pr-4 py-1">
-                          <code className="badge-danger px-1 rounded">{error.status}</code>
+                          <code className="badge-danger px-1 rounded">
+                            {error.status}
+                          </code>
                         </td>
                         <td className="pr-4 py-1">
-                          <code className="bg-surface-elevated px-1 rounded">{error.code}</code>
+                          <code className="bg-surface-elevated px-1 rounded">
+                            {error.code}
+                          </code>
                         </td>
-                        <td className="py-1 text-foreground-muted">{error.description}</td>
+                        <td className="py-1 text-foreground-muted">
+                          {error.description}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -223,23 +269,39 @@ export function Component() {
   return (
     <main className="container my-8 px-4 sm:px-8 mx-auto max-w-5xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">{apiSpec.title}</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          {apiSpec.title}
+        </h1>
         <p className="text-foreground-muted">{apiSpec.description}</p>
-        <p className="text-sm text-foreground-muted/70 mt-2">Version {apiSpec.version}</p>
+        <p className="text-sm text-foreground-muted/70 mt-2">
+          Version {apiSpec.version}
+        </p>
       </div>
 
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-2 mb-6 pb-4 border-b border-border">
-        <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>
+        <TabButton
+          active={activeTab === "overview"}
+          onClick={() => setActiveTab("overview")}
+        >
           Overview
         </TabButton>
-        <TabButton active={activeTab === "endpoints"} onClick={() => setActiveTab("endpoints")}>
+        <TabButton
+          active={activeTab === "endpoints"}
+          onClick={() => setActiveTab("endpoints")}
+        >
           API Endpoints
         </TabButton>
-        <TabButton active={activeTab === "static"} onClick={() => setActiveTab("static")}>
+        <TabButton
+          active={activeTab === "static"}
+          onClick={() => setActiveTab("static")}
+        >
           Static Files
         </TabButton>
-        <TabButton active={activeTab === "types"} onClick={() => setActiveTab("types")}>
+        <TabButton
+          active={activeTab === "types"}
+          onClick={() => setActiveTab("types")}
+        >
           Types
         </TabButton>
       </div>
@@ -248,44 +310,62 @@ export function Component() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-3">Base URL</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              Base URL
+            </h2>
             <CodeBlock language="text">{apiSpec.baseUrl}</CodeBlock>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-3">Authentication</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              Authentication
+            </h2>
             <p className="text-foreground">
-              The API currently does not require authentication. It is designed for
-              local/self-hosted deployments.
+              The API currently does not require authentication. It is designed
+              for local/self-hosted deployments.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">CORS</h2>
-            <p className="text-foreground mb-3">Cross-Origin Resource Sharing is enabled:</p>
+            <p className="text-foreground mb-3">
+              Cross-Origin Resource Sharing is enabled:
+            </p>
             <CodeBlock>{`Access-Control-Allow-Origin: ${apiSpec.cors.origins}
 Access-Control-Allow-Methods: ${apiSpec.cors.methods.join(", ")}
 Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-3">Supported File Formats</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              Supported File Formats
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {Object.entries(supportedFormats.books.mimeTypes).map(([format, mimeType]) => (
-                <div
-                  key={format}
-                  className="p-4 bg-surface-elevated rounded-lg border border-border"
-                >
-                  <h3 className="font-semibold text-foreground uppercase">{format}</h3>
-                  <p className="text-xs text-foreground-muted font-mono">{mimeType}</p>
-                </div>
-              ))}
+              {Object.entries(supportedFormats.books.mimeTypes).map(
+                ([format, mimeType]) => (
+                  <div
+                    key={format}
+                    className="p-4 bg-surface-elevated rounded-lg border border-border"
+                  >
+                    <h3 className="font-semibold text-foreground uppercase">
+                      {format}
+                    </h3>
+                    <p className="text-xs text-foreground-muted font-mono">
+                      {mimeType}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-3">Error Response Format</h2>
-            <p className="text-foreground mb-3">All errors follow a consistent format:</p>
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              Error Response Format
+            </h2>
+            <p className="text-foreground mb-3">
+              All errors follow a consistent format:
+            </p>
             <CodeBlock>{apiSpec.types.ApiErrorResponse.schema}</CodeBlock>
           </section>
         </div>
@@ -296,7 +376,10 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
         <div>
           <p className="text-foreground mb-6">
             All API endpoints are prefixed with{" "}
-            <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
+            <code className="bg-surface-elevated px-1 rounded border border-border">
+              /api
+            </code>
+            .
           </p>
           {apiSpec.endpoints.map((endpoint, i) => (
             <EndpointCard key={i} endpoint={endpoint} />
@@ -308,23 +391,36 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
       {activeTab === "static" && (
         <div>
           <p className="text-foreground mb-6">
-            Static file endpoints serve book files, covers, and comic pages directly. These are not
-            prefixed with{" "}
-            <code className="bg-surface-elevated px-1 rounded border border-border">/api</code>.
+            Static file endpoints serve book files, covers, and comic pages
+            directly. These are not prefixed with{" "}
+            <code className="bg-surface-elevated px-1 rounded border border-border">
+              /api
+            </code>
+            .
           </p>
           {staticEndpoints.map((endpoint, i) => (
-            <div key={i} className="border border-border rounded-lg mb-4 overflow-hidden">
+            <div
+              key={i}
+              className="border border-border rounded-lg mb-4 overflow-hidden"
+            >
               <div className="px-4 py-3 flex items-center gap-3 bg-surface-elevated">
                 <MethodBadge method={endpoint.method} />
-                <code className="text-sm font-mono text-foreground flex-1">{endpoint.path}</code>
+                <code className="text-sm font-mono text-foreground flex-1">
+                  {endpoint.path}
+                </code>
                 <span className="text-foreground-muted text-sm hidden sm:block">
                   {endpoint.summary}
                 </span>
               </div>
               <div className="px-4 py-3 border-t border-border">
-                <p className="text-sm text-foreground-muted mb-2">{endpoint.description}</p>
+                <p className="text-sm text-foreground-muted mb-2">
+                  {endpoint.description}
+                </p>
                 {endpoint.pathParams && (
-                  <ParamTable params={endpoint.pathParams} title="Path Parameters" />
+                  <ParamTable
+                    params={endpoint.pathParams}
+                    title="Path Parameters"
+                  />
                 )}
               </div>
             </div>
@@ -337,8 +433,12 @@ Access-Control-Allow-Headers: ${apiSpec.cors.headers.join(", ")}`}</CodeBlock>
         <div className="space-y-6">
           {Object.entries(apiSpec.types).map(([name, type]) => (
             <section key={name}>
-              <h2 className="text-xl font-semibold text-foreground mb-2">{name}</h2>
-              <p className="text-foreground-muted text-sm mb-3">{type.description}</p>
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                {name}
+              </h2>
+              <p className="text-foreground-muted text-sm mb-3">
+                {type.description}
+              </p>
               <CodeBlock language="typescript">{type.schema}</CodeBlock>
             </section>
           ))}

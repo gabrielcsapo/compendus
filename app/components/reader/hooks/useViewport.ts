@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, type RefObject } from "react";
 
-export interface Viewport {
+interface Viewport {
   width: number;
   height: number;
   containerRef: RefObject<HTMLDivElement | null>;

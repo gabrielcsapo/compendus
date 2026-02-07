@@ -33,7 +33,7 @@ function generateFileName(title: string, authors: string[], format: string): str
   return `${baseName}.${format}`;
 }
 
-export interface GetBooksOptions {
+interface GetBooksOptions {
   limit?: number;
   offset?: number;
   orderBy?: "title" | "createdAt" | "lastReadAt";
@@ -350,16 +350,6 @@ export async function skipBookMatch(bookId: string): Promise<boolean> {
     .set({ matchSkipped: true, updatedAt: sql`(unixepoch())` })
     .where(eq(books.id, bookId));
   return true;
-}
-
-export async function getBooksByFormat(): Promise<Array<{ format: string; count: number }>> {
-  return db
-    .select({
-      format: books.format,
-      count: sql<number>`count(*)`,
-    })
-    .from(books)
-    .groupBy(books.format);
 }
 
 /**

@@ -4,7 +4,7 @@ import { resolve } from "path";
 import { existsSync, statSync, createReadStream } from "fs";
 import { eq } from "drizzle-orm";
 import { apiSearchBooks, apiLookupByIsbn, apiGetBook, apiListBooks } from "../app/lib/api/search";
-import { getComicPage, getComicPageCount } from "../app/lib/processing/comic";
+import { getComicPage, getComicPageCount, convertCbrToCbz } from "../app/lib/processing/comic";
 import { extractEpubResource } from "../app/lib/processing/epub";
 import { processBook } from "../app/lib/processing";
 import { getBookFilePath } from "../app/lib/storage";
@@ -698,6 +698,51 @@ async function serveStaticFile(pathname: string, request?: Request): Promise<Res
   // Log all requests to this handler
   if (pathname.includes("/comic/")) {
     console.log(`[serveStaticFile] Comic request: ${pathname}`);
+  }
+
+  // Handle /books/:id/as-cbz requests - convert CBR to CBZ for offline iOS reading
+  const asCbzMatch = pathname.match(/^\/books\/([a-f0-9-]+)\/as-cbz$/);
+  if (asCbzMatch) {
+    const [, bookId] = asCbzMatch;
+
+    // First check if CBZ already exists (prefer native format)
+    const cbzPath = resolve(process.cwd(), "data", "books", `${bookId}.cbz`);
+    if (existsSync(cbzPath)) {
+      // Serve existing CBZ directly
+      const buffer = await readFile(cbzPath);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type": "application/vnd.comicbook+zip",
+          "Content-Disposition": `attachment; filename="${bookId}.cbz"`,
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+
+    // Check for CBR and convert
+    const cbrPath = resolve(process.cwd(), "data", "books", `${bookId}.cbr`);
+    if (existsSync(cbrPath)) {
+      try {
+        console.log(`[as-cbz] Converting CBR to CBZ for book ${bookId}`);
+        const cbrBuffer = await readFile(cbrPath);
+        const cbzBuffer = await convertCbrToCbz(cbrBuffer);
+
+        return new Response(new Uint8Array(cbzBuffer), {
+          headers: {
+            "Content-Type": "application/vnd.comicbook+zip",
+            "Content-Disposition": `attachment; filename="${bookId}.cbz"`,
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      } catch (error) {
+        console.error(`[as-cbz] Conversion failed for ${bookId}:`, error);
+        return new Response("Conversion failed", { status: 500 });
+      }
+    }
+
+    return new Response("Comic not found", { status: 404 });
   }
 
   // Handle /books/:id.:format requests

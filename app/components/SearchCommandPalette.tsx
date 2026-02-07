@@ -26,6 +26,15 @@ export function SearchCommandPalette() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Listen for custom event to open palette (from search button)
+  useEffect(() => {
+    function handleOpenPalette() {
+      setIsOpen(true);
+    }
+    window.addEventListener("open-search-palette", handleOpenPalette);
+    return () => window.removeEventListener("open-search-palette", handleOpenPalette);
+  }, []);
+
   // Focus input when modal opens
   useEffect(() => {
     if (isOpen) {

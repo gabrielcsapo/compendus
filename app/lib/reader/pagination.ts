@@ -18,7 +18,7 @@ const DEFAULT_LINE_HEIGHT = 1.6;
 // Default font size in pixels
 const DEFAULT_FONT_SIZE = 16;
 
-export class PaginationEngine {
+class PaginationEngine {
   /**
    * Calculate how many "pages" of content exist for given viewport
    */

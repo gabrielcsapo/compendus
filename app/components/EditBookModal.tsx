@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { updateBook } from "../actions/books";
-import { getTags, addTagToBookByName, removeTagFromBook } from "../actions/tags";
+import {
+  getTags,
+  addTagToBookByName,
+  removeTagFromBook,
+} from "../actions/tags";
 import type { Book, Tag } from "../lib/db/schema";
 
 interface EditBookModalProps {
@@ -12,10 +16,15 @@ interface EditBookModalProps {
   currentTags: Tag[];
 }
 
-export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookModalProps) {
+export function EditBookModal({
+  isOpen,
+  onClose,
+  book,
+  currentTags,
+}: EditBookModalProps) {
   const [title, setTitle] = useState(book.title);
   const [subtitle, setSubtitle] = useState(book.subtitle || "");
-  const [authors, setAuthors] = useState(() => {
+  const [authors, setAuthors] = useState<string>(() => {
     try {
       return book.authors ? JSON.parse(book.authors).join(", ") : "";
     } catch {
@@ -30,7 +39,9 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
   const [pageCount, setPageCount] = useState(book.pageCount?.toString() || "");
   const [series, setSeries] = useState(book.series || "");
   const [seriesNumber, setSeriesNumber] = useState(book.seriesNumber || "");
-  const [bookTypeOverride, setBookTypeOverride] = useState(book.bookTypeOverride || "");
+  const [bookTypeOverride, setBookTypeOverride] = useState(
+    book.bookTypeOverride || "",
+  );
 
   const [bookTags, setBookTags] = useState<Tag[]>(currentTags);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -162,9 +173,13 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
   };
 
   // Filter tags for dropdown (exclude already added)
-  const availableTags = allTags.filter((tag) => !bookTags.some((bt) => bt.id === tag.id));
+  const availableTags = allTags.filter(
+    (tag) => !bookTags.some((bt) => bt.id === tag.id),
+  );
   const filteredTags = newTagName
-    ? availableTags.filter((tag) => tag.name.toLowerCase().includes(newTagName.toLowerCase()))
+    ? availableTags.filter((tag) =>
+        tag.name.toLowerCase().includes(newTagName.toLowerCase()),
+      )
     : availableTags;
 
   if (!isOpen) return null;
@@ -178,13 +193,20 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
       <div className="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-foreground">Edit Book Details</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Edit Book Details
+          </h2>
           <button
             onClick={handleClose}
             disabled={isSubmitting}
             className="text-foreground-muted hover:text-foreground disabled:opacity-50"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -200,7 +222,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Title */}
             <div className="md:col-span-2">
-              <label htmlFor="title" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="title"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Title <span className="text-error">*</span>
               </label>
               <input
@@ -215,7 +240,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Subtitle */}
             <div className="md:col-span-2">
-              <label htmlFor="subtitle" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="subtitle"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Subtitle
               </label>
               <input
@@ -230,8 +258,14 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Authors */}
             <div className="md:col-span-2">
-              <label htmlFor="authors" className="block text-sm font-medium text-foreground mb-1">
-                Authors <span className="text-foreground-muted text-xs">(comma-separated)</span>
+              <label
+                htmlFor="authors"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                Authors{" "}
+                <span className="text-foreground-muted text-xs">
+                  (comma-separated)
+                </span>
               </label>
               <input
                 type="text"
@@ -246,7 +280,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Publisher */}
             <div>
-              <label htmlFor="publisher" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="publisher"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Publisher
               </label>
               <input
@@ -280,7 +317,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* ISBN */}
             <div>
-              <label htmlFor="isbn" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="isbn"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 ISBN
               </label>
               <input
@@ -296,7 +336,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Language */}
             <div>
-              <label htmlFor="language" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="language"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Language
               </label>
               <input
@@ -312,7 +355,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Page Count */}
             <div>
-              <label htmlFor="pageCount" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="pageCount"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Page Count
               </label>
               <input
@@ -328,7 +374,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Series */}
             <div>
-              <label htmlFor="series" className="block text-sm font-medium text-foreground mb-1">
+              <label
+                htmlFor="series"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
                 Series
               </label>
               <input
@@ -379,13 +428,16 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               >
-                <option value="">Auto (based on file format: {book.format})</option>
+                <option value="">
+                  Auto (based on file format: {book.format})
+                </option>
                 <option value="ebook">eBook</option>
                 <option value="comic">Comic</option>
                 <option value="audiobook">Audiobook</option>
               </select>
               <p className="mt-1 text-xs text-foreground-muted">
-                Use this to treat an EPUB as a comic, or change how the book appears in filters.
+                Use this to treat an EPUB as a comic, or change how the book
+                appears in filters.
               </p>
             </div>
 
@@ -409,7 +461,9 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
             {/* Tags */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-2">Tags</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Tags
+              </label>
 
               {/* Current tags */}
               <div className="flex flex-wrap gap-2 mb-3">
@@ -487,7 +541,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
                 {showTagDropdown && (newTagName || filteredTags.length > 0) && (
                   <div className="absolute z-10 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {newTagName &&
-                      !allTags.some((t) => t.name.toLowerCase() === newTagName.toLowerCase()) && (
+                      !allTags.some(
+                        (t) =>
+                          t.name.toLowerCase() === newTagName.toLowerCase(),
+                      ) && (
                         <button
                           type="button"
                           onClick={() => handleAddTag(newTagName)}
@@ -534,7 +591,10 @@ export function EditBookModal({ isOpen, onClose, book, currentTags }: EditBookMo
 
               {/* Click outside to close dropdown */}
               {showTagDropdown && (
-                <div className="fixed inset-0 z-0" onClick={() => setShowTagDropdown(false)} />
+                <div
+                  className="fixed inset-0 z-0"
+                  onClick={() => setShowTagDropdown(false)}
+                />
               )}
             </div>
           </div>

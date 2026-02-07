@@ -9,17 +9,17 @@ export async function getTags(): Promise<Tag[]> {
   return db.select().from(tags).orderBy(asc(tags.name));
 }
 
-export async function getTag(id: string): Promise<Tag | null> {
+async function getTag(id: string): Promise<Tag | null> {
   const result = await db.select().from(tags).where(eq(tags.id, id)).get();
   return result || null;
 }
 
-export async function getTagByName(name: string): Promise<Tag | null> {
+async function getTagByName(name: string): Promise<Tag | null> {
   const result = await db.select().from(tags).where(eq(tags.name, name.toLowerCase())).get();
   return result || null;
 }
 
-export async function createTag(data: { name: string; color?: string }): Promise<Tag> {
+async function createTag(data: { name: string; color?: string }): Promise<Tag> {
   const id = uuid();
   const name = data.name.toLowerCase().trim();
 
@@ -38,25 +38,7 @@ export async function createTag(data: { name: string; color?: string }): Promise
   return (await getTag(id))!;
 }
 
-export async function updateTag(
-  id: string,
-  data: Partial<{ name: string; color: string }>,
-): Promise<Tag | null> {
-  const updateData: Record<string, unknown> = {};
-  if (data.name) updateData.name = data.name.toLowerCase().trim();
-  if (data.color) updateData.color = data.color;
-
-  await db.update(tags).set(updateData).where(eq(tags.id, id));
-
-  return getTag(id);
-}
-
-export async function deleteTag(id: string): Promise<boolean> {
-  await db.delete(tags).where(eq(tags.id, id));
-  return true;
-}
-
-export async function addTagToBook(bookId: string, tagId: string): Promise<boolean> {
+async function addTagToBook(bookId: string, tagId: string): Promise<boolean> {
   try {
     await db.insert(booksTags).values({
       bookId,
@@ -122,15 +104,6 @@ export async function getTagsForBook(bookId: string): Promise<Tag[]> {
         tagIds.map((t) => t.tagId),
       ),
     );
-}
-
-export async function getTagBookCount(tagId: string): Promise<number> {
-  const result = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(booksTags)
-    .where(eq(booksTags.tagId, tagId))
-    .get();
-  return result?.count || 0;
 }
 
 export async function getTagsWithCounts(): Promise<Array<Tag & { count: number }>> {

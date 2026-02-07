@@ -38,13 +38,11 @@ export function BookCard({ book }: BookCardProps) {
   const bookType = getBookType(book.format, book.bookTypeOverride);
 
   return (
-    <Link
-      to={`/book/${book.id}`}
-      className="group block bg-surface border border-border rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30"
-    >
-      {/* Cover */}
-      <div
-        className="aspect-[2/3] w-full overflow-hidden bg-surface-elevated"
+    <div className="group relative bg-surface border border-border rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30">
+      {/* Cover with quick action overlay */}
+      <Link
+        to={`/book/${book.id}`}
+        className="block aspect-[2/3] w-full overflow-hidden bg-surface-elevated relative"
         style={{ backgroundColor: book.coverColor || undefined }}
       >
         {book.coverPath ? (
@@ -60,10 +58,30 @@ export function BookCard({ book }: BookCardProps) {
             </span>
           </div>
         )}
+
+        {/* Format badge overlay */}
+        <span className={`absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full uppercase tracking-wide ${getBadgeStyles(bookType)} shadow-sm`}>
+          <TypeIcon type={bookType} />
+          {book.format}
+        </span>
+
+      </Link>
+
+      {/* Hover overlay with quick action - positioned absolutely over the card */}
+      <div className="absolute inset-0 aspect-[2/3] bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
+        <Link
+          to={`/book/${book.id}/read`}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-medium text-sm hover:bg-primary-hover transition-colors shadow-lg pointer-events-auto"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          {progressPercent > 0 ? "Continue" : "Read"}
+        </Link>
       </div>
 
       {/* Info */}
-      <div className="p-4">
+      <Link to={`/book/${book.id}`} className="block p-4">
         <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-foreground">{book.title}</h3>
         {authors.length > 0 && (
           <p className="text-xs text-foreground-muted line-clamp-1">
@@ -73,25 +91,17 @@ export function BookCard({ book }: BookCardProps) {
 
         {/* Progress bar */}
         {progressPercent > 0 && (
-          <div className="mt-3">
+          <div className="mt-2">
             <div className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-xs text-foreground-muted mt-1.5">{progressPercent}%</p>
+            <p className="text-xs text-foreground-muted mt-1">{progressPercent}%</p>
           </div>
         )}
-
-        {/* Format badge */}
-        <div className="mt-3">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full uppercase tracking-wide ${getBadgeStyles(bookType)}`}>
-            <TypeIcon type={bookType} />
-            {book.format}
-          </span>
-        </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

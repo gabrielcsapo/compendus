@@ -4,7 +4,7 @@ import { v4 as uuid } from "uuid";
 import { db, wantedBooks, books } from "../lib/db";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 import type { WantedBook } from "../lib/db/schema.js";
-import type { MetadataSearchResult } from "../lib/metadata.js";
+import type { MetadataSearchResult } from "../lib/metadata/index.js";
 
 export async function getWantedBooks(options?: {
   status?: WantedBook["status"];
@@ -90,7 +90,7 @@ export async function getWantedBooks(options?: {
   return { books: filteredBooks, removed: idsToRemove.length };
 }
 
-export async function getWantedBook(id: string): Promise<WantedBook | null> {
+async function getWantedBook(id: string): Promise<WantedBook | null> {
   const result = await db
     .select()
     .from(wantedBooks)
@@ -196,22 +196,6 @@ export async function removeFromWantedList(id: string): Promise<boolean> {
 export async function clearWantedList(): Promise<number> {
   const result = await db.delete(wantedBooks).returning({ id: wantedBooks.id });
   return result.length;
-}
-
-export async function getWantedBooksCount(
-  status?: WantedBook["status"],
-): Promise<number> {
-  let query = db
-    .select({ count: sql<number>`count(*)` })
-    .from(wantedBooks)
-    .$dynamic();
-
-  if (status) {
-    query = query.where(eq(wantedBooks.status, status));
-  }
-
-  const result = await query.get();
-  return result?.count || 0;
 }
 
 export async function isBookWanted(

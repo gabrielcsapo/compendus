@@ -3,7 +3,7 @@
 import { db, books, bookmarks, highlights } from "../lib/db";
 import { eq, sql } from "drizzle-orm";
 import { v4 as uuid } from "uuid";
-import { getContent, paginationEngine, invalidateContent } from "../lib/reader";
+import { getContent, paginationEngine } from "../lib/reader";
 import type {
   ViewportConfig,
   TocEntry,
@@ -141,25 +141,6 @@ export async function saveReadingProgress(
   return { position, pageNum };
 }
 
-export async function getReadingProgress(bookId: string): Promise<{
-  position: number;
-  pageNum?: number;
-} | null> {
-  const book = await db
-    .select({ readingProgress: books.readingProgress, lastPosition: books.lastPosition })
-    .from(books)
-    .where(eq(books.id, bookId))
-    .get();
-
-  if (!book) return null;
-
-  const lastPosition = book.lastPosition ? JSON.parse(book.lastPosition) : null;
-  return {
-    position: book.readingProgress || 0,
-    pageNum: lastPosition?.pageNum,
-  };
-}
-
 // ============================================
 // READER CONTENT
 // ============================================
@@ -267,27 +248,3 @@ export async function getReaderPageForPosition(
   };
 }
 
-export interface SearchResult {
-  pageNum: number;
-  text: string;
-  context: string;
-}
-
-export async function searchInBook(
-  bookId: string,
-  query: string,
-  viewport: ViewportConfig,
-): Promise<SearchResult[]> {
-  // Get normalized content
-  const content = await getContent(bookId);
-  if (!content) return [];
-
-  return paginationEngine.searchContent(content, query, viewport);
-}
-
-/**
- * Invalidate cached content for a book (forces re-parse on next load)
- */
-export async function invalidateBookContent(bookId: string): Promise<void> {
-  invalidateContent(bookId);
-}

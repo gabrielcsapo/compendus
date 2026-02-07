@@ -73,8 +73,23 @@ class DownloadManager: NSObject {
             return existing
         }
 
-        // Start download
-        guard let downloadURL = apiService.bookDownloadURL(bookId: book.id, format: book.format) else {
+        // Determine download URL and final format
+        // For CBR files, download as CBZ for offline reading support
+        let isCbr = book.format.lowercased() == "cbr"
+        let downloadURL: URL?
+        let localFormat: String
+
+        if isCbr {
+            // Download CBR as CBZ for offline iOS support
+            downloadURL = config.bookAsCbzURL(for: book.id)
+            localFormat = "cbz"
+            print("[DownloadManager] Converting CBR to CBZ for offline reading: \(book.id)")
+        } else {
+            downloadURL = apiService.bookDownloadURL(bookId: book.id, format: book.format)
+            localFormat = book.format
+        }
+
+        guard let downloadURL = downloadURL else {
             throw APIError.invalidURL
         }
 
@@ -96,7 +111,7 @@ class DownloadManager: NSObject {
         let booksDir = documentsURL.appendingPathComponent("books", isDirectory: true)
         try FileManager.default.createDirectory(at: booksDir, withIntermediateDirectories: true)
 
-        let fileName = "\(book.id).\(book.format)"
+        let fileName = "\(book.id).\(localFormat)"
         let destinationURL = booksDir.appendingPathComponent(fileName)
 
         // Remove existing file if present
@@ -122,11 +137,16 @@ class DownloadManager: NSObject {
         }
 
         // Create database entry with actual file size
+        // Use local format (cbz) instead of original format (cbr) for offline reading
         let downloadedBook = DownloadedBook.from(
             book: book,
             localPath: "books/\(fileName)",
             coverData: coverData
         )
+        // Override format if we converted CBR to CBZ
+        if isCbr {
+            downloadedBook.format = localFormat
+        }
         downloadedBook.fileSize = actualFileSize
         modelContext.insert(downloadedBook)
         try modelContext.save()

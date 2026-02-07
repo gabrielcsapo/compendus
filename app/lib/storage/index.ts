@@ -72,16 +72,4 @@ export function getBookFilePath(bookId: string, format: BookFormat): string {
   return resolve(BOOKS_DIR, `${bookId}${ext}`);
 }
 
-export function getCoverPath(bookId: string): string {
-  return resolve(COVERS_DIR, `${bookId}.jpg`);
-}
-
-export function bookFileExists(bookId: string, format: BookFormat): boolean {
-  return existsSync(getBookFilePath(bookId, format));
-}
-
-export function coverExists(bookId: string): boolean {
-  return existsSync(getCoverPath(bookId));
-}
-
-export { BOOKS_DIR, COVERS_DIR, DATA_DIR };
+export { BOOKS_DIR };

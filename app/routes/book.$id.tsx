@@ -50,45 +50,64 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
         </Link>
       </div>
 
-      <div className="grid md:grid-cols-[300px_1fr] gap-8">
-        {/* Cover */}
-        <div>
-          <CoverDropZone
-            bookId={book.id}
-            coverPath={book.coverPath}
-            coverColor={book.coverColor}
-            title={book.title}
-          />
-          <p className="text-xs text-foreground-muted text-center mt-2">
-            Drop image or <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">⌘/Ctrl</kbd>+<kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">V</kbd> to paste
-          </p>
-
-          {/* Cover actions */}
-          <div className="mt-3">
-            <CoverExtractButton bookId={book.id} bookFormat={book.format} />
+      <div className="grid md:grid-cols-[280px_1fr] gap-8">
+        {/* Cover & Actions */}
+        <div className="space-y-4">
+          {/* Cover */}
+          <div>
+            <CoverDropZone
+              bookId={book.id}
+              coverPath={book.coverPath}
+              coverColor={book.coverColor}
+              title={book.title}
+            />
+            <p className="text-xs text-foreground-muted text-center mt-2">
+              Drop image or <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">⌘/Ctrl</kbd>+<kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">V</kbd> to paste
+            </p>
           </div>
-          <CoverUploadButton bookId={book.id} hasCover={!!book.coverPath} />
 
-          {/* Read button */}
-          <Link
-            to={`/book/${book.id}/read`}
-            className="btn btn-primary w-full mt-4 text-center justify-center text-foreground"
-          >
-            {progressPercent > 0 ? "Continue Reading" : "Start Reading"}
-          </Link>
+          {/* Progress - show prominently if reading */}
+          {progressPercent > 0 && (
+            <div className="p-3 bg-surface-elevated rounded-lg border border-border">
+              <div className="flex justify-between text-sm text-foreground-muted mb-2">
+                <span>Reading Progress</span>
+                <span className="font-medium text-foreground">{progressPercent}%</span>
+              </div>
+              <div className="h-2 bg-surface rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
 
-          {/* Download button */}
-          <a
-            href={`/books/${book.id}.${book.format}`}
-            download={book.fileName}
-            className="btn btn-secondary w-full mt-2 text-center justify-center"
-          >
-            Download {book.format.toUpperCase()}
-          </a>
+          {/* Primary Actions */}
+          <div className="space-y-2">
+            <Link
+              to={`/book/${book.id}/read`}
+              className="btn btn-primary w-full text-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              {progressPercent > 0 ? "Continue Reading" : "Start Reading"}
+            </Link>
+            <a
+              href={`/books/${book.id}.${book.format}`}
+              download={book.fileName}
+              className="btn btn-secondary w-full text-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download {book.format.toUpperCase()}
+            </a>
+          </div>
 
           {/* Linked formats (same ISBN, different format) */}
           {linkedFormats.length > 0 && (
-            <div className="mt-4 p-3 bg-surface-elevated rounded-lg border border-border">
+            <div className="p-3 bg-surface-elevated rounded-lg border border-border">
               <p className="text-xs text-foreground-muted mb-2">Also available as:</p>
               <div className="flex flex-wrap gap-2">
                 {linkedFormats.map((linked) => (
@@ -100,32 +119,12 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
                     {linked.format === "m4b" ||
                     linked.format === "mp3" ||
                     linked.format === "m4a" ? (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" />
                       </svg>
                     ) : (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     )}
                     {linked.format.toUpperCase()}
@@ -135,27 +134,23 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
             </div>
           )}
 
-          {/* Edit button */}
-          <EditBookButton book={book} tags={tags} />
-
-          {/* Delete button */}
-          <DeleteBookButton book={book} />
-
-          {/* Progress */}
-          {progressPercent > 0 && (
-            <div className="mt-4">
-              <div className="flex justify-between text-sm text-foreground-muted mb-1">
-                <span>Progress</span>
-                <span>{progressPercent}%</span>
-              </div>
-              <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+          {/* Secondary Actions - collapsible group */}
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer p-3 bg-surface-elevated rounded-lg border border-border hover:bg-surface transition-colors text-sm font-medium text-foreground-muted">
+              <span>Manage Book</span>
+              <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="mt-2 space-y-1">
+              {/* Cover actions */}
+              <CoverExtractButton bookId={book.id} bookFormat={book.format} />
+              <CoverUploadButton bookId={book.id} hasCover={!!book.coverPath} />
+              {/* Edit & Delete */}
+              <EditBookButton book={book} tags={tags} />
+              <DeleteBookButton book={book} />
             </div>
-          )}
+          </details>
         </div>
 
         {/* Details */}

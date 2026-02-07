@@ -2,7 +2,7 @@
  * Simple in-memory job tracking for long-running tasks like audio merging
  */
 
-export interface JobProgress {
+interface JobProgress {
   id: string;
   status: "pending" | "running" | "completed" | "error";
   progress: number; // 0-100
@@ -100,7 +100,7 @@ export function subscribeToJob(
 /**
  * Clean up completed/expired jobs periodically
  */
-export function cleanupJobs(): void {
+function cleanupJobs(): void {
   const now = Date.now();
   for (const [id, job] of jobs) {
     if (now - job.updatedAt > JOB_EXPIRY_MS) {

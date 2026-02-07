@@ -163,32 +163,36 @@ export default function Home({ loaderData }: { loaderData: LoaderData }) {
   return (
     <main className="container my-8 px-6 mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Library</h1>
-          <p className="text-foreground-muted">
-            {totalCount} {totalCount === 1 ? "book" : "books"}
-          </p>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Library</h1>
+            <p className="text-foreground-muted">
+              {totalCount} {totalCount === 1 ? "book" : "books"}
+              {totalPages > 1 && ` · Page ${currentPage} of ${totalPages}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <SortDropdown currentSort={currentSort} />
+            {unmatchedCount > 0 && (
+              <Link
+                to="/unmatched"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning-light text-warning hover:opacity-80 transition-opacity text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <span className="font-medium">{unmatchedCount}</span>
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="flex gap-4 items-center flex-wrap">
-          <TypeTabs currentType={currentType} currentSort={currentSort} />
-          {unmatchedCount > 0 && (
-            <Link
-              to="/unmatched"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning-light text-warning hover:opacity-80 transition-opacity"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <span className="font-medium">{unmatchedCount} need matching</span>
-            </Link>
-          )}
-        </div>
+        <TypeTabs currentType={currentType} currentSort={currentSort} />
       </div>
 
       {/* Recently read - only show on first page */}
@@ -199,19 +203,8 @@ export default function Home({ loaderData }: { loaderData: LoaderData }) {
         </section>
       )}
 
-      {/* All books */}
+      {/* Books grid */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">All Books</h2>
-          <div className="flex items-center gap-4">
-            <SortDropdown currentSort={currentSort} />
-            {totalPages > 1 && (
-              <span className="text-sm text-foreground-muted">
-                Page {currentPage} of {totalPages}
-              </span>
-            )}
-          </div>
-        </div>
         <BookGrid
           books={books}
           emptyMessage="Your library is empty. Drop some books above to get started!"

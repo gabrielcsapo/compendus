@@ -75,7 +75,7 @@ export const COMIC_FIT_MODES = {
 } as const;
 
 // PDF page layout modes
-export const PDF_PAGE_LAYOUTS = {
+const PDF_PAGE_LAYOUTS = {
   single: {
     name: "Single Page",
     description: "Show one page at a time",

@@ -22,12 +22,12 @@ import {
   saveReadingProgress,
 } from "@/actions/reader";
 
-export interface UseReaderOptions {
+interface UseReaderOptions {
   bookId: string;
   initialPosition?: number;
 }
 
-export interface UseReaderReturn {
+interface UseReaderReturn {
   // Book info
   bookInfo: ReaderInfoResponse | null;
   loading: boolean;
