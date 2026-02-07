@@ -550,13 +550,76 @@ function mergeMetadata(
 }
 
 /**
+ * Check if a string looks like an ISBN (10 or 13 digits, possibly with dashes/spaces)
+ */
+function looksLikeISBN(query: string): string | null {
+  // Remove dashes, spaces, and common separators
+  const cleaned = query.replace(/[-\s.]/g, "").trim();
+
+  // ISBN-13: 13 digits, typically starting with 978 or 979
+  if (/^\d{13}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  // ISBN-10: 10 characters, last can be X (checksum)
+  if (/^\d{9}[\dXx]$/.test(cleaned)) {
+    return cleaned.toUpperCase();
+  }
+
+  return null;
+}
+
+/**
  * Search all sources, returning combined results
+ * Automatically detects ISBN input and uses ISBN-specific lookups
  */
 export async function searchAllSources(
   title: string,
   author?: string,
   _format?: BookFormat,
 ): Promise<MetadataSearchResult[]> {
+  // Check if the input looks like an ISBN
+  const isbn = looksLikeISBN(title);
+
+  if (isbn) {
+    // Use ISBN-specific lookups for better accuracy
+    console.log(`[Metadata] Detected ISBN search: ${isbn}`);
+
+    const results = await Promise.allSettled([
+      lookupGoogleBooksByISBN(isbn),
+      lookupByISBN(isbn),
+    ]);
+
+    const googleResult =
+      results[0].status === "fulfilled" ? results[0].value : null;
+    const olResult =
+      results[1].status === "fulfilled" ? results[1].value : null;
+
+    const combined: MetadataSearchResult[] = [];
+
+    // Add Google result first (usually better covers)
+    if (googleResult) {
+      combined.push(googleResult);
+    }
+
+    // Add Open Library result if different or if Google didn't find anything
+    if (olResult) {
+      // Only add if it's a different result or we have no Google result
+      if (!googleResult || olResult.title !== googleResult.title) {
+        combined.push(olResult);
+      }
+    }
+
+    // If ISBN lookup failed, fall back to title search with the ISBN
+    if (combined.length === 0) {
+      console.log(`[Metadata] ISBN lookup returned no results, trying title search`);
+      return searchAllSources(`isbn:${isbn}`, undefined, _format);
+    }
+
+    return combined;
+  }
+
+  // Regular title/author search
   const query = author ? `${title} ${author}` : title;
 
   // Search Google Books and Open Library in parallel
