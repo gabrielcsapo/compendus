@@ -69,7 +69,7 @@ export function CoverUploadButton({ bookId, hasCover }: CoverUploadButtonProps) 
   };
 
   return (
-    <div className="mt-3">
+    <div>
       <input
         ref={fileInputRef}
         type="file"

@@ -2,7 +2,6 @@
 
 import {
   searchBooks as searchBooksLib,
-  getSearchSuggestions as getSuggestionsLib,
   type SearchOptions,
   type SearchResult,
 } from "../lib/search";
@@ -19,10 +18,6 @@ export async function searchBooks(
     query,
     ...options,
   });
-}
-
-export async function getSearchSuggestions(prefix: string): Promise<string[]> {
-  return getSuggestionsLib(prefix);
 }
 
 export interface QuickSearchResult {

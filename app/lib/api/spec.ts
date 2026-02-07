@@ -7,16 +7,6 @@
  * - Potentially for runtime validation
  */
 
-import type {
-  ApiBook,
-  ApiSearchResult,
-  ApiSearchResponse,
-  ApiBookResponse,
-  ApiErrorResponse,
-} from "./search";
-
-// Re-export types for convenience
-export type { ApiBook, ApiSearchResult, ApiSearchResponse, ApiBookResponse, ApiErrorResponse };
 
 export interface ParamSpec {
   name: string;
@@ -59,7 +49,7 @@ export interface EndpointSpec {
   };
 }
 
-export interface ApiSpec {
+interface ApiSpec {
   title: string;
   version: string;
   description: string;

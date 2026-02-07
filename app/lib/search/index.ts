@@ -153,21 +153,6 @@ export async function searchBooks(options: SearchOptions): Promise<SearchResult[
   return results;
 }
 
-export async function getSearchSuggestions(prefix: string, limit: number = 10): Promise<string[]> {
-  if (!prefix || prefix.length < 2) return [];
-
-  const results = rawDb
-    .prepare(
-      `SELECT DISTINCT title
-       FROM books_fts
-       WHERE title MATCH ?
-       LIMIT ?`,
-    )
-    .all(prefix + "*", limit) as Array<{ title: string }>;
-
-  return results.map((r) => r.title);
-}
-
 function buildFtsQuery(query: string): string {
   // Escape special FTS5 characters
   const escaped = query.replace(/['"(){}[\]^~*?:\\-]/g, " ");
@@ -183,4 +168,3 @@ function buildFtsQuery(query: string): string {
   return terms.join(" ");
 }
 
-export { buildFtsQuery };

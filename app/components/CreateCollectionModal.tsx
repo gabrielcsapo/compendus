@@ -24,7 +24,7 @@ interface CreateCollectionModalProps {
   onClose: () => void;
 }
 
-export function CreateCollectionModal({ isOpen, onClose }: CreateCollectionModalProps) {
+function CreateCollectionModal({ isOpen, onClose }: CreateCollectionModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(COLORS[0]);

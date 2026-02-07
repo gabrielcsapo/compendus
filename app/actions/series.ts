@@ -29,21 +29,6 @@ export interface SeriesWithCounts {
 }
 
 /**
- * Get all unique series names from owned books
- */
-export async function getOwnedSeries(): Promise<string[]> {
-  const result = await db
-    .selectDistinct({ series: books.series })
-    .from(books)
-    .where(isNotNull(books.series));
-
-  return result
-    .map((r) => r.series!)
-    .filter(Boolean)
-    .sort();
-}
-
-/**
  * Get all series with counts of owned and wanted books
  */
 export async function getAllSeriesWithCounts(): Promise<SeriesWithCounts[]> {
@@ -126,7 +111,7 @@ export async function getSeriesDetails(seriesName: string): Promise<SeriesInfo> 
 /**
  * Search for books in a series from external APIs
  */
-export async function searchSeriesBooks(seriesName: string): Promise<MetadataSearchResult[]> {
+async function searchSeriesBooks(seriesName: string): Promise<MetadataSearchResult[]> {
   // Search external APIs for the series
   const results = await searchAllSources(seriesName);
 

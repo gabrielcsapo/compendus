@@ -157,7 +157,7 @@ export interface AudioFileInput {
   trackNumber: number;
 }
 
-export interface MergeResult {
+interface MergeResult {
   success: boolean;
   duration?: number;
   chapters?: AudioChapter[];
@@ -165,7 +165,7 @@ export interface MergeResult {
   error?: string;
 }
 
-export interface MergeOptions {
+interface MergeOptions {
   onProgress?: (progress: number, currentTime: number, totalDuration: number) => void;
 }
 

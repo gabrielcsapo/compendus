@@ -4,7 +4,7 @@ import type { BookFormat } from "../types";
 // Image extensions for comic book archives
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
 
-export interface ComicPage {
+interface ComicPage {
   index: number;
   name: string;
   data: Buffer;
@@ -69,7 +69,7 @@ async function getCbzImageFileList(buffer: Buffer): Promise<string[]> {
 /**
  * Extract a single page from a CBZ (ZIP) file
  */
-export async function extractCbzPage(buffer: Buffer, pageIndex: number): Promise<ComicPage | null> {
+async function extractCbzPage(buffer: Buffer, pageIndex: number): Promise<ComicPage | null> {
   try {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(buffer);
@@ -100,41 +100,9 @@ export async function extractCbzPage(buffer: Buffer, pageIndex: number): Promise
 /**
  * Get page count from a CBZ file (without extracting data)
  */
-export async function getCbzPageCount(buffer: Buffer): Promise<number> {
+async function getCbzPageCount(buffer: Buffer): Promise<number> {
   const imageFiles = await getCbzImageFileList(buffer);
   return imageFiles.length;
-}
-
-/**
- * Extract all pages from a CBZ (ZIP) file
- */
-export async function extractCbzPages(buffer: Buffer): Promise<ComicPage[]> {
-  try {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(buffer);
-    const imageFiles = Object.keys(zip.files)
-      .filter((name) => !zip.files[name].dir && isImageFile(name))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-    const pages: ComicPage[] = [];
-    for (let index = 0; index < imageFiles.length; index++) {
-      const fileName = imageFiles[index];
-      const file = zip.files[fileName];
-      const data = await file.async("nodebuffer");
-
-      pages.push({
-        index,
-        name: fileName,
-        data,
-        mimeType: getMimeType(fileName),
-      });
-    }
-
-    return pages;
-  } catch (error) {
-    console.error("Error extracting CBZ pages:", error);
-    return [];
-  }
 }
 
 /**
@@ -181,7 +149,7 @@ async function getCbrImageFileList(buffer: Buffer): Promise<string[]> {
 /**
  * Extract a single page from a CBR (RAR) file
  */
-export async function extractCbrPage(buffer: Buffer, pageIndex: number): Promise<ComicPage | null> {
+async function extractCbrPage(buffer: Buffer, pageIndex: number): Promise<ComicPage | null> {
   try {
     const imageFiles = await getCbrImageFileList(buffer);
 
@@ -216,59 +184,9 @@ export async function extractCbrPage(buffer: Buffer, pageIndex: number): Promise
 /**
  * Get page count from a CBR file (without extracting data)
  */
-export async function getCbrPageCount(buffer: Buffer): Promise<number> {
+async function getCbrPageCount(buffer: Buffer): Promise<number> {
   const imageFiles = await getCbrImageFileList(buffer);
   return imageFiles.length;
-}
-
-/**
- * Extract all pages from a CBR (RAR) file
- */
-export async function extractCbrPages(buffer: Buffer): Promise<ComicPage[]> {
-  try {
-    const extractor = await createExtractorFromData({ data: bufferToArrayBuffer(buffer) });
-    const { files } = extractor.extract();
-
-    const pages: ComicPage[] = [];
-
-    // Collect all image files
-    for (const file of files) {
-      if (file.fileHeader.flags.directory) continue;
-      if (!isImageFile(file.fileHeader.name)) continue;
-
-      pages.push({
-        index: 0, // Will be set after sorting
-        name: file.fileHeader.name,
-        data: Buffer.from(file.extraction!),
-        mimeType: getMimeType(file.fileHeader.name),
-      });
-    }
-
-    // Sort alphabetically and update indices
-    pages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    pages.forEach((page, index) => {
-      page.index = index;
-    });
-
-    return pages;
-  } catch (error) {
-    console.error("Error extracting CBR pages:", error);
-    return [];
-  }
-}
-
-/**
- * Extract pages from a comic book archive (CBZ or CBR)
- */
-export async function extractComicPages(buffer: Buffer, format: BookFormat): Promise<ComicPage[]> {
-  switch (format) {
-    case "cbz":
-      return extractCbzPages(buffer);
-    case "cbr":
-      return extractCbrPages(buffer);
-    default:
-      throw new Error(`Not a comic book format: ${format}`);
-  }
 }
 
 /**
@@ -301,4 +219,51 @@ export async function getComicPageCount(buffer: Buffer, format: BookFormat): Pro
     default:
       throw new Error(`Not a comic book format: ${format}`);
   }
+}
+
+/**
+ * Convert a CBR (RAR) archive to CBZ (ZIP) format
+ * This allows iOS devices to read comics offline without server extraction
+ */
+export async function convertCbrToCbz(cbrBuffer: Buffer): Promise<Buffer> {
+  console.log(`[CBR→CBZ] Starting conversion, input size: ${(cbrBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+
+  // Get list of image files from CBR
+  const imageFiles = await getCbrImageFileList(cbrBuffer);
+
+  if (imageFiles.length === 0) {
+    throw new Error("No images found in CBR archive");
+  }
+
+  console.log(`[CBR→CBZ] Extracting ${imageFiles.length} images...`);
+
+  // Extract all images from CBR
+  const extractor = await createExtractorFromData({ data: bufferToArrayBuffer(cbrBuffer) });
+  const { files } = extractor.extract({ files: imageFiles });
+
+  let extractedCount = 0;
+  for (const file of files) {
+    if (file.extraction) {
+      // Get just the filename without directory path for cleaner structure
+      const baseName = file.fileHeader.name.split("/").pop() || file.fileHeader.name;
+      zip.file(baseName, file.extraction);
+      extractedCount++;
+    }
+  }
+
+  console.log(`[CBR→CBZ] Extracted ${extractedCount} images, creating CBZ...`);
+
+  // Generate CBZ with good compression
+  const cbzBuffer = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+
+  console.log(`[CBR→CBZ] Conversion complete, output size: ${(cbzBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+
+  return cbzBuffer;
 }

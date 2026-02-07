@@ -5,6 +5,7 @@ import { SearchCommandPalette } from "./components/SearchCommandPalette";
 import { DarkModeToggle } from "./components/DarkModeToggle.js";
 import { GlobalUploadDropzone } from "./components/GlobalUploadDropzone";
 import { SearchInput } from "./components/SearchInput";
+import { Footer } from "./components/Footer";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,7 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-40 backdrop-blur-md bg-background/80 border-b border-border">
           <nav className="container px-6 py-4 mx-auto">
             <ul className="flex gap-2 flex-wrap items-center">
@@ -102,7 +103,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <GlobalNavigationLoadingBar />
         <SearchCommandPalette />
         <GlobalUploadDropzone />
-        {children}
+        <div className="flex-1">
+          {children}
+        </div>
+        <Footer />
       </body>
     </html>
   );

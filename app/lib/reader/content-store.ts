@@ -248,37 +248,3 @@ function updateCacheOrder(bookId: string): void {
     cacheOrder.push(bookId);
   }
 }
-
-/**
- * Invalidate cached content for a book
- */
-export function invalidateContent(bookId: string): void {
-  contentCache.delete(bookId);
-  const index = cacheOrder.indexOf(bookId);
-  if (index > -1) {
-    cacheOrder.splice(index, 1);
-  }
-}
-
-/**
- * Clear entire cache
- */
-export function clearContentCache(): void {
-  contentCache.clear();
-  cacheOrder.length = 0;
-}
-
-/**
- * Get cache statistics
- */
-export function getCacheStats(): {
-  size: number;
-  maxSize: number;
-  keys: string[];
-} {
-  return {
-    size: contentCache.size,
-    maxSize: MAX_CACHE_SIZE,
-    keys: [...cacheOrder],
-  };
-}

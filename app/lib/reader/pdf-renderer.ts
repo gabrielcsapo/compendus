@@ -49,22 +49,3 @@ export async function renderPdfPage(
 
   return result.buffer;
 }
-
-/**
- * Clear cached PDF pages for a book
- */
-export async function clearPdfCache(bookId: string): Promise<void> {
-  await ensureCacheDir();
-
-  const { readdir, unlink } = await import("fs/promises");
-  try {
-    const files = await readdir(CACHE_DIR);
-    for (const file of files) {
-      if (file.startsWith(`${bookId}-page`)) {
-        await unlink(join(CACHE_DIR, file));
-      }
-    }
-  } catch {
-    // Ignore cleanup errors
-  }
-}

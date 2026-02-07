@@ -29,7 +29,7 @@ import type {
   ImportOptions,
 } from "../types";
 
-export interface ProcessingResultWithJob extends ProcessingResult {
+interface ProcessingResultWithJob extends ProcessingResult {
   jobId?: string;
 }
 
@@ -291,7 +291,7 @@ async function extractMetadata(buffer: Buffer, format: BookFormat): Promise<Book
   }
 }
 
-export async function extractContent(
+async function extractContent(
   buffer: Buffer,
   format: BookFormat,
 ): Promise<ExtractedContent> {
@@ -404,158 +404,6 @@ function queueContentIndexing(bookId: string, buffer: Buffer, format: BookFormat
     const content = await suppressConsole(() => extractContent(buffer, format));
     await indexContent(bookId, content);
   });
-}
-
-/**
- * Format duration in seconds to HH:MM:SS
- */
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-}
-
-/**
- * Process a multi-file audiobook by merging files into a single M4B
- */
-export async function processMultiFileAudiobook(
-  files: Array<{ buffer: Buffer; fileName: string }>,
-  folderName: string,
-  options: ImportOptions = {},
-): Promise<ProcessingResult> {
-  const startTime = Date.now();
-
-  if (files.length === 0) {
-    return { success: false, error: "no_files" };
-  }
-
-  // Sort files by track number
-  const sortedFiles = sortAudioFilesByTrack(files);
-
-  // Assign track numbers
-  const filesWithTracks: AudioFileInput[] = sortedFiles.map((f, i) => ({
-    buffer: f.buffer,
-    fileName: f.fileName,
-    trackNumber: i + 1,
-  }));
-
-  // Generate book ID
-  const bookId = uuid();
-
-  // Create output path for merged file
-  const { getBookFilePath } = await import("../storage");
-  const outputPath = getBookFilePath(bookId, "m4b");
-
-  // Merge all files into single M4B with progress logging
-  console.log(`[Merge] Starting merge of ${files.length} files for "${folderName}"...`);
-  const mergeResult = await mergeAudioFiles(filesWithTracks, outputPath, {
-    onProgress: (progress, currentTime, totalDuration) => {
-      const currentFormatted = formatDuration(currentTime);
-      const totalFormatted = formatDuration(totalDuration);
-      console.log(`[Merge] ${folderName}: ${progress}% (${currentFormatted} / ${totalFormatted})`);
-    },
-  });
-  console.log(`[Merge] Merge completed for "${folderName}"`);
-
-  if (!mergeResult.success) {
-    return {
-      success: false,
-      error: mergeResult.error || "merge_failed",
-    };
-  }
-
-  // Compute hash of merged file for deduplication
-  const fileHash = createHash("sha256").update(mergeResult.outputBuffer!).digest("hex");
-
-  // Check for duplicates
-  const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
-  if (existing && !options.overwriteExisting) {
-    // Clean up the merged file since it's a duplicate
-    const { deleteBookFile } = await import("../storage");
-    deleteBookFile(outputPath);
-    return {
-      success: false,
-      error: "duplicate",
-      existingBookId: existing.id,
-    };
-  }
-
-  // Extract metadata from first file
-  let metadata: AudioMetadata;
-  try {
-    metadata = await suppressConsole(() => extractAudioMetadata(sortedFiles[0].buffer));
-  } catch {
-    metadata = { title: null, authors: [] };
-  }
-
-  // Extract cover from first file (or try all files until we find one)
-  let coverResult = await suppressConsole(() => extractAudioCover(sortedFiles[0].buffer));
-  if (!coverResult) {
-    for (let i = 1; i < sortedFiles.length && !coverResult; i++) {
-      coverResult = await suppressConsole(() => extractAudioCover(sortedFiles[i].buffer));
-    }
-  }
-  const coverPath = coverResult ? storeCoverImage(coverResult.buffer, bookId) : null;
-
-  // Merge metadata with overrides
-  const meta = options.metadata;
-  const fileName = `${folderName}.m4b`;
-
-  try {
-    await db.insert(books).values({
-      id: bookId,
-      filePath: outputPath,
-      fileName,
-      fileSize: mergeResult.outputBuffer!.length,
-      fileHash,
-      mimeType: "audio/mp4",
-      title: meta?.title || metadata.title || folderName,
-      subtitle: metadata.subtitle,
-      authors: meta?.authors
-        ? JSON.stringify(meta.authors)
-        : JSON.stringify(metadata.authors || []),
-      publisher: meta?.publisher || metadata.publisher,
-      description: meta?.description || metadata.description,
-      language: meta?.language || metadata.language,
-      coverPath,
-      coverColor: coverResult?.dominantColor,
-      duration: mergeResult.duration,
-      narrator: metadata.narrator,
-      chapters: mergeResult.chapters ? JSON.stringify(mergeResult.chapters) : null,
-    });
-  } catch (error: unknown) {
-    // Handle UNIQUE constraint violation
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "SQLITE_CONSTRAINT_UNIQUE"
-    ) {
-      const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
-      return {
-        success: false,
-        error: "duplicate",
-        existingBookId: existing?.id,
-      };
-    }
-    throw error;
-  }
-
-  // Index metadata for search
-  scheduleBackground(async () => {
-    const { indexBookMetadata } = await import("../search/indexer");
-    const book = await db.select().from(books).where(eq(books.id, bookId)).get();
-    if (book) {
-      await indexBookMetadata(book.id, book.title, book.subtitle, book.authors || "[]", book.description);
-    }
-  });
-
-  return {
-    success: true,
-    bookId,
-    processingTime: Date.now() - startTime,
-  };
 }
 
 /**
@@ -741,4 +589,3 @@ export async function processMultiFileAudiobookWithProgress(
   };
 }
 
-export { detectFormat, extractMetadata };

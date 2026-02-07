@@ -9,7 +9,7 @@ interface AuthorLinkProps {
   asSpan?: boolean;
 }
 
-export function AuthorLink({ name, className = "", asSpan = false }: AuthorLinkProps) {
+function AuthorLink({ name, className = "", asSpan = false }: AuthorLinkProps) {
   const navigate = useNavigate();
   const href = `/author/${encodeURIComponent(name)}`;
 

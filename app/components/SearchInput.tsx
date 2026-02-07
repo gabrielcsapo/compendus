@@ -1,33 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useCallback } from "react";
 
 export function SearchInput() {
-  const [query, setQuery] = useState("");
-  const navigate = useNavigate();
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (query.trim()) {
-        navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-      }
-    },
-    [query, navigate],
-  );
+  const handleClick = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("open-search-palette"));
+  }, []);
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search books... (CMD+K)"
-        className="input w-64 pl-10"
-      />
+    <button
+      onClick={handleClick}
+      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-elevated hover:bg-surface border border-border text-foreground-muted hover:text-foreground transition-colors"
+      aria-label="Search books"
+    >
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted"
+        className="w-4 h-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -39,6 +26,10 @@ export function SearchInput() {
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
         />
       </svg>
-    </form>
+      <span className="text-sm hidden sm:inline">Search</span>
+      <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-mono bg-background rounded border border-border">
+        <span className="text-xs">⌘</span>K
+      </kbd>
+    </button>
   );
 }

@@ -25,6 +25,7 @@ struct CompendusApp: App {
 
     @State private var serverConfig = ServerConfig()
     @State private var storageManager = StorageManager()
+    @State private var comicExtractor = ComicExtractor()
 
     // These are created lazily based on serverConfig
     @State private var apiService: APIService
@@ -45,6 +46,7 @@ struct CompendusApp: App {
             ContentView()
                 .environment(serverConfig)
                 .environment(storageManager)
+                .environment(comicExtractor)
                 .environment(apiService)
                 .environment(downloadManager)
         }

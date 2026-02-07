@@ -121,26 +121,6 @@ export interface ReaderPageResponse {
   prevPage: number | null;
 }
 
-export interface ReaderPositionResponse {
-  pageNum: number;
-  content: PageContent;
-  position: number;
-}
-
-export interface SearchResult {
-  text: string;
-  context: string;
-  position: number;
-  pageNum: number;
-  chapterTitle?: string;
-}
-
-export interface ReaderSearchResponse {
-  query: string;
-  results: SearchResult[];
-  totalResults: number;
-}
-
 // Bookmark with normalized position
 export interface ReaderBookmark {
   id: string;
@@ -162,12 +142,4 @@ export interface ReaderHighlight {
   note?: string;
   color: string;
   createdAt: Date;
-}
-
-// Reading progress
-export interface ReadingProgress {
-  bookId: string;
-  position: number;
-  pageNum?: number;
-  updatedAt: Date;
 }

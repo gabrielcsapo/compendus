@@ -34,6 +34,6 @@ export function getBookType(format: string, bookTypeOverride?: string | null): B
 /**
  * Check if a string is a valid BookType
  */
-export function isValidBookType(value: string): value is BookType {
+function isValidBookType(value: string): value is BookType {
   return value === "audiobook" || value === "ebook" || value === "comic";
 }

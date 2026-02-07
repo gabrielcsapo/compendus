@@ -442,91 +442,6 @@ export async function lookupByISBN(
 }
 
 /**
- * Get detailed book information from Open Library work key
- */
-export async function getBookDetails(
-  workKey: string,
-): Promise<MetadataSearchResult | null> {
-  // Check cache first
-  const cacheKey = `openlibrary:work:${workKey}`;
-  const cached = metadataCache.get<MetadataSearchResult | null>(cacheKey);
-  if (cached !== null) {
-    return cached;
-  }
-
-  const response = await fetch(`https://openlibrary.org${workKey}.json`);
-
-  if (!response.ok) {
-    console.error("Open Library work lookup failed:", response.statusText);
-    metadataCache.set(cacheKey, null);
-    return null;
-  }
-
-  const work = await response.json();
-
-  // Get description
-  let description: string | null = null;
-  if (work.description) {
-    description =
-      typeof work.description === "string"
-        ? work.description
-        : work.description.value;
-  }
-
-  // Fetch authors
-  const authors: string[] = [];
-  if (work.authors) {
-    for (const authorRef of work.authors) {
-      const authorKey = authorRef.author?.key || authorRef.key;
-      if (authorKey) {
-        try {
-          const authorResponse = await fetch(
-            `https://openlibrary.org${authorKey}.json`,
-          );
-          if (authorResponse.ok) {
-            const author: OpenLibraryAuthor = await authorResponse.json();
-            authors.push(author.name);
-          }
-        } catch {
-          // Skip if fetch fails
-        }
-      }
-    }
-  }
-
-  // Get cover URL
-  const coverUrl = work.covers?.[0]
-    ? `https://covers.openlibrary.org/b/id/${work.covers[0]}-L.jpg`
-    : null;
-
-  const result: MetadataSearchResult = {
-    title: work.title,
-    subtitle: work.subtitle || null,
-    authors,
-    publisher: null,
-    publishedDate: work.first_publish_date || null,
-    description,
-    pageCount: null,
-    isbn: null,
-    isbn13: null,
-    isbn10: null,
-    language: null,
-    subjects: work.subjects?.slice(0, 20) || [],
-    series: null,
-    seriesNumber: null,
-    coverUrl,
-    coverUrlHQ: null,
-    coverUrls: coverUrl ? [coverUrl] : [],
-    source: "openlibrary",
-    sourceId: workKey,
-  };
-
-  // Cache the result
-  metadataCache.set(cacheKey, result);
-  return result;
-}
-
-/**
  * Try to find the best metadata match for a book
  * Searches multiple sources and combines best results
  */
@@ -582,14 +497,10 @@ export async function findBestMetadata(
     }
 
     if (olResults.length > 0) {
-      // Get full details from Open Library
-      const details = await getBookDetails(olResults[0].sourceId);
-      const olData = details || olResults[0];
-
       if (result) {
-        result = mergeMetadata(result, olData);
+        result = mergeMetadata(result, olResults[0]);
       } else {
-        result = olData;
+        result = olResults[0];
       }
     }
   }
@@ -672,13 +583,4 @@ export async function searchAllSources(
   }
 
   return combined.slice(0, 20);
-}
-
-/**
- * Search specifically for comics using Google Books
- */
-export async function searchComics(
-  title: string,
-): Promise<MetadataSearchResult[]> {
-  return searchGoogleBooks(`${title} comic`);
 }

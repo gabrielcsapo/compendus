@@ -2,7 +2,8 @@
 //  ComicReaderView.swift
 //  Compendus
 //
-//  Comic reader for CBR/CBZ files with server-side page extraction
+//  Comic reader for CBR/CBZ files with local extraction support for offline reading
+//  CBZ files can be read offline, CBR files require server connection
 //
 
 import SwiftUI
@@ -14,6 +15,7 @@ struct ComicReaderView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(APIService.self) private var apiService
     @Environment(StorageManager.self) private var storageManager
+    @Environment(ComicExtractor.self) private var comicExtractor
 
     @State private var currentPage: Int = 0
     @State private var totalPages: Int = 0
@@ -22,6 +24,7 @@ struct ComicReaderView: View {
     @State private var showingControls = true
     @State private var currentPageImage: UIImage?
     @State private var isLoadingPage = false
+    @State private var isOfflineMode = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -87,6 +90,21 @@ struct ComicReaderView: View {
                 // Controls overlay
                 if showingControls && !isLoading && errorMessage == nil {
                     VStack {
+                        // Offline indicator at top
+                        if isOfflineMode {
+                            HStack {
+                                Image(systemName: "icloud.slash")
+                                Text("Offline Mode")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                            .padding(.top, 8)
+                        }
+
                         Spacer()
 
                         VStack(spacing: 12) {
@@ -138,6 +156,63 @@ struct ComicReaderView: View {
         isLoading = true
         errorMessage = nil
 
+        // Check if we can use local extraction
+        let canExtractLocally = comicExtractor.supportsLocalExtraction(format: book.format)
+        let hasLocalFile = book.fileURL != nil && FileManager.default.fileExists(atPath: book.fileURL!.path)
+
+        if canExtractLocally && hasLocalFile {
+            // Use local extraction for CBZ
+            await loadComicLocally()
+        } else if book.format.lowercased() == "cbr" && hasLocalFile {
+            // CBR downloaded but needs server for extraction
+            // Try server first, but inform user about limitation
+            await loadComicFromServer()
+        } else {
+            // No local file or unsupported format - use server
+            await loadComicFromServer()
+        }
+    }
+
+    private func loadComicLocally() async {
+        guard let fileURL = book.fileURL else {
+            errorMessage = "Book file not found"
+            isLoading = false
+            return
+        }
+
+        do {
+            // Get page count from local file
+            totalPages = try comicExtractor.getPageCount(from: fileURL, format: book.format)
+
+            if totalPages == 0 {
+                errorMessage = "Comic has no pages"
+                isLoading = false
+                return
+            }
+
+            // Cache page count for future use
+            if book.pageCount != totalPages {
+                book.pageCount = totalPages
+                try? modelContext.save()
+            }
+
+            // Restore last position
+            if let lastPosition = book.lastPosition, let page = Int(lastPosition) {
+                currentPage = min(page, totalPages - 1)
+            }
+
+            isOfflineMode = true
+            isLoading = false
+
+            // Load initial page
+            await loadPage(currentPage)
+        } catch {
+            errorMessage = error.localizedDescription
+            isLoading = false
+        }
+    }
+
+    private func loadComicFromServer() async {
         do {
             // Get page count from server
             let info = try await apiService.fetchComicInfo(bookId: book.id, format: book.format)
@@ -149,17 +224,29 @@ struct ComicReaderView: View {
                 return
             }
 
+            // Cache page count
+            if book.pageCount != totalPages {
+                book.pageCount = totalPages
+                try? modelContext.save()
+            }
+
             // Restore last position
             if let lastPosition = book.lastPosition, let page = Int(lastPosition) {
                 currentPage = min(page, totalPages - 1)
             }
 
+            isOfflineMode = false
             isLoading = false
 
             // Load initial page
             await loadPage(currentPage)
         } catch {
-            errorMessage = "Failed to load comic: \(error.localizedDescription)"
+            // If server fails and we have a CBR file, show specific message
+            if book.format.lowercased() == "cbr" {
+                errorMessage = "CBR files require server connection for reading. Please connect to your server or download books in CBZ format for offline reading."
+            } else {
+                errorMessage = "Failed to load comic: \(error.localizedDescription)"
+            }
             isLoading = false
         }
     }
@@ -168,7 +255,7 @@ struct ComicReaderView: View {
         isLoadingPage = true
         currentPageImage = nil
 
-        // Check cache first
+        // Check local cache first
         if let cachedData = storageManager.getCachedComicPage(bookId: book.id, page: page),
            let image = UIImage(data: cachedData) {
             currentPageImage = image
@@ -176,7 +263,41 @@ struct ComicReaderView: View {
             return
         }
 
-        // Fetch from server
+        // Try local extraction for CBZ
+        let canExtractLocally = comicExtractor.supportsLocalExtraction(format: book.format)
+        let hasLocalFile = book.fileURL != nil && FileManager.default.fileExists(atPath: book.fileURL!.path)
+
+        if canExtractLocally && hasLocalFile {
+            await loadPageLocally(page)
+        } else {
+            await loadPageFromServer(page)
+        }
+    }
+
+    private func loadPageLocally(_ page: Int) async {
+        guard let fileURL = book.fileURL else {
+            isLoadingPage = false
+            return
+        }
+
+        do {
+            let data = try comicExtractor.extractPage(from: fileURL, format: book.format, pageIndex: page)
+            if let image = UIImage(data: data) {
+                currentPageImage = image
+
+                // Cache for faster access next time
+                try? storageManager.cacheComicPage(bookId: book.id, page: page, data: data)
+            }
+        } catch {
+            print("Failed to extract page \(page) locally: \(error)")
+            // Try server as fallback
+            await loadPageFromServer(page)
+        }
+
+        isLoadingPage = false
+    }
+
+    private func loadPageFromServer(_ page: Int) async {
         do {
             let data = try await apiService.fetchComicPage(bookId: book.id, format: book.format, page: page)
             if let image = UIImage(data: data) {
@@ -186,8 +307,7 @@ struct ComicReaderView: View {
                 try? storageManager.cacheComicPage(bookId: book.id, page: page, data: data)
             }
         } catch {
-            // Page load error - show placeholder
-            print("Failed to load page \(page): \(error)")
+            print("Failed to load page \(page) from server: \(error)")
         }
 
         isLoadingPage = false
@@ -208,6 +328,7 @@ struct ComicReaderView: View {
     private func saveProgress() {
         book.lastPosition = String(currentPage)
         book.readingProgress = totalPages > 0 ? Double(currentPage + 1) / Double(totalPages) : 0
+        book.lastReadAt = Date()
         try? modelContext.save()
     }
 }
@@ -227,5 +348,6 @@ struct ComicReaderView: View {
     }
     .environment(APIService(config: ServerConfig()))
     .environment(StorageManager())
+    .environment(ComicExtractor())
     .modelContainer(for: DownloadedBook.self, inMemory: true)
 }
