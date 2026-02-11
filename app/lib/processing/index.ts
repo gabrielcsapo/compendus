@@ -5,7 +5,7 @@ import { lookup } from "mime-types";
 import { eq, sql } from "drizzle-orm";
 
 import { db, books } from "../db";
-import { storeBookFile, storeCoverImage } from "../storage";
+import { storeBookFile, storeCoverImage, getBookFilePath, getBookFileRelativePath } from "../storage";
 import { extractPdfMetadata, extractPdfContent } from "./pdf";
 import { extractEpubMetadata, extractEpubContent } from "./epub";
 import { extractMobiMetadata, extractMobiContent } from "./mobi";
@@ -445,9 +445,10 @@ export async function processMultiFileAudiobookWithProgress(
   // Generate book ID
   const bookId = uuid();
 
-  // Create output path for merged file
-  const { getBookFilePath } = await import("../storage");
+  // Create output path for merged file (absolute for file operations)
   const outputPath = getBookFilePath(bookId, "m4b");
+  // Relative path for database storage
+  const relativeFilePath = getBookFileRelativePath(bookId, "m4b");
 
   // Merge all files into single M4B with progress tracking
   updateJobProgress(jobId, { status: "running", progress: 0, message: "Merging audio files..." });
@@ -522,7 +523,7 @@ export async function processMultiFileAudiobookWithProgress(
   try {
     await db.insert(books).values({
       id: bookId,
-      filePath: outputPath,
+      filePath: relativeFilePath,
       fileName,
       fileSize: mergeResult.outputBuffer!.length,
       fileHash,

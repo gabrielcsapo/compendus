@@ -96,7 +96,7 @@ struct ServerSetupView: View {
                 }
 
                 VStack(spacing: 16) {
-                    TextField("Server URL (e.g., 192.168.1.100:5173)", text: $serverURL)
+                    TextField("Server URL (e.g., 192.168.1.100:3000)", text: $serverURL)
                         .textFieldStyle(.roundedBorder)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()

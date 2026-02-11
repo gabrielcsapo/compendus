@@ -1,1 +1,0 @@
-ALTER TABLE `books` ADD `book_type_override` text;

@@ -11,7 +11,6 @@ export default defineConfig({
     minify: false,
   },
   plugins: [
-    // import("vite-plugin-inspect").then(m => m.default()),
     tailwindcss(),
     react(),
     reactRouter(),
@@ -32,13 +31,23 @@ export default defineConfig({
     include: ["react-router", "react-router/internal/react-server-client"],
     exclude: ["better-sqlite3"],
   },
+  preview: {
+    // Allow connections from iOS simulator and local network devices
+    host: true,
+    port: 3000,
+    // Allow requests from reverse proxy with different origin
+    allowedHosts: ["*"],
+  },
   server: {
     // Allow connections from iOS simulator and local network devices
     host: true,
+    port: 3000,
     // Serve static files from data directory
     fs: {
       allow: ["..", "./data"],
     },
+    // Allow requests from reverse proxy with different origin
+    allowedHosts: ["*"],
   },
   // Public directory for static assets
   publicDir: "public",

@@ -2,7 +2,7 @@
 
 import { db, books, booksTags, booksCollections, tags } from "../lib/db";
 import { eq, desc, asc, like, inArray, sql, and } from "drizzle-orm";
-import { deleteBookFile, deleteCoverImage, getBookFilePath } from "../lib/storage";
+import { deleteBookFile, deleteCoverImage, getBookFilePath, resolveStoragePath } from "../lib/storage";
 import { removeBookIndex, indexBookMetadata } from "../lib/search/indexer";
 import { findBestMetadata, searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { processAndStoreCover } from "../lib/processing/cover";
@@ -196,7 +196,7 @@ export async function updateBook(
           if (updatedBook.coverPath) {
             try {
               const { readFile } = await import("fs/promises");
-              coverImage = await readFile(updatedBook.coverPath);
+              coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
             } catch {
               // Cover file not found, proceed without embedding
             }
@@ -561,7 +561,7 @@ export async function refreshMetadata(
         if (updatedBook.coverPath) {
           try {
             const { readFile } = await import("fs/promises");
-            coverImage = await readFile(updatedBook.coverPath);
+            coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
           } catch {
             // Cover file not found, proceed without embedding
           }
@@ -795,7 +795,7 @@ export async function applyMetadata(
     if (updateData.coverPath) {
       try {
         const { readFile } = await import("fs/promises");
-        coverImage = await readFile(updateData.coverPath as string);
+        coverImage = await readFile(resolveStoragePath(updateData.coverPath as string));
       } catch {
         // Cover file not found, proceed without embedding
       }

@@ -54,7 +54,7 @@ importers:
         specifier: ^3.2.0
         version: 3.2.0
       pdfjs-dist:
-        specifier: ^5.4.624
+        specifier: ^5.4.530
         version: 5.4.624
       react:
         specifier: ^19.2.4

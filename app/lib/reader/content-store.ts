@@ -5,6 +5,7 @@ import { Worker } from "worker_threads";
 import { join } from "path";
 
 import { db, books } from "../db";
+import { resolveStoragePath } from "../storage";
 import { suppressConsole } from "../processing/utils";
 import type { NormalizedContent } from "./types";
 import type { BookFormat } from "../types";
@@ -106,10 +107,9 @@ export async function getContent(
     return null;
   }
 
-  // Read book file using the stored filePath directly
-  // (filePath is the actual path on disk, format is derived from original fileName which may differ)
+  // Read book file using the stored filePath (resolve relative to project root)
   const format = book.format as BookFormat;
-  const filePath = book.filePath;
+  const filePath = resolveStoragePath(book.filePath);
   if (!existsSync(filePath)) {
     console.error(`[Content Store] Book file not found: ${filePath}`);
     return null;

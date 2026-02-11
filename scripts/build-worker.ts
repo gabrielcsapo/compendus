@@ -3,6 +3,7 @@
  * Bundles the worker and its dependencies into a single JS file
  */
 import { build } from "esbuild";
+import { copyFile, mkdir } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -51,6 +52,18 @@ async function buildWorker() {
     // Log level
     logLevel: "info",
   });
+
+  // Copy pdf.worker.mjs to dist/worker directory
+  // pdfjs-dist requires this worker file to exist alongside the bundled parser-worker
+  const pdfWorkerSrc = join(
+    rootDir,
+    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+  );
+  const pdfWorkerDest = join(rootDir, "dist/worker/pdf.worker.mjs");
+
+  await mkdir(dirname(pdfWorkerDest), { recursive: true });
+  await copyFile(pdfWorkerSrc, pdfWorkerDest);
+  console.log("[Worker Build] Copied pdf.worker.mjs to dist/worker/");
 
   const duration = ((performance.now() - startTime) / 1000).toFixed(2);
   console.log(`[Worker Build] Done in ${duration}s`);
