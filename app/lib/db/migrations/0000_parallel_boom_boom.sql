@@ -16,7 +16,19 @@ CREATE TABLE `books` (
 	`file_name` text NOT NULL,
 	`file_size` integer NOT NULL,
 	`file_hash` text NOT NULL,
-	`format` text NOT NULL,
+	`format` text GENERATED ALWAYS AS (CASE
+          WHEN file_name LIKE '%.pdf' THEN 'pdf'
+          WHEN file_name LIKE '%.epub' THEN 'epub'
+          WHEN file_name LIKE '%.mobi' THEN 'mobi'
+          WHEN file_name LIKE '%.azw3' THEN 'azw3'
+          WHEN file_name LIKE '%.azw' THEN 'mobi'
+          WHEN file_name LIKE '%.cbr' THEN 'cbr'
+          WHEN file_name LIKE '%.cbz' THEN 'cbz'
+          WHEN file_name LIKE '%.m4b' THEN 'm4b'
+          WHEN file_name LIKE '%.mp3' THEN 'mp3'
+          WHEN file_name LIKE '%.m4a' THEN 'm4a'
+          ELSE 'unknown'
+        END) VIRTUAL NOT NULL,
 	`mime_type` text NOT NULL,
 	`title` text NOT NULL,
 	`subtitle` text,
@@ -26,10 +38,18 @@ CREATE TABLE `books` (
 	`description` text,
 	`isbn` text,
 	`isbn13` text,
+	`isbn10` text,
 	`language` text,
 	`page_count` integer,
+	`series` text,
+	`series_number` text,
+	`duration` integer,
+	`narrator` text,
+	`chapters` text,
 	`cover_path` text,
 	`cover_color` text,
+	`match_skipped` integer DEFAULT false,
+	`book_type_override` text,
 	`reading_progress` real DEFAULT 0,
 	`last_read_at` integer,
 	`last_position` text,
@@ -110,4 +130,32 @@ CREATE TABLE `tags` (
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_tags_name` ON `tags` (`name`);
+CREATE UNIQUE INDEX `idx_tags_name` ON `tags` (`name`);--> statement-breakpoint
+CREATE TABLE `wanted_books` (
+	`id` text PRIMARY KEY NOT NULL,
+	`title` text NOT NULL,
+	`subtitle` text,
+	`authors` text,
+	`publisher` text,
+	`published_date` text,
+	`description` text,
+	`isbn` text,
+	`isbn13` text,
+	`isbn10` text,
+	`language` text,
+	`page_count` integer,
+	`series` text,
+	`series_number` text,
+	`cover_url` text,
+	`source` text NOT NULL,
+	`source_id` text,
+	`status` text DEFAULT 'wishlist' NOT NULL,
+	`priority` integer DEFAULT 0,
+	`notes` text,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_wanted_books_series` ON `wanted_books` (`series`);--> statement-breakpoint
+CREATE INDEX `idx_wanted_books_status` ON `wanted_books` (`status`);--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_wanted_books_source` ON `wanted_books` (`source`,`source_id`);

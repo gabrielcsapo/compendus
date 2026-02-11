@@ -13,8 +13,6 @@
 		<string>CloudKit</string>
 	</array>
 	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.compendus.shared</string>
-	</array>
+	<array/>
 </dict>
 </plist>

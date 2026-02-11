@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { mkdirSync } from "fs";
 import { dirname, resolve } from "path";
 import * as schema from "./schema";
@@ -18,6 +19,9 @@ sqlite.pragma("journal_mode = WAL");
 
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
+
+// Run migrations automatically on startup
+migrate(db, { migrationsFolder: resolve(import.meta.dirname, "migrations") });
 
 // Export raw sqlite for FTS operations
 export const rawDb = sqlite;

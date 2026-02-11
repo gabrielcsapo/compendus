@@ -68,7 +68,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Server")
                 } footer: {
-                    Text("Enter the IP address or hostname of your Compendus server (e.g., 192.168.1.100:5173)")
+                    Text("Enter the IP address or hostname of your Compendus server (e.g., 192.168.1.100:3000)")
                 }
 
                 // Appearance section

@@ -1,10 +1,23 @@
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve, dirname, isAbsolute } from "path";
 import type { BookFormat } from "../types";
 
 const DATA_DIR = resolve(process.cwd(), "data");
 const BOOKS_DIR = resolve(DATA_DIR, "books");
 const COVERS_DIR = resolve(DATA_DIR, "covers");
+
+/**
+ * Resolve a relative path (stored in DB) to an absolute path.
+ * Handles both new relative paths (e.g., "data/books/uuid.pdf") and
+ * legacy absolute paths for backwards compatibility.
+ */
+export function resolveStoragePath(relativePath: string): string {
+  if (isAbsolute(relativePath)) {
+    // Legacy absolute path - return as-is for backwards compatibility
+    return relativePath;
+  }
+  return resolve(process.cwd(), relativePath);
+}
 
 // Ensure directories exist
 mkdirSync(BOOKS_DIR, { recursive: true });
@@ -25,28 +38,31 @@ const FORMAT_EXTENSIONS: Record<BookFormat, string> = {
 export function storeBookFile(buffer: Buffer, bookId: string, format: BookFormat): string {
   const ext = FORMAT_EXTENSIONS[format];
   const fileName = `${bookId}${ext}`;
-  const filePath = resolve(BOOKS_DIR, fileName);
+  const absolutePath = resolve(BOOKS_DIR, fileName);
 
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, buffer);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, buffer);
 
-  return filePath;
+  // Return relative path for database storage
+  return `data/books/${fileName}`;
 }
 
 export function storeCoverImage(buffer: Buffer, bookId: string): string {
   const fileName = `${bookId}.jpg`;
-  const filePath = resolve(COVERS_DIR, fileName);
+  const absolutePath = resolve(COVERS_DIR, fileName);
 
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, buffer);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, buffer);
 
-  return filePath;
+  // Return relative path for database storage
+  return `data/covers/${fileName}`;
 }
 
 export function deleteBookFile(filePath: string): boolean {
   try {
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
+    const absolutePath = resolveStoragePath(filePath);
+    if (existsSync(absolutePath)) {
+      unlinkSync(absolutePath);
       return true;
     }
     return false;
@@ -57,8 +73,9 @@ export function deleteBookFile(filePath: string): boolean {
 
 export function deleteCoverImage(coverPath: string): boolean {
   try {
-    if (existsSync(coverPath)) {
-      unlinkSync(coverPath);
+    const absolutePath = resolveStoragePath(coverPath);
+    if (existsSync(absolutePath)) {
+      unlinkSync(absolutePath);
       return true;
     }
     return false;
@@ -69,7 +86,14 @@ export function deleteCoverImage(coverPath: string): boolean {
 
 export function getBookFilePath(bookId: string, format: BookFormat): string {
   const ext = FORMAT_EXTENSIONS[format];
+  // Return absolute path for file operations
   return resolve(BOOKS_DIR, `${bookId}${ext}`);
+}
+
+export function getBookFileRelativePath(bookId: string, format: BookFormat): string {
+  const ext = FORMAT_EXTENSIONS[format];
+  // Return relative path for database storage
+  return `data/books/${bookId}${ext}`;
 }
 
 export { BOOKS_DIR };

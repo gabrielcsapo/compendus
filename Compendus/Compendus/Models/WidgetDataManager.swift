@@ -8,7 +8,7 @@
 import Foundation
 
 /// App Group identifier - must match the one configured in Xcode Signing & Capabilities
-let appGroupIdentifier = "group.com.compendus.shared"
+let appGroupIdentifier = "com.gabrielcsapo.Compendus.shared"
 
 /// Lightweight book data structure for widget display
 struct WidgetBook: Codable {
