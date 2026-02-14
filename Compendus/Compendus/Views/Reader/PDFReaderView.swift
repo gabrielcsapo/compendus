@@ -2,7 +2,7 @@
 //  PDFReaderView.swift
 //  Compendus
 //
-//  PDF reader using native PDFKit
+//  PDF reader using native PDFKit with highlighting support
 //
 
 import SwiftUI
@@ -24,6 +24,16 @@ struct PDFReaderView: View {
     @State private var brightness: Double = Double(UIScreen.main.brightness)
     @State private var originalBrightness: Double = Double(UIScreen.main.brightness)
 
+    // Highlighting state
+    @State private var highlights: [BookHighlight] = []
+    @State private var hasTextSelection = false
+    @State private var showingFloatingToolbar = false
+    @State private var showingCustomColorPicker = false
+    @State private var customColor: Color = .yellow
+    @State private var selectionFrame: CGRect?
+    @State private var showingHighlights = false
+    @State private var pdfViewReference: PDFView?
+
     var body: some View {
         Group {
             if let error = errorMessage {
@@ -33,40 +43,88 @@ struct PDFReaderView: View {
                     Text(error)
                 }
             } else if let document = pdfDocument {
-                ZStack {
-                    PDFKitView(document: document, currentPage: $currentPage)
+                GeometryReader { geometry in
+                    ZStack {
+                        PDFKitView(
+                            document: document,
+                            currentPage: $currentPage,
+                            onSelectionChanged: { hasSelection, frame in
+                                hasTextSelection = hasSelection
+                                selectionFrame = frame
+                                if hasSelection {
+                                    showingFloatingToolbar = true
+                                } else {
+                                    showingFloatingToolbar = false
+                                }
+                            },
+                            onPDFViewCreated: { pdfView in
+                                pdfViewReference = pdfView
+                            }
+                        )
                         .ignoresSafeArea(edges: .bottom)
 
-                    // Controls overlay
-                    VStack(spacing: 0) {
-                        Spacer()
+                        // Controls overlay
+                        VStack(spacing: 0) {
+                            Spacer()
 
-                        // Thumbnail scrubber
-                        if showingThumbnails {
-                            PDFThumbnailScrubber(
-                                document: document,
-                                currentPage: $currentPage
-                            )
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-
-                        // Main controls
-                        if showingControls {
-                            controlsOverlay
+                            // Thumbnail scrubber
+                            if showingThumbnails {
+                                PDFThumbnailScrubber(
+                                    document: document,
+                                    currentPage: $currentPage
+                                )
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+
+                            // Main controls
+                            if showingControls {
+                                controlsOverlay
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+
+                            // Page indicator (always visible when controls shown)
+                            if showingControls || !showingThumbnails {
+                                pageIndicator
+                            }
                         }
 
-                        // Page indicator (always visible when controls shown)
-                        if showingControls || !showingThumbnails {
-                            pageIndicator
+                        // Floating highlight toolbar
+                        if showingFloatingToolbar, let frame = selectionFrame {
+                            FloatingHighlightToolbar(
+                                selectionRect: frame,
+                                containerSize: geometry.size,
+                                onSelectColor: { color in
+                                    saveHighlight(color: color)
+                                    showingFloatingToolbar = false
+                                },
+                                onCustomColor: {
+                                    showingCustomColorPicker = true
+                                },
+                                onDismiss: {
+                                    pdfViewReference?.clearSelection()
+                                    hasTextSelection = false
+                                    showingFloatingToolbar = false
+                                }
+                            )
                         }
                     }
-                }
-                .onTapGesture {
-                    withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
-                        showingControls.toggle()
-                        if !showingControls {
-                            showingThumbnails = false
+                    .onTapGesture { location in
+                        let width = UIScreen.main.bounds.width
+                        if location.x < width * 0.3 {
+                            if currentPage > 0 {
+                                currentPage -= 1
+                            }
+                        } else if location.x > width * 0.7 {
+                            if currentPage < totalPages - 1 {
+                                currentPage += 1
+                            }
+                        } else {
+                            withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
+                                showingControls.toggle()
+                                if !showingControls {
+                                    showingThumbnails = false
+                                }
+                            }
                         }
                     }
                 }
@@ -76,6 +134,17 @@ struct PDFReaderView: View {
         }
         .navigationTitle(book.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if pdfDocument != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingHighlights = true
+                    } label: {
+                        Image(systemName: "highlighter")
+                    }
+                }
+            }
+        }
         .task {
             loadPDF()
         }
@@ -83,8 +152,59 @@ struct PDFReaderView: View {
             saveProgress(page: newValue)
         }
         .onDisappear {
-            // Restore original brightness when leaving
             UIScreen.main.brightness = CGFloat(originalBrightness)
+        }
+        .sheet(isPresented: $showingCustomColorPicker) {
+            NavigationStack {
+                VStack(spacing: 20) {
+                    ColorPicker("Choose a color", selection: $customColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .scaleEffect(2)
+                        .padding(.top, 40)
+
+                    Spacer()
+
+                    Button {
+                        let uiColor = UIColor(customColor)
+                        let hex = uiColor.hexString
+                        saveHighlight(color: hex)
+                        showingFloatingToolbar = false
+                        showingCustomColorPicker = false
+                    } label: {
+                        Text("Highlight")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(customColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                }
+                .navigationTitle("Custom Color")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            showingCustomColorPicker = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingHighlights) {
+            PDFHighlightsView(
+                highlights: highlights,
+                onSelect: { highlight in
+                    navigateToHighlight(highlight)
+                    showingHighlights = false
+                },
+                onDelete: { highlight in
+                    deleteHighlight(highlight)
+                }
+            )
         }
     }
 
@@ -181,6 +301,10 @@ struct PDFReaderView: View {
         if let lastPosition = book.lastPosition, let page = Int(lastPosition) {
             currentPage = min(page, totalPages - 1)
         }
+
+        // Load and apply saved highlights
+        fetchHighlights()
+        applyHighlightAnnotations(to: document)
     }
 
     private func saveProgress(page: Int) {
@@ -188,11 +312,156 @@ struct PDFReaderView: View {
         book.readingProgress = totalPages > 0 ? Double(page + 1) / Double(totalPages) : 0
         try? modelContext.save()
     }
+
+    // MARK: - Highlight Methods
+
+    private func fetchHighlights() {
+        let bookId = book.id
+        let descriptor = FetchDescriptor<BookHighlight>(
+            predicate: #Predicate<BookHighlight> { highlight in
+                highlight.bookId == bookId
+            },
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        highlights = (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func saveHighlight(color: String) {
+        guard let pdfView = pdfViewReference,
+              let selection = pdfView.currentSelection else { return }
+
+        let text = selection.string ?? ""
+        if text.isEmpty { return }
+
+        // Build annotation data for each line of the selection
+        var annotationData: [[String: Any]] = []
+        let lineSelections = selection.selectionsByLine()
+
+        for lineSelection in lineSelections {
+            for page in lineSelection.pages {
+                let bounds = lineSelection.bounds(for: page)
+                guard let document = pdfView.document else { continue }
+                let pageIndex = document.index(for: page)
+                guard pageIndex != NSNotFound else { continue }
+
+                annotationData.append([
+                    "pageIndex": pageIndex,
+                    "x": bounds.origin.x,
+                    "y": bounds.origin.y,
+                    "width": bounds.size.width,
+                    "height": bounds.size.height,
+                ])
+
+                // Create and add the visual annotation
+                let annotation = PDFAnnotation(bounds: bounds, forType: .highlight, withProperties: nil)
+                annotation.color = (UIColor(hex: color) ?? .yellow).withAlphaComponent(0.4)
+                page.addAnnotation(annotation)
+            }
+        }
+
+        // Determine page index for progression
+        let primaryPageIndex: Int
+        if let firstPage = lineSelections.first?.pages.first,
+           let document = pdfView.document {
+            primaryPageIndex = document.index(for: firstPage)
+        } else {
+            primaryPageIndex = currentPage
+        }
+
+        // Serialize locator data
+        let locatorDict: [String: Any] = [
+            "type": "pdf",
+            "annotations": annotationData,
+        ]
+
+        guard let locatorData = try? JSONSerialization.data(withJSONObject: locatorDict),
+              let locatorJSON = String(data: locatorData, encoding: .utf8) else { return }
+
+        let highlight = BookHighlight(
+            bookId: book.id,
+            locatorJSON: locatorJSON,
+            text: text,
+            color: color,
+            progression: totalPages > 0 ? Double(primaryPageIndex) / Double(totalPages) : 0,
+            chapterTitle: "Page \(primaryPageIndex + 1)"
+        )
+
+        modelContext.insert(highlight)
+        try? modelContext.save()
+
+        // Clear selection and refresh
+        pdfView.clearSelection()
+        hasTextSelection = false
+        fetchHighlights()
+    }
+
+    private func applyHighlightAnnotations(to document: PDFDocument) {
+        for highlight in highlights {
+            guard let data = highlight.locatorJSON.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let annotations = json["annotations"] as? [[String: Any]] else { continue }
+
+            for annotationInfo in annotations {
+                guard let pageIndex = annotationInfo["pageIndex"] as? Int,
+                      let x = annotationInfo["x"] as? Double,
+                      let y = annotationInfo["y"] as? Double,
+                      let width = annotationInfo["width"] as? Double,
+                      let height = annotationInfo["height"] as? Double,
+                      let page = document.page(at: pageIndex) else { continue }
+
+                let bounds = CGRect(x: x, y: y, width: width, height: height)
+                let annotation = PDFAnnotation(bounds: bounds, forType: .highlight, withProperties: nil)
+                annotation.color = highlight.uiColor.withAlphaComponent(0.4)
+                annotation.setValue(highlight.id, forAnnotationKey: PDFAnnotationKey(rawValue: "highlightId"))
+                page.addAnnotation(annotation)
+            }
+        }
+    }
+
+    private func deleteHighlight(_ highlight: BookHighlight) {
+        // Remove annotations from PDF pages
+        if let document = pdfDocument,
+           let data = highlight.locatorJSON.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let annotations = json["annotations"] as? [[String: Any]] {
+            for annotationInfo in annotations {
+                guard let pageIndex = annotationInfo["pageIndex"] as? Int,
+                      let page = document.page(at: pageIndex) else { continue }
+
+                // Find and remove matching annotation
+                for annotation in page.annotations {
+                    if annotation.type == "Highlight",
+                       let storedId = annotation.value(forAnnotationKey: PDFAnnotationKey(rawValue: "highlightId")) as? String,
+                       storedId == highlight.id {
+                        page.removeAnnotation(annotation)
+                    }
+                }
+            }
+        }
+
+        modelContext.delete(highlight)
+        try? modelContext.save()
+        fetchHighlights()
+    }
+
+    private func navigateToHighlight(_ highlight: BookHighlight) {
+        guard let data = highlight.locatorJSON.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let annotations = json["annotations"] as? [[String: Any]],
+              let firstAnnotation = annotations.first,
+              let pageIndex = firstAnnotation["pageIndex"] as? Int else { return }
+
+        currentPage = pageIndex
+    }
 }
+
+// MARK: - PDF Kit View
 
 struct PDFKitView: UIViewRepresentable {
     let document: PDFDocument
     @Binding var currentPage: Int
+    var onSelectionChanged: ((Bool, CGRect?) -> Void)?
+    var onPDFViewCreated: ((PDFView) -> Void)?
 
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
@@ -207,7 +476,7 @@ struct PDFKitView: UIViewRepresentable {
             pdfView.go(to: page)
         }
 
-        // Add notification observer for page changes
+        // Observe page changes
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.pageChanged(_:)),
@@ -215,11 +484,21 @@ struct PDFKitView: UIViewRepresentable {
             object: pdfView
         )
 
+        // Observe selection changes
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.selectionChanged(_:)),
+            name: .PDFViewSelectionChanged,
+            object: pdfView
+        )
+
+        context.coordinator.pdfView = pdfView
+        onPDFViewCreated?(pdfView)
+
         return pdfView
     }
 
     func updateUIView(_ pdfView: PDFView, context: Context) {
-        // Only go to page if it's different from current
         if let currentDisplayedPage = pdfView.currentPage {
             let currentIndex = document.index(for: currentDisplayedPage)
             if currentIndex != NSNotFound && currentIndex != currentPage {
@@ -236,6 +515,7 @@ struct PDFKitView: UIViewRepresentable {
 
     class Coordinator: NSObject {
         var parent: PDFKitView
+        weak var pdfView: PDFView?
 
         init(_ parent: PDFKitView) {
             self.parent = parent
@@ -255,6 +535,99 @@ struct PDFKitView: UIViewRepresentable {
                 }
             }
         }
+
+        @objc func selectionChanged(_ notification: Notification) {
+            guard let pdfView = notification.object as? PDFView else { return }
+            let selection = pdfView.currentSelection
+            let hasSelection = selection?.string?.isEmpty == false
+
+            var frame: CGRect? = nil
+            if hasSelection, let sel = selection {
+                let lines = sel.selectionsByLine()
+                if let firstLine = lines.first, let page = firstLine.pages.first {
+                    let pageBounds = firstLine.bounds(for: page)
+                    frame = pdfView.convert(pageBounds, from: page)
+                }
+            }
+
+            DispatchQueue.main.async {
+                self.parent.onSelectionChanged?(hasSelection, frame)
+            }
+        }
+    }
+}
+
+// MARK: - PDF Highlights List
+
+struct PDFHighlightsView: View {
+    let highlights: [BookHighlight]
+    let onSelect: (BookHighlight) -> Void
+    let onDelete: (BookHighlight) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if highlights.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Highlights", systemImage: "highlighter")
+                    } description: {
+                        Text("Select text while reading to create highlights.")
+                    }
+                } else {
+                    List {
+                        ForEach(highlights, id: \.id) { highlight in
+                            Button {
+                                onSelect(highlight)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color(uiColor: highlight.uiColor))
+                                        .frame(width: 4)
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\"\(highlight.text)\"")
+                                            .font(.subheadline)
+                                            .italic()
+                                            .lineLimit(3)
+                                            .foregroundStyle(.primary)
+
+                                        HStack {
+                                            if let chapter = highlight.chapterTitle {
+                                                Text(chapter)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+
+                                            Spacer()
+
+                                            Text("\(Int(highlight.progression * 100))%")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .onDelete { indexSet in
+                            for index in indexSet {
+                                onDelete(highlights[index])
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Highlights")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
@@ -271,5 +644,5 @@ struct PDFKitView: UIViewRepresentable {
     NavigationStack {
         PDFReaderView(book: book)
     }
-    .modelContainer(for: DownloadedBook.self, inMemory: true)
+    .modelContainer(for: [DownloadedBook.self, BookHighlight.self], inMemory: true)
 }

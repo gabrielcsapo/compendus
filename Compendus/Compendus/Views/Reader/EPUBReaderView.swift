@@ -39,6 +39,86 @@ final class ReadiumServices {
     )
 }
 
+// MARK: - EPUB Navigator Container
+
+/// Wraps EPUBNavigatorViewController as a child VC so we can handle
+/// custom editing actions (like "Highlight") via the responder chain.
+@MainActor
+class EPUBNavigatorContainer: UIViewController {
+    let navigator: EPUBNavigatorViewController
+    var onHighlightRequested: ((Locator, String, CGRect?) -> Void)?
+
+    init(navigator: EPUBNavigatorViewController) {
+        self.navigator = navigator
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        addChild(navigator)
+        navigator.view.frame = view.bounds
+        navigator.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(navigator.view)
+        navigator.didMove(toParent: self)
+    }
+
+    /// Called when the user taps "Highlight" in the text selection menu
+    @objc func highlightSelection() {
+        guard let selection = navigator.currentSelection else { return }
+        let text = selection.locator.text.highlight ?? ""
+        let frame = selection.frame
+        onHighlightRequested?(selection.locator, text, frame)
+        // Don't clear selection yet — cleared when color is picked or toolbar dismissed
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(highlightSelection) {
+            return navigator.currentSelection != nil
+        }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    /// Apply highlight decorations to the navigator
+    func applyHighlightDecorations(_ highlights: [BookHighlight]) {
+        let decorations: [Decoration] = highlights.compactMap { highlight in
+            guard let locator = Self.deserializeLocator(highlight.locatorJSON) else { return nil }
+            return Decoration(
+                id: Decoration.Id(highlight.id),
+                locator: locator,
+                style: .highlight(tint: highlight.uiColor, isActive: false)
+            )
+        }
+        navigator.apply(decorations: decorations, in: "user-highlights")
+    }
+
+    static func serializeLocator(_ locator: Locator) -> String? {
+        locator.jsonString
+    }
+
+    static func deserializeLocator(_ json: String) -> Locator? {
+        try? Locator(jsonString: json)
+    }
+}
+
+// MARK: - Container Wrapper (UIViewControllerRepresentable)
+
+struct EPUBNavigatorContainerWrapper: UIViewControllerRepresentable {
+    let container: EPUBNavigatorContainer
+    let highlights: [BookHighlight]
+
+    func makeUIViewController(context: Context) -> EPUBNavigatorContainer {
+        container
+    }
+
+    func updateUIViewController(_ uiViewController: EPUBNavigatorContainer, context: Context) {
+        uiViewController.applyHighlightDecorations(highlights)
+    }
+}
+
 // MARK: - EPUB Reader View
 
 struct EPUBReaderView: View {
@@ -48,10 +128,20 @@ struct EPUBReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var readerState: ReaderState = .loading
     @State private var publication: Publication?
-    @State private var navigator: EPUBNavigatorViewController?
+    @State private var container: EPUBNavigatorContainer?
     @State private var currentLocator: Locator?
     @State private var showingTOC = false
+    @State private var showingHighlights = false
     @State private var readerDelegate: EPUBReaderDelegate?
+
+    // Highlighting state
+    @State private var highlights: [BookHighlight] = []
+    @State private var showingFloatingToolbar = false
+    @State private var showingCustomColorPicker = false
+    @State private var customColor: SwiftUI.Color = .yellow
+    @State private var selectionFrame: CGRect?
+    @State private var pendingHighlightLocator: Locator?
+    @State private var pendingHighlightText: String = ""
 
     enum ReaderState {
         case loading
@@ -70,31 +160,60 @@ struct EPUBReaderView: View {
                         .foregroundStyle(.secondary)
                 }
             case .ready:
-                if let navigator = navigator {
-                    VStack(spacing: 0) {
-                        EPUBNavigatorWrapper(navigator: navigator)
+                if let container = container {
+                    GeometryReader { geometry in
+                        ZStack {
+                            VStack(spacing: 0) {
+                                EPUBNavigatorContainerWrapper(
+                                    container: container,
+                                    highlights: highlights
+                                )
 
-                        // Progress bar at bottom
-                        VStack(spacing: 4) {
-                            ProgressView(value: currentLocator?.locations.totalProgression ?? 0)
-                                .tint(.blue)
+                                // Progress bar at bottom
+                                VStack(spacing: 4) {
+                                    ProgressView(value: currentLocator?.locations.totalProgression ?? 0)
+                                        .tint(.blue)
 
-                            HStack {
-                                if let title = currentLocator?.title, !title.isEmpty {
-                                    Text(title)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                    HStack {
+                                        if let title = currentLocator?.title, !title.isEmpty {
+                                            Text(title)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
+                                        Spacer()
+                                        Text("\(Int((currentLocator?.locations.totalProgression ?? 0) * 100))%")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
-                                Spacer()
-                                Text("\(Int((currentLocator?.locations.totalProgression ?? 0) * 100))%")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemBackground))
+                            }
+
+                            // Floating highlight toolbar
+                            if showingFloatingToolbar, let frame = selectionFrame {
+                                FloatingHighlightToolbar(
+                                    selectionRect: frame,
+                                    containerSize: geometry.size,
+                                    onSelectColor: { color in
+                                        saveHighlight(color: color)
+                                        container.navigator.clearSelection()
+                                        showingFloatingToolbar = false
+                                    },
+                                    onCustomColor: {
+                                        showingCustomColorPicker = true
+                                    },
+                                    onDismiss: {
+                                        container.navigator.clearSelection()
+                                        pendingHighlightLocator = nil
+                                        pendingHighlightText = ""
+                                        showingFloatingToolbar = false
+                                    }
+                                )
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color(.systemBackground))
                     }
                 }
             case .error(let message):
@@ -110,10 +229,18 @@ struct EPUBReaderView: View {
         .toolbar {
             if case .ready = readerState {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingTOC = true
-                    } label: {
-                        Image(systemName: "list.bullet")
+                    HStack(spacing: 12) {
+                        Button {
+                            showingHighlights = true
+                        } label: {
+                            Image(systemName: "highlighter")
+                        }
+
+                        Button {
+                            showingTOC = true
+                        } label: {
+                            Image(systemName: "list.bullet")
+                        }
                     }
                 }
             }
@@ -125,18 +252,78 @@ struct EPUBReaderView: View {
             saveProgress()
         }
         .sheet(isPresented: $showingTOC) {
-            if let publication = publication, let navigator = navigator {
+            if let publication = publication, let container = container {
                 EPUBTOCView(
                     publication: publication,
                     currentLocator: currentLocator,
                     onSelect: { locator in
                         Task {
-                            _ = await navigator.go(to: locator)
+                            _ = await container.navigator.go(to: locator)
                         }
                         showingTOC = false
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showingHighlights) {
+            EPUBHighlightsView(
+                highlights: highlights,
+                onSelect: { highlight in
+                    if let locator = EPUBNavigatorContainer.deserializeLocator(highlight.locatorJSON),
+                       let container = container {
+                        Task {
+                            _ = await container.navigator.go(to: locator)
+                        }
+                    }
+                    showingHighlights = false
+                },
+                onDelete: { highlight in
+                    modelContext.delete(highlight)
+                    try? modelContext.save()
+                    fetchHighlights()
+                }
+            )
+        }
+        .sheet(isPresented: $showingCustomColorPicker) {
+            NavigationStack {
+                VStack(spacing: 20) {
+                    ColorPicker("Choose a color", selection: $customColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .scaleEffect(2)
+                        .padding(.top, 40)
+
+                    Spacer()
+
+                    Button {
+                        let uiColor = UIColor(customColor)
+                        let hex = uiColor.hexString
+                        saveHighlight(color: hex)
+                        container?.navigator.clearSelection()
+                        showingFloatingToolbar = false
+                        showingCustomColorPicker = false
+                    } label: {
+                        Text("Highlight")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(customColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                }
+                .navigationTitle("Custom Color")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            showingCustomColorPicker = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -154,13 +341,11 @@ struct EPUBReaderView: View {
         do {
             let services = ReadiumServices.shared
 
-            // Create an absolute URL
             guard let absoluteURL = FileURL(url: fileURL) else {
                 readerState = .error("Invalid file URL")
                 return
             }
 
-            // Retrieve the asset
             let assetResult = await services.assetRetriever.retrieve(url: absoluteURL)
             guard case .success(let asset) = assetResult else {
                 if case .failure(let error) = assetResult {
@@ -169,7 +354,6 @@ struct EPUBReaderView: View {
                 return
             }
 
-            // Open the publication
             let pubResult = await services.publicationOpener.open(
                 asset: asset,
                 allowUserInteraction: false,
@@ -191,20 +375,26 @@ struct EPUBReaderView: View {
                let locatorData = lastPosition.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: locatorData) as? [String: Any],
                let totalProgression = (json["locations"] as? [String: Any])?["totalProgression"] as? Double {
-                // Use totalProgression to locate position
                 initialLocator = await pub.locate(progression: totalProgression)
             }
 
-            // Create the navigator
+            // Configure navigator with "Highlight" editing action
+            let config = EPUBNavigatorViewController.Configuration(
+                editingActions: EditingAction.defaultActions + [
+                    EditingAction(title: "Highlight", action: #selector(EPUBNavigatorContainer.highlightSelection))
+                ]
+            )
+
             let nav = try EPUBNavigatorViewController(
                 publication: pub,
                 initialLocation: initialLocator,
-                config: .init(),
+                config: config,
                 httpServer: services.httpServer
             )
 
             // Set up delegate
             let delegate = EPUBReaderDelegate()
+            delegate.epubNavigator = nav
             delegate.onLocationChanged = { locator in
                 Task { @MainActor in
                     self.currentLocator = locator
@@ -213,7 +403,19 @@ struct EPUBReaderView: View {
             nav.delegate = delegate
             self.readerDelegate = delegate
 
-            self.navigator = nav
+            // Create container wrapping the navigator
+            let cont = EPUBNavigatorContainer(navigator: nav)
+            cont.onHighlightRequested = { locator, text, frame in
+                self.pendingHighlightLocator = locator
+                self.pendingHighlightText = text
+                self.selectionFrame = frame
+                self.showingFloatingToolbar = true
+            }
+            self.container = cont
+
+            // Load existing highlights
+            fetchHighlights()
+
             self.readerState = .ready
 
         } catch {
@@ -224,7 +426,6 @@ struct EPUBReaderView: View {
     private func saveProgress() {
         guard let locator = currentLocator else { return }
 
-        // Save a simplified version of the locator
         let locatorDict: [String: Any] = [
             "href": locator.href.url.absoluteString,
             "type": locator.mediaType.string,
@@ -246,12 +447,46 @@ struct EPUBReaderView: View {
 
         try? modelContext.save()
     }
+
+    private func fetchHighlights() {
+        let bookId = book.id
+        let descriptor = FetchDescriptor<BookHighlight>(
+            predicate: #Predicate<BookHighlight> { highlight in
+                highlight.bookId == bookId
+            },
+            sortBy: [SortDescriptor(\.createdAt)]
+        )
+        highlights = (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func saveHighlight(color: String) {
+        guard let locator = pendingHighlightLocator else { return }
+        guard let locatorJSON = EPUBNavigatorContainer.serializeLocator(locator) else { return }
+
+        let highlight = BookHighlight(
+            bookId: book.id,
+            locatorJSON: locatorJSON,
+            text: pendingHighlightText,
+            color: color,
+            progression: locator.locations.totalProgression ?? 0,
+            chapterTitle: locator.title
+        )
+
+        modelContext.insert(highlight)
+        try? modelContext.save()
+
+        pendingHighlightLocator = nil
+        pendingHighlightText = ""
+
+        fetchHighlights()
+    }
 }
 
 // MARK: - EPUB Reader Delegate
 
 class EPUBReaderDelegate: NSObject, EPUBNavigatorDelegate {
     var onLocationChanged: ((Locator) -> Void)?
+    weak var epubNavigator: EPUBNavigatorViewController?
 
     func navigator(_ navigator: any Navigator, didFailToLoadResourceAt href: RelativeURL, withError error: ReadError) {
         print("Failed to load resource at \(href): \(error)")
@@ -264,19 +499,91 @@ class EPUBReaderDelegate: NSObject, EPUBNavigatorDelegate {
     func navigator(_ navigator: any Navigator, presentError error: NavigatorError) {
         print("Navigator error: \(error)")
     }
+
+    func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
+        guard let epubNav = epubNavigator else { return }
+        let width = epubNav.view.bounds.width
+
+        if point.x < width * 0.25 {
+            Task { await epubNav.goBackward() }
+        } else if point.x > width * 0.75 {
+            Task { await epubNav.goForward() }
+        }
+    }
 }
 
-// MARK: - Navigator Wrapper
+// MARK: - Highlights List View
 
-struct EPUBNavigatorWrapper: UIViewControllerRepresentable {
-    let navigator: EPUBNavigatorViewController
+struct EPUBHighlightsView: View {
+    let highlights: [BookHighlight]
+    let onSelect: (BookHighlight) -> Void
+    let onDelete: (BookHighlight) -> Void
 
-    func makeUIViewController(context: Context) -> EPUBNavigatorViewController {
-        return navigator
-    }
+    @Environment(\.dismiss) private var dismiss
 
-    func updateUIViewController(_ uiViewController: EPUBNavigatorViewController, context: Context) {
-        // Updates handled via delegate
+    var body: some View {
+        NavigationStack {
+            Group {
+                if highlights.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Highlights", systemImage: "highlighter")
+                    } description: {
+                        Text("Select text while reading to create highlights.")
+                    }
+                } else {
+                    List {
+                        ForEach(highlights, id: \.id) { highlight in
+                            Button {
+                                onSelect(highlight)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    // Color indicator
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color(uiColor: highlight.uiColor))
+                                        .frame(width: 4)
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\"\(highlight.text)\"")
+                                            .font(.subheadline)
+                                            .italic()
+                                            .lineLimit(3)
+                                            .foregroundStyle(.primary)
+
+                                        HStack {
+                                            if let chapter = highlight.chapterTitle {
+                                                Text(chapter)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+
+                                            Spacer()
+
+                                            Text("\(Int(highlight.progression * 100))%")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .onDelete { indexSet in
+                            for index in indexSet {
+                                onDelete(highlights[index])
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Highlights")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
@@ -364,5 +671,5 @@ struct EPUBTOCView: View {
     NavigationStack {
         EPUBReaderView(book: book)
     }
-    .modelContainer(for: DownloadedBook.self, inMemory: true)
+    .modelContainer(for: [DownloadedBook.self, BookHighlight.self], inMemory: true)
 }

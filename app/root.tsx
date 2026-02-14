@@ -96,6 +96,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </li>
               <li>
                 <Link
+                  to="/highlights"
+                  className="px-3 py-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors font-medium"
+                >
+                  Highlights
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/discover"
                   className="px-3 py-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-elevated transition-colors font-medium"
                 >

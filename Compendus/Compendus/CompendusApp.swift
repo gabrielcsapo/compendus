@@ -13,6 +13,7 @@ struct CompendusApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             DownloadedBook.self,
+            BookHighlight.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

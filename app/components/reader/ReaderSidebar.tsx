@@ -1,18 +1,21 @@
 "use client";
 
-import type { TocEntry, ReaderBookmark } from "@/lib/reader/types";
+import type { TocEntry, ReaderBookmark, ReaderHighlight } from "@/lib/reader/types";
 
 interface ReaderSidebarProps {
   isOpen: boolean;
-  activeTab: "toc" | "bookmarks" | "search";
-  onTabChange: (tab: "toc" | "bookmarks" | "search") => void;
+  activeTab: "toc" | "bookmarks" | "highlights" | "search";
+  onTabChange: (tab: "toc" | "bookmarks" | "highlights" | "search") => void;
   onClose: () => void;
   toc: TocEntry[];
   bookmarks: ReaderBookmark[];
+  highlights: ReaderHighlight[];
   currentPosition: number;
   onTocSelect: (position: number) => void;
   onBookmarkSelect: (position: number) => void;
   onBookmarkDelete: (bookmarkId: string) => void;
+  onHighlightSelect: (position: number) => void;
+  onHighlightDelete: (highlightId: string) => void;
   theme: {
     background: string;
     foreground: string;
@@ -28,10 +31,13 @@ export function ReaderSidebar({
   onClose,
   toc,
   bookmarks,
+  highlights,
   currentPosition,
   onTocSelect,
   onBookmarkSelect,
   onBookmarkDelete,
+  onHighlightSelect,
+  onHighlightDelete,
   theme,
 }: ReaderSidebarProps) {
   if (!isOpen) return null;
@@ -61,6 +67,13 @@ export function ReaderSidebar({
           >
             Bookmarks ({bookmarks.length})
           </TabButton>
+          <TabButton
+            active={activeTab === "highlights"}
+            onClick={() => onTabChange("highlights")}
+            theme={theme}
+          >
+            Highlights ({highlights.length})
+          </TabButton>
         </div>
 
         {/* Content */}
@@ -80,6 +93,16 @@ export function ReaderSidebar({
               currentPosition={currentPosition}
               onSelect={onBookmarkSelect}
               onDelete={onBookmarkDelete}
+              theme={theme}
+            />
+          )}
+
+          {activeTab === "highlights" && (
+            <HighlightList
+              highlights={highlights}
+              currentPosition={currentPosition}
+              onSelect={onHighlightSelect}
+              onDelete={onHighlightDelete}
               theme={theme}
             />
           )}
@@ -243,6 +266,92 @@ function BookmarkList({
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 text-red-500 transition-opacity"
               aria-label="Delete bookmark"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function HighlightList({
+  highlights,
+  currentPosition,
+  onSelect,
+  onDelete,
+  theme,
+}: {
+  highlights: ReaderHighlight[];
+  currentPosition: number;
+  onSelect: (position: number) => void;
+  onDelete: (id: string) => void;
+  theme: ReaderSidebarProps["theme"];
+}) {
+  if (highlights.length === 0) {
+    return (
+      <div className="p-4 text-center text-sm" style={{ color: theme.muted }}>
+        No highlights yet. Select text while reading to highlight.
+      </div>
+    );
+  }
+
+  const sortedHighlights = [...highlights].sort((a, b) => a.startPosition - b.startPosition);
+
+  return (
+    <ul className="py-2">
+      {sortedHighlights.map((highlight) => {
+        const isNearCurrent =
+          highlight.startPosition <= currentPosition &&
+          highlight.endPosition >= currentPosition;
+
+        return (
+          <li key={highlight.id} className="group relative">
+            <button
+              onClick={() => onSelect(highlight.startPosition)}
+              className="w-full text-left px-4 py-3 pr-12 hover:bg-black/5 transition-colors"
+              style={{ color: isNearCurrent ? theme.accent : theme.foreground }}
+            >
+              {/* Color indicator bar */}
+              <div
+                className="absolute left-0 top-2 bottom-2 w-1 rounded-r"
+                style={{ backgroundColor: highlight.color }}
+              />
+
+              {/* Highlighted text preview */}
+              <div className="text-sm line-clamp-3 pl-2 italic">
+                &ldquo;{highlight.text}&rdquo;
+              </div>
+
+              {/* Note if present */}
+              {highlight.note && (
+                <div className="text-xs line-clamp-2 mt-1 pl-2" style={{ color: theme.muted }}>
+                  {highlight.note}
+                </div>
+              )}
+
+              {/* Position info */}
+              <div className="text-xs mt-1 pl-2" style={{ color: theme.muted }}>
+                {(highlight.startPosition * 100).toFixed(1)}% through book
+              </div>
+            </button>
+
+            {/* Delete button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(highlight.id);
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 text-red-500 transition-opacity"
+              aria-label="Delete highlight"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

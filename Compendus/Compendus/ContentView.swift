@@ -31,11 +31,17 @@ struct ContentView: View {
                         }
                         .tag(1)
 
+                    HighlightsView()
+                        .tabItem {
+                            Label("Highlights", systemImage: "highlighter")
+                        }
+                        .tag(2)
+
                     SettingsView()
                         .tabItem {
                             Label("Settings", systemImage: "gear")
                         }
-                        .tag(2)
+                        .tag(3)
                 }
                 .onChange(of: deepLinkBookId.wrappedValue) { _, newBookId in
                     if let bookId = newBookId {
