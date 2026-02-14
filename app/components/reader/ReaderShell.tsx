@@ -40,7 +40,7 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
 
   const reader = useReader({ bookId, initialPosition });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"toc" | "bookmarks" | "search">("toc");
+  const [sidebarTab, setSidebarTab] = useState<"toc" | "bookmarks" | "highlights" | "search">("toc");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const theme = THEMES[reader.settings.theme];
@@ -63,6 +63,15 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
     [reader],
   );
 
+  // Handle highlight navigation
+  const handleHighlightSelect = useCallback(
+    (position: number) => {
+      reader.goToPosition(position);
+      setSidebarOpen(false);
+    },
+    [reader],
+  );
+
   // Add bookmark at current position
   const handleAddBookmark = useCallback(() => {
     if (reader.pageContent) {
@@ -72,7 +81,7 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
   }, [reader]);
 
   // Toggle sidebar
-  const toggleSidebar = useCallback((tab?: "toc" | "bookmarks" | "search") => {
+  const toggleSidebar = useCallback((tab?: "toc" | "bookmarks" | "highlights" | "search") => {
     if (tab) {
       setSidebarTab(tab);
       setSidebarOpen(true);
@@ -181,10 +190,13 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
           onClose={() => setSidebarOpen(false)}
           toc={reader.bookInfo?.toc || []}
           bookmarks={reader.bookmarks}
+          highlights={reader.highlights}
           currentPosition={reader.position}
           onTocSelect={handleTocSelect}
           onBookmarkSelect={handleBookmarkSelect}
           onBookmarkDelete={reader.removeBookmark}
+          onHighlightSelect={handleHighlightSelect}
+          onHighlightDelete={reader.removeHighlight}
           theme={theme}
         />
 
@@ -199,6 +211,9 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/" }: Re
             onNextPage={reader.nextPage}
             audioChapters={reader.bookInfo?.chapters}
             audioDuration={reader.bookInfo?.duration}
+            highlights={reader.highlights}
+            onAddHighlight={reader.addHighlight}
+            onRemoveHighlight={reader.removeHighlight}
           />
         </div>
 

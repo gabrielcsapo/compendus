@@ -119,6 +119,58 @@ export async function deleteHighlight(highlightId: string): Promise<void> {
   await db.delete(highlights).where(eq(highlights.id, highlightId));
 }
 
+export async function getAllHighlights(): Promise<
+  {
+    id: string;
+    bookId: string;
+    startPosition: number;
+    endPosition: number;
+    text: string;
+    note?: string;
+    color: string;
+    createdAt: Date;
+    bookTitle: string;
+    bookAuthors: string[];
+    bookCoverPath?: string;
+    bookFormat: string;
+  }[]
+> {
+  const rows = await db
+    .select({
+      id: highlights.id,
+      bookId: highlights.bookId,
+      startPosition: highlights.startPosition,
+      endPosition: highlights.endPosition,
+      text: highlights.text,
+      note: highlights.note,
+      color: highlights.color,
+      createdAt: highlights.createdAt,
+      bookTitle: books.title,
+      bookAuthors: books.authors,
+      bookCoverPath: books.coverPath,
+      bookFormat: books.format,
+    })
+    .from(highlights)
+    .innerJoin(books, eq(highlights.bookId, books.id))
+    .orderBy(sql`${highlights.createdAt} DESC`)
+    .all();
+
+  return rows.map((h) => ({
+    id: h.id,
+    bookId: h.bookId,
+    startPosition: parseFloat(h.startPosition),
+    endPosition: parseFloat(h.endPosition),
+    text: h.text,
+    note: h.note ?? undefined,
+    color: h.color ?? "#ffff00",
+    createdAt: h.createdAt ?? new Date(),
+    bookTitle: h.bookTitle,
+    bookAuthors: h.bookAuthors ? JSON.parse(h.bookAuthors) : [],
+    bookCoverPath: h.bookCoverPath ?? undefined,
+    bookFormat: h.bookFormat,
+  }));
+}
+
 // ============================================
 // READING PROGRESS
 // ============================================

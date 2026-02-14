@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { PageContent } from "@/lib/reader/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PageContent, ReaderHighlight } from "@/lib/reader/types";
 import type { ReaderSettings } from "@/lib/reader/settings";
 import { THEMES, FONTS } from "@/lib/reader/settings";
 import type { AudioChapter } from "@/lib/types";
+import { HighlightToolbar } from "./HighlightToolbar";
+import {
+  selectionToPositions,
+  applyHighlightsToDOM,
+  calculateToolbarPosition,
+} from "./utils/highlightUtils";
 
 interface ReaderContentProps {
   content: PageContent | null;
@@ -16,6 +22,16 @@ interface ReaderContentProps {
   // Audio-specific props
   audioChapters?: AudioChapter[];
   audioDuration?: number;
+  // Highlighting props
+  highlights?: ReaderHighlight[];
+  onAddHighlight?: (
+    startPosition: number,
+    endPosition: number,
+    text: string,
+    note?: string,
+    color?: string,
+  ) => void;
+  onRemoveHighlight?: (highlightId: string) => void;
 }
 
 /**
@@ -30,6 +46,8 @@ export function ReaderContent({
   onNextPage,
   audioChapters,
   audioDuration,
+  highlights,
+  onAddHighlight,
 }: ReaderContentProps) {
   if (!content) {
     return (
@@ -39,6 +57,8 @@ export function ReaderContent({
     );
   }
 
+  const theme = THEMES[settings.theme];
+
   switch (content.type) {
     case "text":
       return (
@@ -47,6 +67,9 @@ export function ReaderContent({
           settings={settings}
           onPrevPage={onPrevPage}
           onNextPage={onNextPage}
+          highlights={highlights}
+          onAddHighlight={onAddHighlight}
+          theme={theme}
         />
       );
     case "image":
@@ -76,20 +99,45 @@ export function ReaderContent({
 
 /**
  * Text content renderer (EPUB, MOBI)
+ * Supports tap navigation and text highlighting.
  */
 function TextContent({
   content,
   settings,
   onPrevPage,
   onNextPage,
+  highlights,
+  onAddHighlight,
+  theme,
 }: {
   content: PageContent;
   settings: ReaderSettings;
   onPrevPage?: () => void;
   onNextPage?: () => void;
+  highlights?: ReaderHighlight[];
+  onAddHighlight?: (
+    startPosition: number,
+    endPosition: number,
+    text: string,
+    note?: string,
+    color?: string,
+  ) => void;
+  theme: { background: string; foreground: string; muted: string; accent: string; selection: string };
 }) {
-  const theme = THEMES[settings.theme];
   const font = FONTS[settings.fontFamily];
+  const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number; above: boolean }>({
+    x: 0,
+    y: 0,
+    above: true,
+  });
+  const [currentSelection, setCurrentSelection] = useState<{
+    startPosition: number;
+    endPosition: number;
+    text: string;
+  } | null>(null);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -107,15 +155,125 @@ function TextContent({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onPrevPage, onNextPage]);
 
+  // Detect text selection for highlighting
+  useEffect(() => {
+    const handleSelectionEnd = () => {
+      // Small delay to let selection stabilize (especially on iOS)
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || !contentRef.current) {
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+        if (!contentRef.current.contains(range.commonAncestorContainer)) {
+          return;
+        }
+
+        const positions = selectionToPositions(
+          contentRef.current,
+          content.position,
+          content.endPosition,
+        );
+
+        if (positions) {
+          setCurrentSelection(positions);
+
+          const selectionRect = range.getBoundingClientRect();
+          const containerRect = containerRef.current?.getBoundingClientRect();
+          if (containerRect) {
+            setToolbarPosition(calculateToolbarPosition(selectionRect, containerRect));
+          }
+          setShowToolbar(true);
+        }
+      }, 50);
+    };
+
+    document.addEventListener("mouseup", handleSelectionEnd);
+    document.addEventListener("touchend", handleSelectionEnd);
+
+    return () => {
+      document.removeEventListener("mouseup", handleSelectionEnd);
+      document.removeEventListener("touchend", handleSelectionEnd);
+    };
+  }, [content.position, content.endPosition]);
+
+  // Apply saved highlights to DOM after content renders
+  useEffect(() => {
+    if (!contentRef.current || !highlights?.length) return;
+
+    requestAnimationFrame(() => {
+      if (contentRef.current) {
+        applyHighlightsToDOM(
+          contentRef.current,
+          highlights,
+          content.position,
+          content.endPosition,
+        );
+      }
+    });
+  }, [content.html, content.position, content.endPosition, highlights]);
+
+  // Handle tap navigation (replaces overlay click zones)
+  const handleContentClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // If user has an active text selection, don't navigate
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim().length > 0) {
+        return;
+      }
+
+      // Don't navigate if clicking on interactive elements or highlight marks
+      const target = e.target as HTMLElement;
+      if (target.closest("a, button, input, select, textarea, [data-highlight-id]")) {
+        return;
+      }
+
+      // Determine navigation direction based on click position
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const relativeX = clickX / rect.width;
+
+      if (relativeX < 0.25) {
+        onPrevPage?.();
+      } else if (relativeX > 0.75) {
+        onNextPage?.();
+      }
+    },
+    [onPrevPage, onNextPage],
+  );
+
+  // Handle highlight save
+  const handleHighlight = useCallback(
+    (color: string) => {
+      if (currentSelection && onAddHighlight) {
+        onAddHighlight(
+          currentSelection.startPosition,
+          currentSelection.endPosition,
+          currentSelection.text,
+          undefined,
+          color,
+        );
+      }
+      window.getSelection()?.removeAllRanges();
+      setShowToolbar(false);
+      setCurrentSelection(null);
+    },
+    [currentSelection, onAddHighlight],
+  );
+
   return (
     <div
+      ref={containerRef}
       className="h-full overflow-auto p-4 md:p-8 relative"
       style={{
         backgroundColor: theme.background,
         color: theme.foreground,
       }}
+      onClick={handleContentClick}
     >
       <div
+        ref={contentRef}
         className="mx-auto prose max-w-none"
         style={
           {
@@ -125,7 +283,6 @@ function TextContent({
             lineHeight: settings.lineHeight,
             textAlign: settings.textAlign,
             padding: `0 ${settings.margins}%`,
-            // Override Tailwind prose colors with theme colors
             "--tw-prose-body": theme.foreground,
             "--tw-prose-headings": theme.foreground,
             "--tw-prose-lead": theme.foreground,
@@ -142,23 +299,25 @@ function TextContent({
             "--tw-prose-pre-bg": theme.background,
             "--tw-prose-th-borders": theme.muted,
             "--tw-prose-td-borders": theme.muted,
+            "--reader-selection-color": theme.selection,
           } as React.CSSProperties
         }
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
         dangerouslySetInnerHTML={{ __html: content.html || "" }}
       />
 
-      {/* Click zones for navigation - absolute within content area so they don't overlap toolbar */}
-      <div
-        className="absolute inset-y-0 left-0 w-1/4 cursor-w-resize opacity-0 hover:opacity-10 hover:bg-black/5 transition-opacity z-10"
-        onClick={onPrevPage}
-        aria-label="Previous page"
-      />
-      <div
-        className="absolute inset-y-0 right-0 w-1/4 cursor-e-resize opacity-0 hover:opacity-10 hover:bg-black/5 transition-opacity z-10"
-        onClick={onNextPage}
-        aria-label="Next page"
-      />
+      {/* Floating highlight toolbar */}
+      {showToolbar && (
+        <HighlightToolbar
+          position={toolbarPosition}
+          onHighlight={handleHighlight}
+          onDismiss={() => {
+            setShowToolbar(false);
+            window.getSelection()?.removeAllRanges();
+          }}
+          theme={theme}
+        />
+      )}
     </div>
   );
 }

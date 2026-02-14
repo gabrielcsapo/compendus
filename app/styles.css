@@ -45,3 +45,17 @@
 @view-transition {
   navigation: auto;
 }
+
+/* Reader text selection color matching the active theme */
+.prose ::selection {
+  background-color: var(--reader-selection-color, #c7d2fe);
+}
+
+/* Highlight marks applied to reader text */
+.reader-highlight {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.reader-highlight:hover {
+  opacity: 0.8;
+}
