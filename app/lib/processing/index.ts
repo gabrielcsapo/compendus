@@ -6,12 +6,11 @@ import { eq, sql } from "drizzle-orm";
 
 import { db, books } from "../db";
 import { storeBookFile, storeCoverImage, getBookFilePath, getBookFileRelativePath } from "../storage";
-import { extractPdfMetadata, extractPdfContent } from "./pdf";
-import { extractEpubMetadata, extractEpubContent } from "./epub";
-import { extractMobiMetadata, extractMobiContent } from "./mobi";
+import { extractPdfMetadata } from "./pdf";
+import { extractEpubMetadata } from "./epub";
+import { extractMobiMetadata } from "./mobi";
 import {
   extractAudioMetadata,
-  extractAudioContent,
   extractAudioCover,
   mergeAudioFiles,
   sortAudioFilesByTrack,
@@ -24,7 +23,6 @@ import { createJob, updateJobProgress } from "../jobs";
 import type {
   BookFormat,
   BookMetadata,
-  ExtractedContent,
   ProcessingResult,
   ImportOptions,
 } from "../types";
@@ -35,7 +33,6 @@ interface ProcessingResultWithJob extends ProcessingResult {
 
 // Size threshold for background processing
 const BACKGROUND_PROCESSING_THRESHOLD = 5 * 1024 * 1024; // 5MB
-const MAX_SIZE_FOR_CONTENT_INDEXING = 20 * 1024 * 1024; // 20MB
 
 export async function processBook(
   buffer: Buffer,
@@ -192,11 +189,6 @@ export async function processBook(
     throw error;
   }
 
-  // Queue content indexing for small files
-  if (!options.skipContentIndexing) {
-    queueContentIndexing(bookId, buffer, format);
-  }
-
   return {
     success: true,
     bookId,
@@ -291,32 +283,6 @@ async function extractMetadata(buffer: Buffer, format: BookFormat): Promise<Book
   }
 }
 
-async function extractContent(
-  buffer: Buffer,
-  format: BookFormat,
-): Promise<ExtractedContent> {
-  switch (format) {
-    case "pdf":
-      return extractPdfContent(buffer);
-    case "epub":
-      return extractEpubContent(buffer);
-    case "mobi":
-    case "azw3":
-      return extractMobiContent(buffer);
-    case "cbr":
-    case "cbz":
-      // Comic book archives are image-based, no text content to extract
-      return { fullText: "", chapters: [], toc: [] };
-    case "m4b":
-    case "m4a":
-    case "mp3":
-      // Audio files don't have text content to extract
-      return extractAudioContent();
-    default:
-      throw new Error(`Unsupported format: ${format}`);
-  }
-}
-
 // Background processing for large files - extracts metadata, cover, and indexes content
 function queueBackgroundProcessing(
   bookId: string,
@@ -377,32 +343,6 @@ function queueBackgroundProcessing(
 
     await db.update(books).set(updateData).where(eq(books.id, bookId));
 
-    // Yield before search indexing
-    await yieldToEventLoop();
-
-    // Index metadata for search
-    const { indexBookMetadata } = await import("../search/indexer");
-    const book = await db.select().from(books).where(eq(books.id, bookId)).get();
-    if (book) {
-      await indexBookMetadata(book.id, book.title, book.subtitle, book.authors || "[]", book.description);
-    }
-
-    // Content indexing for files under the size limit
-    if (!options.skipContentIndexing && buffer.length <= MAX_SIZE_FOR_CONTENT_INDEXING) {
-      await yieldToEventLoop();
-      const { indexContent } = await import("../search/indexer");
-      const content = await suppressConsole(() => extractContent(buffer, format));
-      await indexContent(bookId, content);
-    }
-  });
-}
-
-// Background content indexing for small files
-function queueContentIndexing(bookId: string, buffer: Buffer, format: BookFormat) {
-  scheduleBackground(async () => {
-    const { indexContent } = await import("../search/indexer");
-    const content = await suppressConsole(() => extractContent(buffer, format));
-    await indexContent(bookId, content);
   });
 }
 
@@ -565,14 +505,6 @@ export async function processMultiFileAudiobookWithProgress(
     throw error;
   }
 
-  // Index metadata for search
-  scheduleBackground(async () => {
-    const { indexBookMetadata } = await import("../search/indexer");
-    const book = await db.select().from(books).where(eq(books.id, bookId)).get();
-    if (book) {
-      await indexBookMetadata(book.id, book.title, book.subtitle, book.authors || "[]", book.description);
-    }
-  });
 
   // Mark job as complete
   updateJobProgress(jobId, {

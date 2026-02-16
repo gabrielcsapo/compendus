@@ -3,7 +3,6 @@
 import { db, books, booksTags, booksCollections, tags } from "../lib/db";
 import { eq, desc, asc, like, inArray, sql, and } from "drizzle-orm";
 import { deleteBookFile, deleteCoverImage, getBookFilePath, resolveStoragePath } from "../lib/storage";
-import { removeBookIndex, indexBookMetadata } from "../lib/search/indexer";
 import { findBestMetadata, searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { processAndStoreCover } from "../lib/processing/cover";
 import { writeMetadataToFile } from "../lib/processing/metadata-writer";
@@ -171,54 +170,42 @@ export async function updateBook(
 
   await db.update(books).set(updateData).where(eq(books.id, id));
 
-  // Re-index for search if metadata changed
-  if ("title" in data || "subtitle" in data || "authors" in data || "description" in data) {
+  // Write metadata to the actual book file if title/authors changed
+  if ("title" in data || "authors" in data) {
     const updatedBook = await getBook(id);
     if (updatedBook) {
-      await removeBookIndex(id);
-      await indexBookMetadata(
-        updatedBook.id,
-        updatedBook.title,
-        updatedBook.subtitle,
-        updatedBook.authors || "",
-        updatedBook.description,
-      );
+      try {
+        const format = updatedBook.format as BookFormat;
+        const filePath = getBookFilePath(id, format);
+        const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
 
-      // Write metadata to the actual book file if title/authors changed
-      if ("title" in data || "authors" in data) {
-        try {
-          const format = updatedBook.format as BookFormat;
-          const filePath = getBookFilePath(id, format);
-          const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
-
-          // Load cover image for embedding if available
-          let coverImage: Buffer | null = null;
-          if (updatedBook.coverPath) {
-            try {
-              const { readFile } = await import("fs/promises");
-              coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
-            } catch {
-              // Cover file not found, proceed without embedding
-            }
+        // Load cover image for embedding if available
+        let coverImage: Buffer | null = null;
+        if (updatedBook.coverPath) {
+          try {
+            const { readFile } = await import("fs/promises");
+            coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
+          } catch {
+            // Cover file not found, proceed without embedding
           }
-
-          await writeMetadataToFile(filePath, format, {
-            title: updatedBook.title,
-            authors,
-            publisher: updatedBook.publisher,
-            description: updatedBook.description,
-            isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
-            language: updatedBook.language,
-            series: updatedBook.series,
-            seriesNumber: updatedBook.seriesNumber,
-            publishedDate: updatedBook.publishedDate,
-            coverImage,
-            coverMimeType: "image/jpeg",
-          });
-        } catch (error) {
-          // Don't fail the operation if file metadata update fails
-          console.error(`Error writing embedded metadata for book ${id}:`, error);
         }
+
+        await writeMetadataToFile(filePath, format, {
+          title: updatedBook.title,
+          authors,
+          publisher: updatedBook.publisher,
+          description: updatedBook.description,
+          isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
+          language: updatedBook.language,
+          series: updatedBook.series,
+          seriesNumber: updatedBook.seriesNumber,
+          publishedDate: updatedBook.publishedDate,
+          coverImage,
+          coverMimeType: "image/jpeg",
+        });
+      } catch (error) {
+        // Don't fail the operation if file metadata update fails
+        console.error(`Error writing embedded metadata for book ${id}:`, error);
       }
     }
   }
@@ -235,9 +222,6 @@ export async function deleteBook(id: string): Promise<boolean> {
   if (book.coverPath) {
     deleteCoverImage(book.coverPath);
   }
-
-  // Delete from search index
-  await removeBookIndex(id);
 
   // Delete from database (cascades to junctions)
   await db.delete(books).where(eq(books.id, id));
@@ -277,9 +261,6 @@ export async function deleteMissingFileRecord(bookId: string): Promise<{ success
   if (!book) {
     return { success: false, message: "Book not found in database" };
   }
-
-  // Delete from search index
-  await removeBookIndex(bookId);
 
   // Delete from database (cascades to junctions)
   await db.delete(books).where(eq(books.id, bookId));
@@ -537,20 +518,10 @@ export async function refreshMetadata(
     updateData.updatedAt = sql`(unixepoch())`;
     await db.update(books).set(updateData).where(eq(books.id, bookId));
 
-    // Re-index for search (remove old entry, add new one)
+    // Write metadata to the actual book file
+    // This makes the file the source of truth for backups/migrations
     const updatedBook = await getBook(bookId);
     if (updatedBook) {
-      await removeBookIndex(bookId);
-      await indexBookMetadata(
-        updatedBook.id,
-        updatedBook.title,
-        updatedBook.subtitle,
-        updatedBook.authors || "",
-        updatedBook.description,
-      );
-
-      // Write metadata to the actual book file
-      // This makes the file the source of truth for backups/migrations
       try {
         const format = updatedBook.format as BookFormat;
         const filePath = getBookFilePath(bookId, format);
@@ -832,18 +803,7 @@ export async function applyMetadata(
     await createTagsFromSubjects(bookId, metadata.subjects);
   }
 
-  // Re-index for search (remove old entry, add new one)
   const updatedBook = await getBook(bookId);
-  if (updatedBook) {
-    await removeBookIndex(bookId);
-    await indexBookMetadata(
-      updatedBook.id,
-      updatedBook.title,
-      updatedBook.subtitle,
-      updatedBook.authors || "",
-      updatedBook.description,
-    );
-  }
 
   return {
     success: true,
