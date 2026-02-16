@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { dirname, resolve } from "path";
 import * as schema from "./schema";
 
@@ -21,10 +21,17 @@ sqlite.pragma("journal_mode = WAL");
 export const db = drizzle(sqlite, { schema });
 
 // Run migrations automatically on startup
-migrate(db, { migrationsFolder: resolve(import.meta.dirname, "migrations") });
-
-// Export raw sqlite for FTS operations
-export const rawDb = sqlite;
+// In production builds, import.meta.dirname points to dist/rsc/assets/ but migrations
+// are at dist/rsc/migrations/. Try multiple locations to find migrations.
+const migrationsPaths = [
+  resolve(import.meta.dirname, "migrations"),
+  resolve(import.meta.dirname, "..", "migrations"),
+  resolve(process.cwd(), "app/lib/db/migrations"),
+];
+const migrationsFolder = migrationsPaths.find((p) => existsSync(resolve(p, "meta")));
+if (migrationsFolder) {
+  migrate(db, { migrationsFolder });
+}
 
 // Export types
 export * from "./schema";

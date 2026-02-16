@@ -118,11 +118,10 @@ export async function apiSearchBooks(
   options: {
     limit?: number;
     offset?: number;
-    searchContent?: boolean;
   },
   baseUrl: string,
 ): Promise<ApiSearchResponse | ApiErrorResponse> {
-  const { limit = 20, offset = 0, searchContent = false } = options;
+  const { limit = 20, offset = 0 } = options;
 
   if (!query || query.trim().length < 2) {
     return {
@@ -141,20 +140,10 @@ export async function apiSearchBooks(
   }
 
   try {
-    const searchIn: ("title" | "authors" | "description" | "content")[] = [
-      "title",
-      "authors",
-      "description",
-    ];
-    if (searchContent) {
-      searchIn.push("content");
-    }
-
     const results = await searchBooksLib({
       query,
       limit,
       offset,
-      searchIn,
     });
 
     return {

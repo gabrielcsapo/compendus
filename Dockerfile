@@ -16,7 +16,7 @@ COPY . .
 
 RUN pnpm install --frozen-lockfile
 
-EXPOSE 3000
+EXPOSE 3000 3001
 
 # Increase Node.js memory limit for processing large files (CBR/PDF)
 ENV NODE_OPTIONS="--max-old-space-size=4096"
