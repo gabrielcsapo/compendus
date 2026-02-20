@@ -51,6 +51,8 @@
 		F91E18752F37E6270029A1F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F91E18742F37E6270029A1F0 /* WidgetKit.framework */; };
 		F91E18772F37E6270029A1F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F91E18762F37E6270029A1F0 /* SwiftUI.framework */; };
 		F91E18882F37E6280029A1F0 /* CompendusWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F91E18732F37E6270029A1F0 /* CompendusWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F9A1B0012F4500000029A1F0 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = F9A1B0022F4500000029A1F0 /* SwiftSoup */; };
+		F9CF53942F4848380099E42C /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F9CF53932F4848380099E42C /* Launch Screen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -129,6 +131,7 @@
 		F91E18762F37E6270029A1F0 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		F91E18932F37EAAF0029A1F0 /* CompendusWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CompendusWidgetExtension.entitlements; sourceTree = "<group>"; };
 		F936D7C41466220B1F3D3926 /* epub30-spec.epub */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = "epub30-spec.epub"; sourceTree = "<group>"; };
+		F9CF53932F4848380099E42C /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
 		FE3B98B8FB9F95209F6ED0D8 /* childrens-media-query.epub */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = "childrens-media-query.epub"; sourceTree = "<group>"; };
 		FE841F3410C7E564EA872A44 /* kusamakura-preview.epub */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = "kusamakura-preview.epub"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -183,6 +186,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F91E18572F3679000029A1F0 /* ZIPFoundation in Frameworks */,
+				F9A1B0012F4500000029A1F0 /* SwiftSoup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -264,6 +268,7 @@
 		F91E18012F366F9C0029A1F0 = {
 			isa = PBXGroup;
 			children = (
+				F9CF53932F4848380099E42C /* Launch Screen.storyboard */,
 				F91E18932F37EAAF0029A1F0 /* CompendusWidgetExtension.entitlements */,
 				F91E180C2F366F9C0029A1F0 /* Compendus */,
 				F91E18782F37E6270029A1F0 /* CompendusWidget */,
@@ -334,6 +339,7 @@
 			name = Compendus;
 			packageProductDependencies = (
 				F91E18582F3679000029A1F0 /* ZIPFoundation */,
+				F9A1B0022F4500000029A1F0 /* SwiftSoup */,
 			);
 			productName = Compendus;
 			productReference = F91E180A2F366F9C0029A1F0 /* Compendus.app */;
@@ -388,6 +394,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F91E18592F3679000029A1F0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				F9A1B0032F4500000029A1F0 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F91E180B2F366F9C0029A1F0 /* Products */;
@@ -446,6 +453,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F9CF53942F4848380099E42C /* Launch Screen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -547,6 +555,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Compendus/Compendus.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -604,6 +613,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Compendus/Compendus.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -897,6 +907,14 @@
 				minimumVersion = 0.9.19;
 			};
 		};
+		F9A1B0032F4500000029A1F0 /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scinfu/SwiftSoup";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -904,6 +922,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F91E18592F3679000029A1F0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		F9A1B0022F4500000029A1F0 /* SwiftSoup */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F9A1B0032F4500000029A1F0 /* XCRemoteSwiftPackageReference "SwiftSoup" */;
+			productName = SwiftSoup;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

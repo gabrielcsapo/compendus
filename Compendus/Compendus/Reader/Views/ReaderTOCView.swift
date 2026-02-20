@@ -17,43 +17,71 @@ struct ReaderTOCView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if items.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Table of Contents", systemImage: "list.bullet")
-                    } description: {
-                        Text("This book doesn't have a table of contents.")
-                    }
-                } else {
-                    List {
-                        ForEach(flattenedItems) { item in
-                            Button {
-                                onSelect(item)
-                            } label: {
-                                HStack {
-                                    Text(item.title)
-                                        .foregroundStyle(.primary)
-                                        .padding(.leading, CGFloat(item.level) * 16)
-
-                                    Spacer()
-
-                                    if isCurrentItem(item) {
-                                        Image(systemName: "bookmark.fill")
-                                            .foregroundStyle(.blue)
-                                    }
-                                }
-                            }
-                        }
+            tocContent
+                .navigationTitle("Table of Contents")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
                     }
                 }
+        }
+    }
+
+    @ViewBuilder
+    private var tocContent: some View {
+        if items.isEmpty {
+            ContentUnavailableView {
+                Label("No Table of Contents", systemImage: "list.bullet")
+            } description: {
+                Text("This book doesn't have a table of contents.")
             }
-            .navigationTitle("Table of Contents")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+        } else {
+            List {
+                ForEach(flattenedItems) { item in
+                    tocRow(for: item)
                 }
             }
+            .listStyle(.plain)
+        }
+    }
+
+    private func tocRow(for item: TOCItem) -> some View {
+        let isCurrent = isCurrentItem(item)
+        return Button {
+            onSelect(item)
+        } label: {
+            HStack(spacing: 8) {
+                Text(item.title)
+                    .font(fontForLevel(item.level))
+                    .foregroundStyle(isCurrent ? Color.accentColor : Color.primary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 4)
+
+                if let pageIndex = item.location.pageIndex {
+                    Text("\(pageIndex + 1)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                if isCurrent {
+                    Image(systemName: "bookmark.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.leading, CGFloat(item.level) * 20)
+        }
+        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.1) : Color.clear)
+    }
+
+    private func fontForLevel(_ level: Int) -> Font {
+        switch level {
+        case 0: return .body.weight(.medium)
+        case 1: return .subheadline
+        default: return .footnote
         }
     }
 

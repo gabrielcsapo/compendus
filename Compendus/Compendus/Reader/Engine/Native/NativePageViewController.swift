@@ -34,6 +34,19 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     var onSelectionChanged: ((ReaderSelection?) -> Void)?
     var onHighlightTapped: ((String) -> Void)?
     var onTapZone: ((String) -> Void)?
+    var onLinkTapped: ((URL) -> Void)?
+
+    // Media attachments in the current chapter
+    private var mediaAttachments: [MediaAttachment] = []
+
+    // Inline player views positioned over media attachments on the current page
+    private var inlinePlayerViews: [InlineMediaPlayerView] = []
+
+    // Floating elements (CSS float images) in the current chapter
+    private var floatingElements: [FloatingElement] = []
+
+    // UIImageView subviews for floating images on the current page
+    private var floatingImageViews: [UIImageView] = []
 
     /// Called once when the view has been laid out with a proper size.
     /// The engine uses this to know when it's safe to paginate.
@@ -54,6 +67,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         notifyReadyIfNeeded()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        stopAllMedia()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         suppressNativeEditMenu(in: textView)
@@ -68,7 +86,10 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     }
 
     private func setupTextView() {
-        textView = UITextView()
+        // Use TextKit 1 explicitly. Our hit-testing methods access layoutManager
+        // which forces a TextKit 2 → 1 compatibility switch mid-lifecycle,
+        // corrupting the rendering pipeline. Starting in TK1 avoids this.
+        textView = UITextView(usingTextLayoutManager: false)
         textView.isEditable = false
         textView.isScrollEnabled = false
         textView.isSelectable = true
@@ -130,12 +151,20 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         attributedString: NSAttributedString,
         pages: [PageInfo],
         chapterHref: String?,
-        startAtPage: Int = 0
+        startAtPage: Int = 0,
+        mediaAttachments: [MediaAttachment] = [],
+        floatingElements: [FloatingElement] = []
     ) {
         self.fullAttributedString = attributedString
         self.pages = pages
         self.currentChapterHref = chapterHref
         self.currentPageIndex = min(startAtPage, max(0, pages.count - 1))
+        self.mediaAttachments = mediaAttachments
+        self.floatingElements = floatingElements
+
+        // Use responsive insets
+        let insets = NativePaginationEngine.insets(for: view.bounds.width)
+        textView.textContainerInset = insets
 
         showCurrentPage()
     }
@@ -159,6 +188,10 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         guard let fullString = fullAttributedString,
               currentPageIndex < pages.count else { return }
 
+        // Remove old inline players and floating images before changing page content
+        removeInlinePlayers()
+        removeFloatingImages()
+
         suppressSelectionCallbacks = true
 
         let page = pages[currentPageIndex]
@@ -178,6 +211,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         }
 
         suppressSelectionCallbacks = false
+
+        // Apply floating images with exclusion paths (must be before inline players)
+        overlayFloatingImages()
+
+        // Overlay inline players for media attachments on this page
+        overlayInlinePlayers()
     }
 
     private func blankPagePlaceholder() -> NSAttributedString {
@@ -329,6 +368,13 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: view)
 
+        // Ignore taps on inline player views — they handle their own interactions
+        for playerView in inlinePlayerViews {
+            if playerView.frame.contains(point) {
+                return
+            }
+        }
+
         // Check if user has text selected — if so, clear selection
         if let selectedRange = textView.selectedTextRange, !selectedRange.isEmpty {
             clearSelection()
@@ -339,6 +385,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         let textViewPoint = gesture.location(in: textView)
         if let highlightId = highlightAtPoint(textViewPoint) {
             onHighlightTapped?(highlightId)
+            return
+        }
+
+        // Check if tap is on a link
+        if let linkURL = linkAtPoint(textViewPoint) {
+            onLinkTapped?(linkURL)
             return
         }
 
@@ -359,6 +411,223 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     @objc private func handleSwipeRight(_ gesture: UISwipeGestureRecognizer) {
         onTapZone?("left") // Swipe right = go backward
+    }
+
+    // MARK: - Link Hit Testing
+
+    private func linkAtPoint(_ point: CGPoint) -> URL? {
+        let layoutManager = textView.layoutManager
+        let textContainer = textView.textContainer
+        let characterIndex = layoutManager.characterIndex(
+            for: point,
+            in: textContainer,
+            fractionOfDistanceBetweenInsertionPoints: nil
+        )
+
+        guard let attrString = textView.attributedText,
+              characterIndex < attrString.length else { return nil }
+
+        let attrs = attrString.attributes(at: characterIndex, effectiveRange: nil)
+        return attrs[.link] as? URL
+    }
+
+    // MARK: - Floating Images (CSS float)
+
+    /// Position floating images as subviews and set exclusion paths for text wrapping.
+    private func overlayFloatingImages() {
+        guard !floatingElements.isEmpty, currentPageIndex < pages.count else { return }
+
+        let pageRange = pages[currentPageIndex].range
+        let containerWidth = textView.textContainer.size.width
+
+        // First pass: determine which floats are on this page and their Y positions
+        textView.layoutIfNeeded()
+        let layoutManager = textView.layoutManager
+
+        var exclusionRects: [CGRect] = []
+
+        for floatEl in floatingElements {
+            // Check if this float's marker falls within the current page range
+            guard NSLocationInRange(floatEl.markerIndex, pageRange) else { continue }
+
+            // Convert to page-local character index
+            let localIndex = floatEl.markerIndex - pageRange.location
+            guard localIndex >= 0,
+                  let attrText = textView.attributedText,
+                  localIndex < attrText.length else { continue }
+
+            // Find Y position of the marker character
+            let charRange = NSRange(location: localIndex, length: 1)
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: charRange, actualCharacterRange: nil
+            )
+            guard glyphRange.location != NSNotFound else { continue }
+
+            let lineRect = layoutManager.lineFragmentRect(
+                forGlyphAt: glyphRange.location, effectiveRange: nil
+            )
+
+            // The float starts at the top of the line containing the marker
+            let floatY = lineRect.origin.y + floatEl.marginTop
+
+            // Calculate exclusion rect in text container coordinates
+            let exclusionRect: CGRect
+            if floatEl.floatSide == .right {
+                let x = containerWidth - floatEl.size.width
+                exclusionRect = CGRect(
+                    x: x - floatEl.marginInline,
+                    y: floatY,
+                    width: floatEl.size.width + floatEl.marginInline,
+                    height: floatEl.size.height + floatEl.marginBottom
+                )
+            } else {
+                exclusionRect = CGRect(
+                    x: 0,
+                    y: floatY,
+                    width: floatEl.size.width + floatEl.marginInline,
+                    height: floatEl.size.height + floatEl.marginBottom
+                )
+            }
+
+            exclusionRects.append(exclusionRect)
+
+            // Create UIImageView for the floating image
+            let imageView = UIImageView(image: floatEl.image)
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+
+            // Position in text container coordinates, then convert to view coordinates
+            let imageRect: CGRect
+            if floatEl.floatSide == .right {
+                imageRect = CGRect(
+                    x: containerWidth - floatEl.size.width,
+                    y: floatY,
+                    width: floatEl.size.width,
+                    height: floatEl.size.height
+                )
+            } else {
+                imageRect = CGRect(
+                    x: 0,
+                    y: floatY,
+                    width: floatEl.size.width,
+                    height: floatEl.size.height
+                )
+            }
+
+            // Convert from text container coords to textView coords (add insets)
+            var viewFrame = imageRect
+            viewFrame.origin.x += textView.textContainerInset.left
+            viewFrame.origin.y += textView.textContainerInset.top
+
+            // Convert to self.view coordinates
+            let finalFrame = textView.convert(viewFrame, to: view)
+            imageView.frame = finalFrame
+
+            view.addSubview(imageView)
+            floatingImageViews.append(imageView)
+        }
+
+        // Apply exclusion paths — text will reflow around these rects
+        if !exclusionRects.isEmpty {
+            let paths = exclusionRects.map { UIBezierPath(rect: $0) }
+            textView.textContainer.exclusionPaths = paths
+            textView.layoutIfNeeded()
+        }
+    }
+
+    /// Remove all floating image subviews and clear exclusion paths.
+    private func removeFloatingImages() {
+        for imageView in floatingImageViews {
+            imageView.removeFromSuperview()
+        }
+        floatingImageViews.removeAll()
+        textView.textContainer.exclusionPaths = []
+    }
+
+    // MARK: - Inline Media Players
+
+    /// Stop all active media players. Called when the book is closed.
+    func stopAllMedia() {
+        removeInlinePlayers()
+    }
+
+    /// Create and position inline player views over media attachments on the current page.
+    private func overlayInlinePlayers() {
+        guard !mediaAttachments.isEmpty, currentPageIndex < pages.count else { return }
+
+        let pageRange = pages[currentPageIndex].range
+        textView.layoutIfNeeded()
+
+        let layoutManager = textView.layoutManager
+        let textContainer = textView.textContainer
+
+        for media in mediaAttachments {
+            // Check if this attachment overlaps with the current page
+            let overlap = NSIntersectionRange(media.range, pageRange)
+            guard overlap.length > 0 else { continue }
+
+            // Use only the first character (the attachment character itself),
+            // not the trailing newline, to get the precise attachment frame.
+            let attachCharIndex = overlap.location - pageRange.location
+
+            guard attachCharIndex >= 0,
+                  let attrText = textView.attributedText,
+                  attachCharIndex < attrText.length else { continue }
+
+            // Get the attachment size from the NSTextAttachment bounds
+            let attachSize: CGSize
+            if let attachment = attrText.attribute(.attachment, at: attachCharIndex, effectiveRange: nil) as? NSTextAttachment {
+                attachSize = attachment.bounds.size
+            } else {
+                continue // Not an attachment character
+            }
+
+            guard attachSize.width > 10, attachSize.height > 10 else { continue }
+
+            // Find the glyph position for the attachment character
+            let charRange = NSRange(location: attachCharIndex, length: 1)
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: charRange, actualCharacterRange: nil
+            )
+            let glyphIndex = glyphRange.location
+
+            // Get the line fragment containing this glyph
+            let lineRect = layoutManager.lineFragmentRect(
+                forGlyphAt: glyphIndex, effectiveRange: nil
+            )
+            // Get the glyph's location within the line fragment
+            let glyphLoc = layoutManager.location(forGlyphAt: glyphIndex)
+
+            // Compute the attachment rect in text container coordinates
+            var rect = CGRect(
+                x: lineRect.origin.x + glyphLoc.x,
+                y: lineRect.origin.y,
+                width: attachSize.width,
+                height: attachSize.height
+            )
+
+            // Adjust for text container insets
+            rect.origin.x += textView.textContainerInset.left
+            rect.origin.y += textView.textContainerInset.top
+
+            // Convert to self.view coordinates
+            let viewRect = textView.convert(rect, to: view)
+
+            let mode: InlineMediaPlayerView.Mode = media.kind == .audio ? .audio : .video
+            let playerView = InlineMediaPlayerView(url: media.url, mode: mode)
+            playerView.frame = viewRect
+            view.addSubview(playerView)
+            inlinePlayerViews.append(playerView)
+        }
+    }
+
+    /// Remove and stop all inline player views.
+    private func removeInlinePlayers() {
+        for playerView in inlinePlayerViews {
+            playerView.stopPlayback()
+            playerView.removeFromSuperview()
+        }
+        inlinePlayerViews.removeAll()
     }
 
     // MARK: - Highlight Hit Testing
