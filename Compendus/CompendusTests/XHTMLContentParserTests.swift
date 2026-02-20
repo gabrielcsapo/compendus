@@ -22,7 +22,7 @@ final class XHTMLContentParserTests: XCTestCase {
         let nodes = parse("<p>Hello world</p>")
 
         XCTAssertEqual(nodes.count, 1)
-        if case .paragraph(let runs) = nodes.first {
+        if case .paragraph(let runs, _) = nodes.first {
             XCTAssertEqual(runs.count, 1)
             XCTAssertTrue(runs[0].text.contains("Hello world"))
         } else {
@@ -35,20 +35,20 @@ final class XHTMLContentParserTests: XCTestCase {
 
         XCTAssertGreaterThanOrEqual(nodes.count, 3)
 
-        if case .heading(let level, let runs) = nodes[0] {
+        if case .heading(let level, let runs, _) = nodes[0] {
             XCTAssertEqual(level, 1)
             XCTAssertTrue(runs[0].text.contains("Title"))
         } else {
             XCTFail("Expected h1 heading")
         }
 
-        if case .heading(let level, _) = nodes[1] {
+        if case .heading(let level, _, _) = nodes[1] {
             XCTAssertEqual(level, 2)
         } else {
             XCTFail("Expected h2 heading")
         }
 
-        if case .heading(let level, _) = nodes[2] {
+        if case .heading(let level, _, _) = nodes[2] {
             XCTAssertEqual(level, 3)
         } else {
             XCTFail("Expected h3 heading")
@@ -60,7 +60,7 @@ final class XHTMLContentParserTests: XCTestCase {
     func testBoldStyle() {
         let nodes = parse("<p><strong>bold text</strong></p>")
 
-        if case .paragraph(let runs) = nodes.first {
+        if case .paragraph(let runs, _) = nodes.first {
             XCTAssertTrue(runs.contains { $0.styles.contains(.bold) },
                           "Should have a bold run")
         } else {
@@ -71,7 +71,7 @@ final class XHTMLContentParserTests: XCTestCase {
     func testItalicStyle() {
         let nodes = parse("<p><em>italic text</em></p>")
 
-        if case .paragraph(let runs) = nodes.first {
+        if case .paragraph(let runs, _) = nodes.first {
             XCTAssertTrue(runs.contains { $0.styles.contains(.italic) },
                           "Should have an italic run")
         } else {
@@ -82,7 +82,7 @@ final class XHTMLContentParserTests: XCTestCase {
     func testCodeStyle() {
         let nodes = parse("<p><code>code text</code></p>")
 
-        if case .paragraph(let runs) = nodes.first {
+        if case .paragraph(let runs, _) = nodes.first {
             XCTAssertTrue(runs.contains { $0.styles.contains(.code) },
                           "Should have a code-styled run")
         } else {
@@ -93,7 +93,7 @@ final class XHTMLContentParserTests: XCTestCase {
     func testNestedBoldItalic() {
         let nodes = parse("<p><strong><em>bold italic</em></strong></p>")
 
-        if case .paragraph(let runs) = nodes.first {
+        if case .paragraph(let runs, _) = nodes.first {
             let combined = runs.filter { $0.styles.contains(.bold) && $0.styles.contains(.italic) }
             XCTAssertFalse(combined.isEmpty, "Should have a run with both bold and italic")
         } else {
@@ -122,7 +122,7 @@ final class XHTMLContentParserTests: XCTestCase {
         }
         XCTAssertFalse(listNodes.isEmpty, "Should have a list node")
 
-        if case .list(let ordered, let items) = listNodes.first {
+        if case .list(let ordered, let items, _) = listNodes.first {
             XCTAssertFalse(ordered, "Should be unordered")
             XCTAssertEqual(items.count, 2, "Should have 2 list items")
         }
@@ -197,13 +197,13 @@ final class XHTMLContentParserTests: XCTestCase {
 
     private func extractText(from node: ContentNode, into text: inout String) {
         switch node {
-        case .paragraph(let runs), .heading(_, let runs):
+        case .paragraph(let runs, _), .heading(_, let runs, _):
             text += runs.map(\.text).joined()
         case .codeBlock(let code):
             text += code
-        case .container(let children), .blockquote(let children):
+        case .container(let children, _), .blockquote(let children):
             for child in children { extractText(from: child, into: &text) }
-        case .list(_, let items):
+        case .list(_, let items, _):
             for item in items {
                 for child in item.children { extractText(from: child, into: &text) }
             }

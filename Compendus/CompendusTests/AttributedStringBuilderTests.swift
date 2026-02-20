@@ -145,7 +145,7 @@ final class AttributedStringBuilderTests: XCTestCase {
     func testImageAttachment() {
         // Use a non-existent image URL — should fall back to alt text
         let nodes: [ContentNode] = [
-            .image(url: URL(fileURLWithPath: "/nonexistent.png"), alt: "Alt text", width: nil, height: nil)
+            .image(url: URL(fileURLWithPath: "/nonexistent.png"), alt: "Alt text", width: nil, height: nil, style: .empty)
         ]
         let builder = makeBuilder()
         let (attrString, _) = builder.build(from: nodes)

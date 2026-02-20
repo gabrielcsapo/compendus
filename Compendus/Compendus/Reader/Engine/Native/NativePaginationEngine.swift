@@ -21,6 +21,12 @@ class NativePaginationEngine {
     /// Default content insets matching the EPUB CSS padding.
     static let defaultInsets = UIEdgeInsets(top: 24, left: 32, bottom: 24, right: 32)
 
+    /// Responsive insets based on viewport width (phone vs tablet).
+    static func insets(for viewportWidth: CGFloat) -> UIEdgeInsets {
+        let horizontal: CGFloat = viewportWidth < 500 ? 20 : 40
+        return UIEdgeInsets(top: 24, left: horizontal, bottom: 24, right: horizontal)
+    }
+
     /// Calculate pages for the given attributed string within the viewport.
     static func paginate(
         attributedString: NSAttributedString,

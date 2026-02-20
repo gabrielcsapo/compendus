@@ -3,461 +3,759 @@
 //  Compendus
 //
 //  Parses EPUB XHTML chapter content into a ContentNode AST.
-//  Uses Foundation's XMLParser (same pattern as EPUBParser.swift).
+//  Uses SwiftSoup for HTML5-tolerant DOM parsing.
+//  Supports CSS class-based style resolution via an optional CSSStylesheet.
 //
 
 import Foundation
+import SwiftSoup
 import os.log
 
 private let parserLogger = Logger(subsystem: "com.compendus.reader", category: "XHTMLParser")
 
-class XHTMLContentParser: NSObject, XMLParserDelegate {
+class XHTMLContentParser {
     private let data: Data
     private let baseURL: URL
+    private let stylesheet: CSSStylesheet?
 
-    private var result: [ContentNode] = []
-
-    // Element stack for nesting context
-    private struct ElementContext {
-        let name: String
-        var children: [ContentNode]
-        var runs: [TextRun]
-        var styles: Set<TextStyle>
-        var link: URL?
-        var isPreformatted: Bool
-        var listOrdered: Bool?
-        var listItems: [ListItem]
-        var tableRows: [TableRow]
-        var tableCells: [TableCell]
-        var isCellHeader: Bool
-    }
-
-    private var stack: [ElementContext] = []
-    private var currentText = ""
-
-    // Block elements that create their own ContentNode
-    private static let blockElements: Set<String> = [
+    // Block-level tag names
+    private static let blockTags: Set<String> = [
         "p", "div", "section", "article", "main", "aside", "nav",
         "header", "footer", "h1", "h2", "h3", "h4", "h5", "h6",
         "blockquote", "pre", "figure", "figcaption",
-        "ul", "ol", "li", "table", "tr", "td", "th",
-        "hr", "br", "img"
+        "ul", "ol", "li", "dl", "dt", "dd",
+        "table", "thead", "tbody", "tfoot", "tr", "td", "th",
+        "hr", "br", "img", "video", "audio", "address"
     ]
 
-    // Inline elements that contribute to text runs with styles
-    private static let inlineElements: Set<String> = [
+    // Inline tag names
+    private static let inlineTags: Set<String> = [
         "em", "i", "strong", "b", "a", "span", "code",
         "sup", "sub", "u", "s", "del", "mark", "small",
-        "cite", "q", "dfn", "abbr", "time", "var", "kbd", "samp"
+        "cite", "q", "dfn", "abbr", "time", "var", "kbd", "samp",
+        "ruby", "rt", "rp", "bdi", "bdo", "wbr", "data", "output"
     ]
 
-    // Container elements treated as generic wrappers
-    private static let containerElements: Set<String> = [
-        "div", "section", "article", "main", "aside", "nav",
-        "header", "footer", "figure", "figcaption"
-    ]
-
-    // Heading levels
+    // Heading level map
     private static let headingLevels: [String: Int] = [
         "h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6
     ]
 
-    init(data: Data, baseURL: URL) {
+    init(data: Data, baseURL: URL, stylesheet: CSSStylesheet? = nil) {
         self.data = data
         self.baseURL = baseURL
+        self.stylesheet = stylesheet
     }
 
     /// Parse XHTML data and return an array of block-level content nodes.
     func parse() -> [ContentNode] {
-        result = []
-        stack = []
-        currentText = ""
-
-        // Push root context
-        stack.append(ElementContext(
-            name: "root",
-            children: [],
-            runs: [],
-            styles: [],
-            link: nil,
-            isPreformatted: false,
-            listOrdered: nil,
-            listItems: [],
-            tableRows: [],
-            tableCells: [],
-            isCellHeader: false
-        ))
-
-        let parser = XMLParser(data: data)
-        parser.delegate = self
-        parser.shouldProcessNamespaces = false
-        parser.shouldReportNamespacePrefixes = false
-        parser.parse()
-
-        // Flush any remaining text
-        flushText()
-
-        let children = stack.last?.children ?? result
-        parserLogger.info("Parsed XHTML: \(children.count) top-level nodes from \(self.data.count) bytes")
-        if children.isEmpty {
-            parserLogger.warning("Parser returned ZERO nodes — stack depth: \(self.stack.count)")
-        }
-        return children
-    }
-
-    // MARK: - XMLParserDelegate
-
-    func parser(_ parser: XMLParser, didStartElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?,
-                attributes attributeDict: [String: String] = [:]) {
-        let name = localName(elementName)
-
-        // Handle self-closing block elements first
-        if name == "br" {
-            currentText += "\n"
-            return
-        }
-
-        if name == "hr" {
-            flushText()
-            appendToParent(.horizontalRule)
-            return
-        }
-
-        if name == "img" {
-            flushText()
-            handleImage(attributeDict)
-            return
-        }
-
-        // Skip non-content elements
-        if name == "html" || name == "head" || name == "title" ||
-           name == "meta" || name == "link" || name == "style" ||
-           name == "script" {
-            // Push a skip context
-            stack.append(makeContext(name: name))
-            return
-        }
-
-        if name == "body" {
-            stack.append(makeContext(name: name))
-            return
-        }
-
-        // Determine inherited styles and preformatted state
-        let parentStyles = stack.last?.styles ?? []
-        let parentLink = stack.last?.link
-        let parentPre = stack.last?.isPreformatted ?? false
-
-        // Inline elements: accumulate styles
-        if Self.inlineElements.contains(name) && !Self.blockElements.contains(name) {
-            var newStyles = parentStyles
-            switch name {
-            case "em", "i", "cite", "dfn":
-                newStyles.insert(.italic)
-            case "strong", "b":
-                newStyles.insert(.bold)
-            case "code", "var", "kbd", "samp":
-                newStyles.insert(.code)
-            case "sup":
-                newStyles.insert(.superscript)
-            case "sub":
-                newStyles.insert(.subscript)
-            case "u":
-                newStyles.insert(.underline)
-            case "s", "del":
-                newStyles.insert(.strikethrough)
-            default:
-                break
-            }
-
-            var link = parentLink
-            if name == "a", let href = attributeDict["href"] {
-                link = URL(string: href, relativeTo: baseURL)
-                newStyles.insert(.underline)
-            }
-
-            stack.append(makeContext(name: name, styles: newStyles, link: link, pre: parentPre))
-            return
-        }
-
-        // Block elements: flush current text to parent, push new context
-        flushText()
-
-        var ctx = makeContext(name: name, styles: [], link: nil, pre: parentPre || name == "pre")
-
-        if name == "ol" {
-            ctx.listOrdered = true
-        } else if name == "ul" {
-            ctx.listOrdered = false
-        } else if name == "td" || name == "th" {
-            ctx.isCellHeader = (name == "th")
-        }
-
-        stack.append(ctx)
-    }
-
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        // Skip content inside <head>, <style>, <script>
-        if let top = stack.last, ["head", "style", "script", "title", "meta", "link"].contains(top.name) {
-            return
-        }
-        currentText += string
-    }
-
-    func parser(_ parser: XMLParser, didEndElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?) {
-        let name = localName(elementName)
-
-        // Self-closing elements don't push context
-        if name == "br" || name == "hr" || name == "img" { return }
-
-        flushText()
-
-        guard stack.count > 1 else { return }
-        let ctx = stack.removeLast()
-
-        // Skip elements that have no renderable content
-        if ["head", "title", "meta", "link", "style", "script"].contains(ctx.name) {
-            return
-        }
-
-        // Transparent wrappers: move children up to parent
-        if ctx.name == "html" || ctx.name == "body" {
-            if var parent = stack.last {
-                parent.children.append(contentsOf: ctx.children)
-                stack[stack.count - 1] = parent
-            }
-            return
-        }
-
-        // Inline elements: transfer their runs up to the parent context
-        if Self.inlineElements.contains(ctx.name) && !Self.blockElements.contains(ctx.name) {
-            if !ctx.runs.isEmpty, stack.count > 0 {
-                stack[stack.count - 1].runs.append(contentsOf: ctx.runs)
-            }
-            return
-        }
-
-        // Build the ContentNode for this block element
-        let node = buildNode(from: ctx)
-        appendToParent(node)
-    }
-
-    func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
-        parserLogger.warning("XML parse error: \(parseError.localizedDescription)")
-    }
-
-    // MARK: - Node Building
-
-    private func buildNode(from ctx: ElementContext) -> ContentNode {
-        let name = ctx.name
-        let runs = ctx.runs.isEmpty ? consolidateChildRuns(ctx.children) : ctx.runs
-
-        // Headings
-        if let level = Self.headingLevels[name] {
-            let headingRuns = runs.isEmpty ? [TextRun(text: " ")] : runs
-            return .heading(level: level, runs: headingRuns)
-        }
-
-        // Paragraphs
-        if name == "p" {
-            if runs.isEmpty && ctx.children.isEmpty {
-                return .paragraph(runs: [TextRun(text: " ")])
-            }
-            if !runs.isEmpty {
-                return .paragraph(runs: runs)
-            }
-            // If only children (nested blocks), wrap in container
-            return ctx.children.count == 1 ? ctx.children[0] : .container(children: ctx.children)
-        }
-
-        // Preformatted / code blocks
-        if name == "pre" {
-            let text = runs.map(\.text).joined()
-            return .codeBlock(text: text.isEmpty ? " " : text)
-        }
-
-        // Lists
-        if name == "ul" || name == "ol" {
-            return .list(ordered: ctx.listOrdered ?? false, items: ctx.listItems)
-        }
-
-        // List items
-        if name == "li" {
-            // Collect content as child nodes
-            var children = ctx.children
-            if !runs.isEmpty {
-                children.insert(.paragraph(runs: runs), at: 0)
-            }
-            // This gets collected by the parent list element
-            return .container(children: children)
-        }
-
-        // Tables
-        if name == "table" {
-            return .table(rows: ctx.tableRows)
-        }
-        if name == "tr" {
-            return .container(children: []) // Handled by table context
-        }
-        if name == "td" || name == "th" {
-            return .container(children: []) // Handled by row context
-        }
-
-        // Blockquotes
-        if name == "blockquote" {
-            var children = ctx.children
-            if !runs.isEmpty {
-                children.insert(.paragraph(runs: runs), at: 0)
-            }
-            return .blockquote(children: children.isEmpty ? [.paragraph(runs: [TextRun(text: " ")])] : children)
-        }
-
-        // Figcaption
-        if name == "figcaption" {
-            return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs)
-        }
-
-        // Generic containers (div, section, article, figure, etc.)
-        var children = ctx.children
-        if !runs.isEmpty {
-            children.insert(.paragraph(runs: runs), at: 0)
-        }
-        if children.isEmpty {
-            return .paragraph(runs: [TextRun(text: " ")])
-        }
-        return children.count == 1 ? children[0] : .container(children: children)
-    }
-
-    // MARK: - Text Flushing
-
-    private func flushText() {
-        guard !currentText.isEmpty else { return }
-        guard stack.count > 0 else {
-            currentText = ""
-            return
-        }
-
-        let isPre = stack.last?.isPreformatted ?? false
-        let processed: String
-
-        if isPre {
-            processed = currentText
+        // Convert data to string (try UTF-8, fallback to Latin-1)
+        let html: String
+        if let utf8 = String(data: data, encoding: .utf8) {
+            html = utf8
+        } else if let latin1 = String(data: data, encoding: .isoLatin1) {
+            html = latin1
         } else {
-            // Collapse whitespace: replace runs of whitespace with single space
-            processed = currentText
-                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            parserLogger.warning("Could not decode XHTML data")
+            return []
         }
 
-        // Don't add empty runs (but allow single space in pre mode)
-        if processed.isEmpty || (!isPre && processed == " " && (stack.last?.runs.isEmpty ?? true)) {
-            currentText = ""
-            return
+        do {
+            let document = try SwiftSoup.parse(html)
+
+            // Find <body> element, fallback to document root
+            let body: Element
+            if let bodyEl = try document.body() {
+                body = bodyEl
+            } else {
+                body = document
+            }
+
+            let nodes = processChildren(of: body)
+            parserLogger.info("Parsed XHTML: \(nodes.count) top-level nodes from \(self.data.count) bytes")
+            if nodes.isEmpty {
+                parserLogger.warning("Parser returned ZERO nodes")
+            }
+            return nodes
+        } catch {
+            parserLogger.warning("SwiftSoup parse error: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    // MARK: - DOM Walking
+
+    /// Process all child nodes of an element, returning block-level ContentNodes.
+    /// Inline content between blocks is accumulated and flushed as paragraphs.
+    private func processChildren(of element: Element) -> [ContentNode] {
+        var nodes: [ContentNode] = []
+        var pendingRuns: [TextRun] = []
+
+        func flushPendingRuns() {
+            let trimmed = trimWhitespaceRuns(pendingRuns)
+            if !trimmed.isEmpty {
+                nodes.append(.paragraph(runs: trimmed))
+            }
+            pendingRuns = []
         }
 
-        let styles = stack.last?.styles ?? []
-        let link = stack.last?.link
-        let run = TextRun(text: processed, styles: styles, link: link)
+        for child in element.getChildNodes() {
+            if let textNode = child as? TextNode {
+                let text = collapseWhitespace(textNode.getWholeText())
+                if !text.isEmpty && text != " " || !pendingRuns.isEmpty {
+                    if !text.isEmpty {
+                        pendingRuns.append(TextRun(text: text))
+                    }
+                }
+            } else if let el = child as? Element {
+                let tag = el.tagName().lowercased()
 
-        stack[stack.count - 1].runs.append(run)
-        currentText = ""
+                // Skip non-content elements: scripts, styles, form controls,
+                // and EPUB-specific namespace elements (epub:trigger, etc.)
+                if ["script", "style", "link", "meta",
+                    "button", "input", "select", "textarea", "form"].contains(tag)
+                    || tag.hasPrefix("epub:") {
+                    continue
+                }
+
+                if isBlockTag(tag) {
+                    flushPendingRuns()
+                    if let node = processBlockElement(el) {
+                        nodes.append(node)
+                    }
+                } else {
+                    // Inline element — resolve its own styles/link, then collect children
+                    let (styles, link) = resolveInlineStyles(for: el, inheritedStyles: [], inheritedLink: nil)
+                    let runs = collectInlineRuns(from: el, inheritedStyles: styles, inheritedLink: link)
+                    pendingRuns.append(contentsOf: runs)
+                }
+            }
+        }
+
+        flushPendingRuns()
+        return nodes
+    }
+
+    /// Process a block-level element and return a ContentNode.
+    private func processBlockElement(_ el: Element) -> ContentNode? {
+        let tag = el.tagName().lowercased()
+        let blockStyle = resolveBlockStyle(for: el)
+
+        // Skip display: none
+        if blockStyle.display == CSSDisplay.none {
+            return nil
+        }
+
+        switch tag {
+        case "h1", "h2", "h3", "h4", "h5", "h6":
+            let level = Self.headingLevels[tag] ?? 1
+            var runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            // Apply CSS inline styles to heading
+            applyBlockCSSInlineStyles(el, to: &runs)
+            if runs.isEmpty { runs = [TextRun(text: " ")] }
+            return .heading(level: level, runs: runs, blockStyle: blockStyle)
+
+        case "p":
+            var runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            applyBlockCSSInlineStyles(el, to: &runs)
+            // Check if p contains block children (images, etc.)
+            let blockChildren = collectBlockChildNodes(from: el)
+            if !runs.isEmpty && blockChildren.isEmpty {
+                return .paragraph(runs: runs, blockStyle: blockStyle)
+            } else if !blockChildren.isEmpty {
+                var children = blockChildren
+                if !runs.isEmpty {
+                    children.insert(.paragraph(runs: runs, blockStyle: blockStyle), at: 0)
+                }
+                return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+            }
+            return .paragraph(runs: [TextRun(text: " ")], blockStyle: blockStyle)
+
+        case "pre":
+            let text = getPreformattedText(el)
+            return .codeBlock(text: text.isEmpty ? " " : text)
+
+        case "ul":
+            return processList(el, ordered: false, blockStyle: blockStyle)
+        case "ol":
+            return processList(el, ordered: true, blockStyle: blockStyle)
+
+        case "dl":
+            return processDefinitionList(el, blockStyle: blockStyle)
+
+        case "blockquote":
+            let children = processChildren(of: el)
+            return .blockquote(children: children.isEmpty ? [.paragraph(runs: [TextRun(text: " ")])] : children)
+
+        case "table":
+            return processTable(el)
+
+        case "hr":
+            return .horizontalRule
+
+        case "br":
+            return .paragraph(runs: [TextRun(text: "\n")])
+
+        case "img":
+            return processImage(el)
+
+        case "video":
+            return processVideo(el)
+
+        case "audio":
+            return processAudio(el)
+
+        case "figure":
+            return processFigure(el, blockStyle: blockStyle)
+
+        case "figcaption":
+            let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs, blockStyle: blockStyle)
+
+        case "li", "dt", "dd":
+            // These should normally be handled by their parent (ul/ol/dl),
+            // but handle gracefully if encountered standalone
+            let children = processChildren(of: el)
+            let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            if !children.isEmpty {
+                return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+            }
+            return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs, blockStyle: blockStyle)
+
+        case "tr", "td", "th", "thead", "tbody", "tfoot":
+            // Should be handled by processTable
+            return nil
+
+        case "address":
+            let runs = collectInlineRuns(from: el, inheritedStyles: [.italic], inheritedLink: nil)
+            return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs, blockStyle: blockStyle)
+
+        default:
+            // Generic container: div, section, article, nav, aside, header, footer, etc.
+            let children = processChildren(of: el)
+            if children.isEmpty {
+                let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+                if runs.isEmpty { return nil }
+                return .paragraph(runs: runs, blockStyle: blockStyle)
+            }
+            return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+        }
+    }
+
+    // MARK: - Inline Content Collection
+
+    /// Resolve an inline element's tag-based and CSS-based styles and link.
+    /// Returns the merged styles and link to pass to child content.
+    private func resolveInlineStyles(for el: Element, inheritedStyles: Set<TextStyle>, inheritedLink: URL?) -> (styles: Set<TextStyle>, link: URL?) {
+        let tag = el.tagName().lowercased()
+        var styles = inheritedStyles
+        var link = inheritedLink
+
+        // Tag-based styles
+        switch tag {
+        case "em", "i", "cite", "dfn":
+            styles.insert(.italic)
+        case "strong", "b":
+            styles.insert(.bold)
+        case "code", "var", "kbd", "samp":
+            styles.insert(.code)
+        case "sup":
+            styles.insert(.superscript)
+        case "sub":
+            styles.insert(.subscript)
+        case "u":
+            styles.insert(.underline)
+        case "s", "del":
+            styles.insert(.strikethrough)
+        default:
+            break
+        }
+
+        // CSS-based styles
+        let cssProps = resolveCSSProperties(for: el)
+        if cssProps.fontStyle == .italic { styles.insert(.italic) }
+        if cssProps.fontWeight == .bold { styles.insert(.bold) }
+        if cssProps.fontVariant == .smallCaps { styles.insert(.smallCaps) }
+        if cssProps.textTransform == .uppercase { styles.insert(.uppercase) }
+        if cssProps.textDecoration == .underline { styles.insert(.underline) }
+        if cssProps.textDecoration == .lineThrough { styles.insert(.strikethrough) }
+
+        // Link handling
+        if tag == "a" {
+            if let href = try? el.attr("href"), !href.isEmpty {
+                link = URL(string: href, relativeTo: baseURL)
+                styles.insert(.underline)
+            }
+        }
+
+        return (styles, link)
+    }
+
+    /// Recursively collect TextRuns from an element's inline content.
+    /// If a block element is encountered inside inline context, it gets collected separately.
+    private func collectInlineRuns(from element: Element, inheritedStyles: Set<TextStyle>, inheritedLink: URL?) -> [TextRun] {
+        var runs: [TextRun] = []
+
+        for child in element.getChildNodes() {
+            if let textNode = child as? TextNode {
+                let isPreformatted = isPreformattedContext(element)
+                let text = isPreformatted ? textNode.getWholeText() : collapseWhitespace(textNode.getWholeText())
+                if !text.isEmpty {
+                    runs.append(TextRun(text: text, styles: inheritedStyles, link: inheritedLink))
+                }
+            } else if let el = child as? Element {
+                let tag = el.tagName().lowercased()
+
+                // Skip non-content: scripts, styles, form controls, epub: elements
+                if ["script", "style", "link", "meta",
+                    "button", "input", "select", "textarea", "form"].contains(tag)
+                    || tag.hasPrefix("epub:") {
+                    continue
+                }
+
+                // Handle <br> as newline
+                if tag == "br" {
+                    runs.append(TextRun(text: "\n", styles: inheritedStyles, link: inheritedLink))
+                    continue
+                }
+
+                // Handle <img> inline (fixes bug #2: a > img)
+                if tag == "img" {
+                    let alt = try? el.attr("alt")
+                    if let alt, !alt.isEmpty {
+                        runs.append(TextRun(text: "[\(alt)]", styles: inheritedStyles, link: inheritedLink))
+                    }
+                    continue
+                }
+
+                // If it's a block tag inside inline context, extract inline content
+                if isBlockTag(tag) && !Self.inlineTags.contains(tag) {
+                    let blockRuns = collectInlineRuns(from: el, inheritedStyles: inheritedStyles, inheritedLink: inheritedLink)
+                    runs.append(contentsOf: blockRuns)
+                    continue
+                }
+
+                // Inline element — resolve styles and link
+                let (newStyles, newLink) = resolveInlineStyles(for: el, inheritedStyles: inheritedStyles, inheritedLink: inheritedLink)
+
+                // CSS display: none check
+                let cssProps = resolveCSSProperties(for: el)
+                if cssProps.display == CSSDisplay.none {
+                    continue
+                }
+
+                let childRuns = collectInlineRuns(from: el, inheritedStyles: newStyles, inheritedLink: newLink)
+                runs.append(contentsOf: childRuns)
+            }
+        }
+
+        return runs
+    }
+
+    /// Check if an element has block-level children, and collect them as ContentNodes.
+    private func collectBlockChildNodes(from element: Element) -> [ContentNode] {
+        var nodes: [ContentNode] = []
+        for child in element.getChildNodes() {
+            guard let el = child as? Element else { continue }
+            let tag = el.tagName().lowercased()
+            if isBlockTag(tag) {
+                if let node = processBlockElement(el) {
+                    nodes.append(node)
+                }
+            }
+        }
+        return nodes
+    }
+
+    // MARK: - Lists
+
+    private func processList(_ el: Element, ordered: Bool, blockStyle: BlockStyle) -> ContentNode {
+        var items: [ListItem] = []
+
+        for child in el.children().array() {
+            let tag = child.tagName().lowercased()
+            if tag == "li" {
+                let children = processListItemContent(child)
+                items.append(ListItem(children: children))
+            } else if tag == "ul" || tag == "ol" {
+                // Nested list outside of li (rare but valid)
+                if let nestedList = processBlockElement(child) {
+                    items.append(ListItem(children: [nestedList]))
+                }
+            }
+        }
+
+        return .list(ordered: ordered, items: items, blockStyle: blockStyle)
+    }
+
+    private func processListItemContent(_ li: Element) -> [ContentNode] {
+        var nodes: [ContentNode] = []
+        var pendingRuns: [TextRun] = []
+        let blockStyle = resolveBlockStyle(for: li)
+
+        func flushRuns() {
+            let trimmed = trimWhitespaceRuns(pendingRuns)
+            if !trimmed.isEmpty {
+                nodes.append(.paragraph(runs: trimmed, blockStyle: blockStyle))
+            }
+            pendingRuns = []
+        }
+
+        for child in li.getChildNodes() {
+            if let textNode = child as? TextNode {
+                let text = collapseWhitespace(textNode.getWholeText())
+                if !text.isEmpty {
+                    pendingRuns.append(TextRun(text: text))
+                }
+            } else if let el = child as? Element {
+                let tag = el.tagName().lowercased()
+                if isBlockTag(tag) {
+                    flushRuns()
+                    if let node = processBlockElement(el) {
+                        nodes.append(node)
+                    }
+                } else {
+                    // Resolve inline element's own styles/link before recursing
+                    let (styles, link) = resolveInlineStyles(for: el, inheritedStyles: [], inheritedLink: nil)
+                    let runs = collectInlineRuns(from: el, inheritedStyles: styles, inheritedLink: link)
+                    pendingRuns.append(contentsOf: runs)
+                }
+            }
+        }
+
+        flushRuns()
+
+        if nodes.isEmpty {
+            nodes.append(.paragraph(runs: [TextRun(text: " ")], blockStyle: blockStyle))
+        }
+
+        return nodes
+    }
+
+    // MARK: - Definition Lists
+
+    private func processDefinitionList(_ el: Element, blockStyle: BlockStyle) -> ContentNode {
+        var items: [ListItem] = []
+
+        for child in el.children().array() {
+            let tag = child.tagName().lowercased()
+            if tag == "dt" {
+                // Definition term — render as bold
+                var runs = collectInlineRuns(from: child, inheritedStyles: [.bold], inheritedLink: nil)
+                if runs.isEmpty { runs = [TextRun(text: " ", styles: [.bold])] }
+                items.append(ListItem(children: [.paragraph(runs: runs)]))
+            } else if tag == "dd" {
+                // Definition description — render normally, with some indent via container
+                let children = processChildren(of: child)
+                if children.isEmpty {
+                    let runs = collectInlineRuns(from: child, inheritedStyles: [], inheritedLink: nil)
+                    items.append(ListItem(children: [.paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs)]))
+                } else {
+                    items.append(ListItem(children: children))
+                }
+            }
+        }
+
+        return .list(ordered: false, items: items, blockStyle: blockStyle)
+    }
+
+    // MARK: - Tables
+
+    private func processTable(_ el: Element) -> ContentNode {
+        var rows: [TableRow] = []
+
+        // Collect rows from thead, tbody, tfoot, or direct tr children
+        let sections = el.children().array()
+        for section in sections {
+            let tag = section.tagName().lowercased()
+            if tag == "tr" {
+                if let row = processTableRow(section) {
+                    rows.append(row)
+                }
+            } else if tag == "thead" || tag == "tbody" || tag == "tfoot" {
+                for tr in section.children().array() {
+                    if tr.tagName().lowercased() == "tr" {
+                        if let row = processTableRow(tr) {
+                            rows.append(row)
+                        }
+                    }
+                }
+            } else if tag == "caption" {
+                // Skip caption for now (could be added as a paragraph above table)
+            }
+        }
+
+        return .table(rows: rows)
+    }
+
+    private func processTableRow(_ tr: Element) -> TableRow? {
+        var cells: [TableCell] = []
+
+        for td in tr.children().array() {
+            let tag = td.tagName().lowercased()
+            if tag == "td" || tag == "th" {
+                let runs = collectInlineRuns(from: td, inheritedStyles: tag == "th" ? [.bold] : [], inheritedLink: nil)
+                cells.append(TableCell(isHeader: tag == "th", runs: runs))
+            }
+        }
+
+        return cells.isEmpty ? nil : TableRow(cells: cells)
+    }
+
+    // MARK: - Media Elements
+
+    private func processImage(_ el: Element) -> ContentNode? {
+        let style = resolveMediaStyle(for: el)
+        guard let src = try? el.attr("src"), !src.isEmpty else {
+            // Try xlink:href for SVG images
+            guard let xlinkSrc = try? el.attr("xlink:href"), !xlinkSrc.isEmpty else {
+                return nil
+            }
+            let url = resolveURL(xlinkSrc)
+            let alt = try? el.attr("alt")
+            let width = (try? el.attr("width")).flatMap { Double($0) }.map { CGFloat($0) }
+            let height = (try? el.attr("height")).flatMap { Double($0) }.map { CGFloat($0) }
+            return .image(url: url, alt: alt, width: width, height: height, style: style)
+        }
+
+        let imageURL = resolveURL(src)
+        let alt = try? el.attr("alt")
+        let width = (try? el.attr("width")).flatMap { Double($0) }.map { CGFloat($0) }
+        let height = (try? el.attr("height")).flatMap { Double($0) }.map { CGFloat($0) }
+        return .image(url: imageURL, alt: alt, width: width, height: height, style: style)
+    }
+
+    private func processVideo(_ el: Element) -> ContentNode? {
+        let style = resolveMediaStyle(for: el)
+        var sources: [URL] = []
+        let poster = (try? el.attr("poster")).flatMap { p -> URL? in
+            guard !p.isEmpty else { return nil }
+            return resolveURL(p)
+        }
+
+        // Check src attribute on video element itself
+        if let src = try? el.attr("src"), !src.isEmpty {
+            sources.append(resolveURL(src))
+        }
+
+        // Check <source> children
+        for source in el.children().array() {
+            if source.tagName().lowercased() == "source" {
+                if let src = try? source.attr("src"), !src.isEmpty {
+                    sources.append(resolveURL(src))
+                }
+            }
+        }
+
+        // Prefer MP4 for iOS
+        let mp4Source = sources.first { $0.pathExtension.lowercased() == "mp4" }
+        if let url = mp4Source ?? sources.first {
+            return .video(url: url, poster: poster, style: style)
+        }
+
+        return nil
+    }
+
+    private func processAudio(_ el: Element) -> ContentNode? {
+        let style = resolveMediaStyle(for: el)
+
+        // Check src attribute on audio element itself
+        if let src = try? el.attr("src"), !src.isEmpty {
+            return .audio(url: resolveURL(src), style: style)
+        }
+
+        // Check <source> children
+        for source in el.children().array() {
+            if source.tagName().lowercased() == "source" {
+                if let src = try? source.attr("src"), !src.isEmpty {
+                    return .audio(url: resolveURL(src), style: style)
+                }
+            }
+        }
+
+        return nil
+    }
+
+    // MARK: - Figure
+
+    private func processFigure(_ el: Element, blockStyle: BlockStyle) -> ContentNode {
+        var children: [ContentNode] = []
+
+        for child in el.children().array() {
+            let tag = child.tagName().lowercased()
+            if tag == "img" {
+                if let img = processImage(child) {
+                    children.append(img)
+                }
+            } else if tag == "video" {
+                if let video = processVideo(child) {
+                    children.append(video)
+                }
+            } else if tag == "audio" {
+                if let audio = processAudio(child) {
+                    children.append(audio)
+                }
+            } else if tag == "figcaption" {
+                let runs = collectInlineRuns(from: child, inheritedStyles: [], inheritedLink: nil)
+                if !runs.isEmpty {
+                    children.append(.paragraph(runs: runs))
+                }
+            } else if tag == "a" {
+                // Handle <figure><a><img></a></figure> pattern (fixes bug #2)
+                for grandchild in child.children().array() {
+                    let gtag = grandchild.tagName().lowercased()
+                    if gtag == "img" {
+                        if let img = processImage(grandchild) {
+                            children.append(img)
+                        }
+                    }
+                }
+            } else if isBlockTag(tag) {
+                if let node = processBlockElement(child) {
+                    children.append(node)
+                }
+            }
+        }
+
+        if children.isEmpty {
+            let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            if !runs.isEmpty {
+                return .paragraph(runs: runs, blockStyle: blockStyle)
+            }
+            return .paragraph(runs: [TextRun(text: " ")], blockStyle: blockStyle)
+        }
+        return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+    }
+
+    // MARK: - CSS Resolution
+
+    private func resolveCSSProperties(for element: Element) -> CSSProperties {
+        guard let stylesheet else { return .empty }
+        let tag = element.tagName().lowercased()
+        let classes = (try? element.className())?.split(separator: " ").map(String.init).filter { !$0.isEmpty } ?? []
+        let id = (try? element.attr("id")).flatMap { $0.isEmpty ? nil : $0 }
+        return stylesheet.resolve(element: tag, classes: classes, id: id)
+    }
+
+    private func resolveMediaStyle(for element: Element) -> MediaStyle {
+        let cssProps = resolveCSSProperties(for: element)
+        var style = MediaStyle.empty
+        style.cssWidth = cssProps.width
+        style.cssHeight = cssProps.height
+        style.cssFloat = cssProps.cssFloat
+        style.marginLeft = cssProps.marginLeft
+        style.marginRight = cssProps.marginRight
+        style.marginTop = cssProps.marginTop
+        style.marginBottom = cssProps.marginBottom
+        // Centered when display:block with no float (margin:auto pattern)
+        if cssProps.display == .block && (cssProps.cssFloat == nil || cssProps.cssFloat == .none) {
+            style.isCentered = true
+        }
+        return style
+    }
+
+    private func resolveBlockStyle(for element: Element) -> BlockStyle {
+        let cssProps = resolveCSSProperties(for: element)
+        var blockStyle = BlockStyle.empty
+        if let align = cssProps.textAlign { blockStyle.textAlign = align }
+        if let indent = cssProps.textIndent { blockStyle.textIndent = indent }
+        if let mt = cssProps.marginTop { blockStyle.marginTop = mt }
+        if let mb = cssProps.marginBottom { blockStyle.marginBottom = mb }
+        if let ml = cssProps.marginLeft { blockStyle.marginLeft = ml }
+        if let mr = cssProps.marginRight { blockStyle.marginRight = mr }
+        if let d = cssProps.display { blockStyle.display = d }
+        if let lst = cssProps.listStyleType { blockStyle.listStyleType = lst }
+        return blockStyle
+    }
+
+    /// Apply CSS inline styles (bold, italic, etc.) from a block element to its runs.
+    private func applyBlockCSSInlineStyles(_ el: Element, to runs: inout [TextRun]) {
+        let cssProps = resolveCSSProperties(for: el)
+        var additionalStyles: Set<TextStyle> = []
+        if cssProps.fontStyle == .italic { additionalStyles.insert(.italic) }
+        if cssProps.fontWeight == .bold { additionalStyles.insert(.bold) }
+        if cssProps.fontVariant == .smallCaps { additionalStyles.insert(.smallCaps) }
+        if cssProps.textTransform == .uppercase { additionalStyles.insert(.uppercase) }
+
+        if !additionalStyles.isEmpty {
+            runs = runs.map { run in
+                var newRun = run
+                newRun.styles = newRun.styles.union(additionalStyles)
+                return newRun
+            }
+        }
     }
 
     // MARK: - Helpers
 
-    private func localName(_ elementName: String) -> String {
-        elementName.components(separatedBy: ":").last ?? elementName
+    private func isBlockTag(_ tag: String) -> Bool {
+        Self.blockTags.contains(tag)
     }
 
-    private func makeContext(name: String, styles: Set<TextStyle> = [],
-                             link: URL? = nil, pre: Bool = false) -> ElementContext {
-        ElementContext(
-            name: name,
-            children: [],
-            runs: [],
-            styles: styles,
-            link: link,
-            isPreformatted: pre,
-            listOrdered: nil,
-            listItems: [],
-            tableRows: [],
-            tableCells: [],
-            isCellHeader: false
-        )
+    private func isPreformattedContext(_ element: Element) -> Bool {
+        var current: Element? = element
+        while let el = current {
+            if el.tagName().lowercased() == "pre" { return true }
+            current = el.parent()
+        }
+        return false
     }
 
-    private func appendToParent(_ node: ContentNode) {
-        guard stack.count > 0 else { return }
-
-        let parentName = stack[stack.count - 1].name
-
-        // Special handling for list items → parent list
-        if parentName == "ul" || parentName == "ol" {
-            if case .container(let children) = node {
-                stack[stack.count - 1].listItems.append(ListItem(children: children))
-            } else {
-                stack[stack.count - 1].listItems.append(ListItem(children: [node]))
+    private func getPreformattedText(_ element: Element) -> String {
+        // For <pre> elements, we want to preserve whitespace
+        // Use SwiftSoup's text extraction but with whitespace preserved
+        var text = ""
+        for child in element.getChildNodes() {
+            if let textNode = child as? TextNode {
+                text += textNode.getWholeText()
+            } else if let el = child as? Element {
+                if el.tagName().lowercased() == "br" {
+                    text += "\n"
+                } else {
+                    text += getPreformattedText(el)
+                }
             }
-            return
         }
-
-        // Special handling for table cells → parent row
-        if parentName == "tr" {
-            if case .container(_) = node {
-                // td/th was processed - get runs from the original context
-                // The runs are already captured in the node
-            }
-            // Cells are added differently - handled in didEndElement
-            stack[stack.count - 1].children.append(node)
-            return
-        }
-
-        // Special handling for table rows → parent table
-        if parentName == "table" || parentName == "thead" || parentName == "tbody" || parentName == "tfoot" {
-            // Collect table rows
-            if case .container(_) = node {
-                // This was a <tr> - build TableRow from its cells
-            }
-            stack[stack.count - 1].children.append(node)
-            return
-        }
-
-        stack[stack.count - 1].children.append(node)
+        return text
     }
 
-    private func handleImage(_ attributes: [String: String]) {
-        guard let src = attributes["src"] ?? attributes["xlink:href"] else { return }
+    private func collapseWhitespace(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
 
-        let imageURL: URL
+    private func resolveURL(_ src: String) -> URL {
         if src.hasPrefix("http://") || src.hasPrefix("https://") {
-            guard let url = URL(string: src) else { return }
-            imageURL = url
-        } else {
-            imageURL = baseURL.appendingPathComponent(src)
+            return URL(string: src) ?? baseURL.appendingPathComponent(src)
         }
-
-        let alt = attributes["alt"]
-        let width = attributes["width"].flatMap { Double($0) }.map { CGFloat($0) }
-        let height = attributes["height"].flatMap { Double($0) }.map { CGFloat($0) }
-
-        appendToParent(.image(url: imageURL, alt: alt, width: width, height: height))
+        return baseURL.appendingPathComponent(src)
     }
 
-    /// Extract text runs from a list of child nodes (for elements that contain
-    /// only inline content but got parsed as children).
-    private func consolidateChildRuns(_ children: [ContentNode]) -> [TextRun] {
-        var runs: [TextRun] = []
-        for child in children {
-            switch child {
-            case .paragraph(let childRuns):
-                runs.append(contentsOf: childRuns)
-            case .heading(_, let childRuns):
-                runs.append(contentsOf: childRuns)
-            default:
-                break
+    /// Remove leading/trailing whitespace-only runs and trim edge whitespace.
+    private func trimWhitespaceRuns(_ runs: [TextRun]) -> [TextRun] {
+        guard !runs.isEmpty else { return [] }
+
+        var result = runs
+
+        // Trim leading whitespace from first run
+        if let first = result.first {
+            let trimmed = first.text.replacingOccurrences(of: "^\\s+", with: "", options: .regularExpression)
+            if trimmed.isEmpty {
+                result.removeFirst()
+            } else if trimmed != first.text {
+                result[0] = TextRun(text: trimmed, styles: first.styles, link: first.link)
             }
         }
-        return runs
+
+        // Trim trailing whitespace from last run
+        if let last = result.last {
+            let trimmed = last.text.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
+            if trimmed.isEmpty {
+                result.removeLast()
+            } else if trimmed != last.text {
+                result[result.count - 1] = TextRun(text: trimmed, styles: last.styles, link: last.link)
+            }
+        }
+
+        return result
     }
 }

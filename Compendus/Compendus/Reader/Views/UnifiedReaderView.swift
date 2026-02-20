@@ -387,8 +387,8 @@ struct UnifiedReaderView: View {
                 .foregroundStyle(.primary)
             }
             .padding(.horizontal)
-            .padding(.bottom, 10)
-            .padding(.top, topSafeAreaInset + 6)
+            .padding(.bottom, 14)
+            .padding(.top, topSafeAreaInset + 12)
             .opacity(visible ? 1 : 0)
         }
         .background(visible ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: readerSettings.theme.backgroundColor)))
@@ -460,8 +460,8 @@ struct UnifiedReaderView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.top, 12)
-        .padding(.bottom, max(12, bottomSafeAreaInset + 8))
+        .padding(.top, 16)
+        .padding(.bottom, max(16, bottomSafeAreaInset + 12))
         .opacity(visible ? 1 : 0)
         .background(visible ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: readerSettings.theme.backgroundColor)))
         .environment(\.colorScheme, readerSettings.theme.colorScheme)

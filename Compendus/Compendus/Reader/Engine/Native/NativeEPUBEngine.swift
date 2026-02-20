@@ -8,6 +8,7 @@
 //
 
 import UIKit
+import SwiftSoup
 import os.log
 
 private let logger = Logger(subsystem: "com.compendus.reader", category: "NativeEPUB")
@@ -50,6 +51,15 @@ class NativeEPUBEngine: ReaderEngine {
     private var chapterPages: [Int: [PageInfo]] = [:]
     private var chapterOffsetMaps: [Int: OffsetMap] = [:]
 
+    // CSS stylesheet loaded once per book
+    private var bookStylesheet: CSSStylesheet?
+
+    // Media attachments for current chapter (for video/audio tap handling)
+    private var currentMediaAttachments: [MediaAttachment] = []
+
+    // Floating elements for current chapter (CSS float images)
+    private var currentFloatingElements: [FloatingElement] = []
+
     // Viewport
     private var viewportSize: CGSize = .zero
 
@@ -68,6 +78,9 @@ class NativeEPUBEngine: ReaderEngine {
             let parser = try await EPUBParser.parse(epubURL: bookURL)
             self.parser = parser
             logger.info("Parsed EPUB: \(parser.package.spine.count) spine items, \(parser.package.manifest.count) manifest items")
+
+            // Load CSS stylesheets once for the entire book
+            loadStylesheets(from: parser)
 
             // Initialize spine page counts
             spinePageCounts = Array(repeating: 1, count: parser.package.spine.count)
@@ -142,6 +155,63 @@ class NativeEPUBEngine: ReaderEngine {
         pageVC.onTapZone = { [weak self] zone in
             self?.onTapZone?(zone)
         }
+
+        pageVC.onLinkTapped = { [weak self] url in
+            self?.handleLinkTap(url)
+        }
+    }
+
+    private func handleLinkTap(_ url: URL) {
+        guard let parser = parser else { return }
+
+        // Get the href relative to the EPUB root
+        let href = url.lastPathComponent
+        let hrefBase = href.components(separatedBy: "#").first ?? href
+
+        // Check if it's an internal link to a spine item
+        for (index, spineItem) in parser.package.spine.enumerated() {
+            guard let manifest = parser.package.manifest[spineItem.idref] else { continue }
+            let manifestBase = manifest.href.components(separatedBy: "#").first ?? manifest.href
+
+            if manifest.href == href || manifestBase == hrefBase
+                || href.hasSuffix(manifestBase) || manifestBase.hasSuffix(hrefBase)
+                || manifest.href.hasSuffix(hrefBase) || hrefBase.hasSuffix(manifest.href.components(separatedBy: "/").last ?? "") {
+
+                if index != currentSpineIndex {
+                    loadChapter(at: index)
+                } else {
+                    // Same chapter — scroll to top
+                    pageViewController?.showPage(0)
+                    currentPageIndex = 0
+                    updateLocation()
+                }
+                return
+            }
+        }
+
+        // External link — open in system browser
+        if url.scheme == "http" || url.scheme == "https" {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    // Media players are managed inline by NativePageViewController.
+    // No overlay-based presentation needed.
+
+    // MARK: - CSS Stylesheet Loading
+
+    private func loadStylesheets(from parser: EPUBParser) {
+        var combined = CSSStylesheet()
+        for (_, item) in parser.package.manifest {
+            guard item.mediaType == "text/css" else { continue }
+            let cssURL = parser.resolveURL(for: item)
+            guard let cssData = try? Data(contentsOf: cssURL),
+                  let cssText = String(data: cssData, encoding: .utf8) else { continue }
+            let parsed = CSSParser.parse(cssText)
+            combined.merge(with: parsed)
+        }
+        self.bookStylesheet = combined
+        logger.info("Loaded CSS stylesheets from manifest")
     }
 
     // MARK: - Chapter Loading
@@ -174,7 +244,7 @@ class NativeEPUBEngine: ReaderEngine {
             }
             logger.info("Chapter XHTML data: \(data.count) bytes")
             let baseURL = chapterURL.deletingLastPathComponent()
-            let contentParser = XHTMLContentParser(data: data, baseURL: baseURL)
+            let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: bookStylesheet)
             parsedChapters[spineIndex] = contentParser.parse()
         }
 
@@ -183,9 +253,11 @@ class NativeEPUBEngine: ReaderEngine {
 
         // Build attributed string if not cached (or settings changed)
         let settings = currentSettings ?? ReaderSettings()
-        let contentWidth = viewportSize.width - NativePaginationEngine.defaultInsets.left - NativePaginationEngine.defaultInsets.right
+        let insets = NativePaginationEngine.insets(for: viewportSize.width)
+        let contentWidth = viewportSize.width - insets.left - insets.right
+        let contentHeight = viewportSize.height - insets.top - insets.bottom
         logger.info("Viewport: \(self.viewportSize.width)x\(self.viewportSize.height), contentWidth: \(contentWidth)")
-        let builder = AttributedStringBuilder(settings: settings, contentWidth: max(1, contentWidth))
+        let builder = AttributedStringBuilder(settings: settings, contentWidth: max(1, contentWidth), contentHeight: max(1, contentHeight))
         let (attrString, offsetMap) = builder.build(from: nodes)
         chapterStrings[spineIndex] = attrString
         chapterOffsetMaps[spineIndex] = offsetMap
@@ -198,10 +270,15 @@ class NativeEPUBEngine: ReaderEngine {
             logger.warning("Attributed string is EMPTY — content will not be visible")
         }
 
+        // Store media attachments and floating elements
+        currentMediaAttachments = builder.mediaAttachments
+        currentFloatingElements = builder.floatingElements
+
         // Paginate
         let pages = NativePaginationEngine.paginate(
             attributedString: attrString,
-            viewportSize: viewportSize
+            viewportSize: viewportSize,
+            contentInsets: insets
         )
         chapterPages[spineIndex] = pages
         updateSpinePageCount(pages.count)
@@ -224,7 +301,9 @@ class NativeEPUBEngine: ReaderEngine {
             attributedString: attrString,
             pages: pages,
             chapterHref: manifestItem?.href,
-            startAtPage: startPage
+            startAtPage: startPage,
+            mediaAttachments: currentMediaAttachments,
+            floatingElements: currentFloatingElements
         )
 
         // Apply theme
@@ -252,6 +331,7 @@ class NativeEPUBEngine: ReaderEngine {
     private func prefetchAdjacentChapters() {
         guard let parser = parser else { return }
         let indices = [currentSpineIndex - 1, currentSpineIndex + 1]
+        let stylesheet = bookStylesheet
         for index in indices {
             guard index >= 0, index < parser.package.spine.count,
                   parsedChapters[index] == nil else { continue }
@@ -262,7 +342,7 @@ class NativeEPUBEngine: ReaderEngine {
                       let data = try? Data(contentsOf: chapterURL) else { return }
 
                 let baseURL = chapterURL.deletingLastPathComponent()
-                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL)
+                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: stylesheet)
                 let nodes = contentParser.parse()
 
                 await MainActor.run {
@@ -403,7 +483,12 @@ class NativeEPUBEngine: ReaderEngine {
 
     func tableOfContents() async -> [TOCItem] {
         guard let parser = parser else { return [] }
-        return convertTOCEntries(parser.package.tocItems, level: 0)
+
+        let items = convertTOCEntries(parser.package.tocItems, level: 0)
+        if !items.isEmpty { return items }
+
+        // Fallback: build TOC from headings found in spine items
+        return await buildTOCFromHeadings(parser: parser)
     }
 
     private func convertTOCEntries(_ entries: [EPUBTOCEntry], level: Int) -> [TOCItem] {
@@ -422,6 +507,80 @@ class NativeEPUBEngine: ReaderEngine {
                 children: convertTOCEntries(entry.children, level: level + 1)
             )
         }
+    }
+
+    /// Scan spine XHTML files for heading elements (h1–h3) to build a fallback TOC.
+    private func buildTOCFromHeadings(parser: EPUBParser) async -> [TOCItem] {
+        var items: [TOCItem] = []
+
+        for (index, spineItem) in parser.package.spine.enumerated() {
+            guard let manifest = parser.package.manifest[spineItem.idref],
+                  let chapterURL = parser.resolveSpineItemURL(at: index),
+                  let data = try? Data(contentsOf: chapterURL),
+                  let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+                continue
+            }
+
+            do {
+                let doc = try SwiftSoup.parse(html)
+                let headings = try doc.select("h1, h2, h3")
+
+                for heading in headings.array() {
+                    let text = try heading.text().trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else { continue }
+
+                    let tagName = heading.tagName()
+                    let level: Int
+                    switch tagName {
+                    case "h1": level = 0
+                    case "h2": level = 1
+                    case "h3": level = 2
+                    default: level = 0
+                    }
+
+                    let href = manifest.href
+                    let item = TOCItem(
+                        id: "\(href)#heading-\(items.count)",
+                        title: text,
+                        location: ReaderLocation(
+                            href: href,
+                            pageIndex: nil,
+                            progression: 0,
+                            totalProgression: 0,
+                            title: text
+                        ),
+                        level: level,
+                        children: []
+                    )
+                    items.append(item)
+                }
+
+                // If no headings found in this spine item, add a generic entry using filename
+                if headings.isEmpty() {
+                    let filename = chapterURL.deletingPathExtension().lastPathComponent
+                        .replacingOccurrences(of: "_", with: " ")
+                        .replacingOccurrences(of: "-", with: " ")
+                    let capitalized = filename.prefix(1).uppercased() + filename.dropFirst()
+                    items.append(TOCItem(
+                        id: manifest.href,
+                        title: capitalized,
+                        location: ReaderLocation(
+                            href: manifest.href,
+                            pageIndex: nil,
+                            progression: 0,
+                            totalProgression: 0,
+                            title: capitalized
+                        ),
+                        level: 0,
+                        children: []
+                    ))
+                }
+            } catch {
+                logger.warning("Failed to parse headings from \(chapterURL.lastPathComponent): \(error)")
+            }
+        }
+
+        return items
     }
 
     func applyHighlights(_ highlights: [BookHighlight]) {
@@ -525,7 +684,7 @@ class NativeEPUBEngine: ReaderEngine {
                 guard let chapterURL = parser.resolveSpineItemURL(at: spineIndex),
                       let data = try? Data(contentsOf: chapterURL) else { continue }
                 let baseURL = chapterURL.deletingLastPathComponent()
-                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL)
+                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: bookStylesheet)
                 let parsed = contentParser.parse()
                 parsedChapters[spineIndex] = parsed
                 nodes = parsed
@@ -603,7 +762,7 @@ class NativeEPUBEngine: ReaderEngine {
 
     private static func appendPlainText(from node: ContentNode, to text: inout String) {
         switch node {
-        case .paragraph(let runs), .heading(_, let runs):
+        case .paragraph(let runs, _), .heading(_, let runs, _):
             for run in runs {
                 text += run.text
             }
@@ -612,14 +771,14 @@ class NativeEPUBEngine: ReaderEngine {
         case .codeBlock(let code):
             text += code + "\n"
 
-        case .list(_, let items):
+        case .list(_, let items, _):
             for item in items {
                 for child in item.children {
                     appendPlainText(from: child, to: &text)
                 }
             }
 
-        case .blockquote(let children), .container(let children):
+        case .blockquote(let children), .container(let children, _):
             for child in children {
                 appendPlainText(from: child, to: &text)
             }
@@ -635,11 +794,15 @@ class NativeEPUBEngine: ReaderEngine {
                 text += "\n"
             }
 
-        case .image(_, let alt, _, _):
+        case .image(_, let alt, _, _, _):
             if let alt = alt { text += alt + "\n" }
 
         case .horizontalRule:
             text += "\n"
+
+        case .video, .audio:
+            break
         }
     }
 }
+

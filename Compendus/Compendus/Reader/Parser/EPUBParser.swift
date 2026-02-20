@@ -14,6 +14,7 @@
 
 import Foundation
 import ZIPFoundation
+import SwiftSoup
 
 // MARK: - Errors
 
@@ -127,152 +128,113 @@ class EPUBParser {
     }
 }
 
-// MARK: - Container XML Parser
+// MARK: - Container XML Parser (SwiftSoup)
 
 private func parseContainerXML(_ data: Data) throws -> String {
-    let parser = ContainerXMLParser(data: data)
-    guard let opfPath = parser.parse() else {
+    guard let xml = String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .isoLatin1) else {
+        throw EPUBParserError.invalidEPUB("Could not decode container.xml")
+    }
+
+    do {
+        let doc = try SwiftSoup.parse(xml, "", Parser.xmlParser())
+        guard let rootfile = try doc.select("rootfile").first(),
+              let fullPath = try? rootfile.attr("full-path"),
+              !fullPath.isEmpty else {
+            throw EPUBParserError.invalidEPUB("Could not find rootfile in container.xml")
+        }
+        return fullPath
+    } catch let error as EPUBParserError {
+        throw error
+    } catch {
         throw EPUBParserError.invalidEPUB("Could not find rootfile in container.xml")
     }
-    return opfPath
 }
 
-private class ContainerXMLParser: NSObject, XMLParserDelegate {
-    private let data: Data
-    private var opfPath: String?
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    func parse() -> String? {
-        let parser = XMLParser(data: data)
-        parser.delegate = self
-        parser.parse()
-        return opfPath
-    }
-
-    func parser(_ parser: XMLParser, didStartElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?,
-                attributes attributeDict: [String: String] = [:]) {
-        if elementName == "rootfile" || qName?.hasSuffix(":rootfile") == true
-            || elementName.hasSuffix("rootfile") {
-            if let path = attributeDict["full-path"] {
-                opfPath = path
-            }
-        }
-    }
-}
-
-// MARK: - OPF Parser
+// MARK: - OPF Parser (SwiftSoup)
 
 private func parseOPF(_ data: Data) throws -> (EPUBMetadata, [String: ManifestItem], [SpineItem]) {
-    let parser = OPFParser(data: data)
-    guard parser.parse() else {
-        throw EPUBParserError.parsingFailed("Failed to parse OPF file")
-    }
-    return (parser.metadata, parser.manifest, parser.spine)
-}
-
-private class OPFParser: NSObject, XMLParserDelegate {
-    private let data: Data
-
-    var metadata = EPUBMetadata(title: "Untitled", authors: [], language: nil, identifier: nil)
-    var manifest: [String: ManifestItem] = [:]
-    var spine: [SpineItem] = []
-
-    // Parsing state
-    private var currentElement = ""
-    private var currentText = ""
-    private var inMetadata = false
-    private var titleText: String?
-    private var authors: [String] = []
-    private var language: String?
-    private var identifier: String?
-
-    init(data: Data) {
-        self.data = data
+    guard let xml = String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .isoLatin1) else {
+        throw EPUBParserError.parsingFailed("Could not decode OPF file")
     }
 
-    func parse() -> Bool {
-        let parser = XMLParser(data: data)
-        parser.delegate = self
-        parser.shouldProcessNamespaces = false
-        let result = parser.parse()
-        metadata = EPUBMetadata(
-            title: titleText ?? "Untitled",
-            authors: authors,
-            language: language,
-            identifier: identifier
-        )
-        return result
-    }
+    do {
+        let doc = try SwiftSoup.parse(xml, "", Parser.xmlParser())
 
-    func parser(_ parser: XMLParser, didStartElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?,
-                attributes attributeDict: [String: String] = [:]) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-        currentElement = localName
-        currentText = ""
+        // Parse metadata
+        var title = "Untitled"
+        var authors: [String] = []
+        var language: String?
+        var identifier: String?
 
-        switch localName {
-        case "metadata":
-            inMetadata = true
-
-        case "item":
-            // Manifest item
-            if let id = attributeDict["id"],
-               let href = attributeDict["href"],
-               let mediaType = attributeDict["media-type"] {
-                let decodedHref = href.removingPercentEncoding ?? href
-                let item = ManifestItem(
-                    id: id,
-                    href: decodedHref,
-                    mediaType: mediaType,
-                    properties: attributeDict["properties"]
-                )
-                manifest[id] = item
+        if let metadataEl = try doc.select("metadata").first() {
+            // Title — getElementsByTag handles namespaced tags like dc:title
+            if let titleEl = try metadataEl.getElementsByTag("dc:title").first()
+                ?? metadataEl.getElementsByTag("title").first() {
+                let t = try titleEl.text().trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { title = t }
             }
 
-        case "itemref":
-            // Spine item
-            if let idref = attributeDict["idref"] {
-                let linear = attributeDict["linear"] != "no"
-                spine.append(SpineItem(idref: idref, linear: linear))
+            // Authors — dc:creator
+            let creators = try metadataEl.getElementsByTag("dc:creator")
+            for creator in creators.array() {
+                let name = try creator.text().trimmingCharacters(in: .whitespacesAndNewlines)
+                if !name.isEmpty { authors.append(name) }
+            }
+            // Fallback: try plain "creator"
+            if authors.isEmpty {
+                for creator in try metadataEl.getElementsByTag("creator").array() {
+                    let name = try creator.text().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !name.isEmpty { authors.append(name) }
+                }
             }
 
-        default:
-            break
-        }
-    }
+            // Language
+            if let langEl = try metadataEl.getElementsByTag("dc:language").first()
+                ?? metadataEl.getElementsByTag("language").first() {
+                language = try langEl.text().trimmingCharacters(in: .whitespacesAndNewlines)
+            }
 
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        currentText += string
-    }
-
-    func parser(_ parser: XMLParser, didEndElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-        let text = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if inMetadata && !text.isEmpty {
-            switch localName {
-            case "title":
-                titleText = text
-            case "creator":
-                authors.append(text)
-            case "language":
-                language = text
-            case "identifier":
-                identifier = text
-            default:
-                break
+            // Identifier
+            if let idEl = try metadataEl.getElementsByTag("dc:identifier").first()
+                ?? metadataEl.getElementsByTag("identifier").first() {
+                identifier = try idEl.text().trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
 
-        if localName == "metadata" {
-            inMetadata = false
+        let metadata = EPUBMetadata(title: title, authors: authors,
+                                     language: language, identifier: identifier)
+
+        // Parse manifest
+        var manifest: [String: ManifestItem] = [:]
+        for item in try doc.select("manifest item").array() {
+            guard let id = try? item.attr("id"), !id.isEmpty,
+                  let href = try? item.attr("href"), !href.isEmpty,
+                  let mediaType = try? item.attr("media-type"), !mediaType.isEmpty else {
+                continue
+            }
+            let decodedHref = href.removingPercentEncoding ?? href
+            let properties = try? item.attr("properties")
+            manifest[id] = ManifestItem(
+                id: id,
+                href: decodedHref,
+                mediaType: mediaType,
+                properties: properties?.isEmpty == true ? nil : properties
+            )
         }
+
+        // Parse spine
+        var spine: [SpineItem] = []
+        for itemref in try doc.select("spine itemref").array() {
+            guard let idref = try? itemref.attr("idref"), !idref.isEmpty else { continue }
+            let linear = (try? itemref.attr("linear")) != "no"
+            spine.append(SpineItem(idref: idref, linear: linear))
+        }
+
+        return (metadata, manifest, spine)
+    } catch {
+        throw EPUBParserError.parsingFailed("Failed to parse OPF file: \(error)")
     }
 }
 
@@ -305,19 +267,11 @@ private func parseTOC(manifest: [String: ManifestItem], rootDir: String, extract
 
 // MARK: - EPUB 3 Navigation Document Parser
 
-/// Parses the EPUB 3 nav document (XHTML with <nav epub:type="toc">)
-private class NavDocumentParser: NSObject, XMLParserDelegate {
+/// Parses the EPUB 3 nav document (XHTML with <nav epub:type="toc">) using SwiftSoup
+/// for HTML5 tolerance.
+private class NavDocumentParser {
     private let data: Data
     private let basePath: String
-
-    private var items: [EPUBTOCEntry] = []
-    private var itemStack: [[EPUBTOCEntry]] = [[]]
-    private var inTocNav = false
-    private var inLink = false
-    private var currentHref = ""
-    private var currentTitle = ""
-    private var elementStack: [String] = []
-    private var depth = 0
 
     init(data: Data, basePath: String) {
         self.data = data
@@ -325,96 +279,100 @@ private class NavDocumentParser: NSObject, XMLParserDelegate {
     }
 
     func parse() -> [EPUBTOCEntry] {
-        let parser = XMLParser(data: data)
-        parser.delegate = self
-        parser.shouldProcessNamespaces = false
-        parser.parse()
-        return itemStack.first ?? []
-    }
+        guard let html = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1) else {
+            return []
+        }
 
-    func parser(_ parser: XMLParser, didStartElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?,
-                attributes attributeDict: [String: String] = [:]) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-        elementStack.append(localName)
+        do {
+            let doc = try SwiftSoup.parse(html)
 
-        if localName == "nav" {
-            // Check for epub:type="toc" (may appear as type, epub:type, etc.)
-            let typeAttr = attributeDict["epub:type"] ?? attributeDict["type"] ?? ""
-            if typeAttr.contains("toc") {
-                inTocNav = true
+            // Find <nav epub:type="toc"> or <nav role="doc-toc">
+            var tocNav: Element?
+            for nav in try doc.select("nav").array() {
+                let epubType = try nav.attr("epub:type")
+                let role = try nav.attr("role")
+                if epubType.contains("toc") || role == "doc-toc" {
+                    tocNav = nav
+                    break
+                }
             }
-        }
 
-        guard inTocNav else { return }
+            guard let nav = tocNav else { return [] }
 
-        if localName == "a" {
-            inLink = true
-            currentTitle = ""
-            currentHref = attributeDict["href"] ?? ""
-        } else if localName == "ol" {
-            depth += 1
-            itemStack.append([])
-        }
-    }
-
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        if inTocNav && inLink {
-            currentTitle += string
-        }
-    }
-
-    func parser(_ parser: XMLParser, didEndElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-
-        if localName == "nav" && inTocNav {
-            inTocNav = false
-        }
-
-        guard inTocNav || localName == "nav" else {
-            elementStack.removeLast()
-            return
-        }
-
-        if localName == "a" && inLink {
-            inLink = false
-        } else if localName == "li" {
-            let title = currentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !title.isEmpty {
-                // Resolve href relative to the nav document's directory
-                let resolvedHref = currentHref.removingPercentEncoding ?? currentHref
-                let children = itemStack.count > 1 ? itemStack.removeLast() : []
-                if itemStack.isEmpty { itemStack.append([]) }
-                let entry = EPUBTOCEntry(title: title, href: resolvedHref, children: children)
-                itemStack[itemStack.count - 1].append(entry)
+            // Find the top-level <ol> inside the nav
+            guard let rootOL = try nav.select("> ol").first()
+                    ?? nav.getElementsByTag("ol").first() else {
+                return []
             }
-            currentTitle = ""
-            currentHref = ""
-        } else if localName == "ol" {
-            depth -= 1
-            if depth < 0 { depth = 0 }
-            // Children are gathered when the parent <li> closes
+
+            return parseOL(rootOL)
+        } catch {
+            return []
+        }
+    }
+
+    private func parseOL(_ ol: Element) -> [EPUBTOCEntry] {
+        var entries: [EPUBTOCEntry] = []
+
+        for li in ol.children().array() {
+            guard li.tagName() == "li" else { continue }
+
+            // Find the <a> link in this <li>
+            guard let link = try? li.select("> a").first()
+                    ?? li.getElementsByTag("a").first() else { continue }
+
+            // Extract title: prefer <span class="toc-label">, else collect
+            // text from children excluding description spans
+            let title: String
+            if let labelSpan = try? link.select("span.toc-label").first() {
+                title = (try? labelSpan.text()) ?? ""
+            } else {
+                // Get text from all children except toc-desc spans
+                var parts: [String] = []
+                for node in link.getChildNodes() {
+                    if let textNode = node as? TextNode {
+                        let t = textNode.getWholeText().trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !t.isEmpty { parts.append(t) }
+                    } else if let el = node as? Element {
+                        let cls = (try? el.className()) ?? ""
+                        if !cls.contains("toc-desc") {
+                            if let t = try? el.text(), !t.isEmpty { parts.append(t) }
+                        }
+                    }
+                }
+                title = parts.joined(separator: " ")
+            }
+
+            let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedTitle.isEmpty else { continue }
+
+            let href = (try? link.attr("href")) ?? ""
+            let resolvedHref = href.removingPercentEncoding ?? href
+
+            // Parse nested <ol> for children
+            var children: [EPUBTOCEntry] = []
+            if let nestedOL = try? li.select("> ol").first() {
+                children = parseOL(nestedOL)
+            }
+
+            entries.append(EPUBTOCEntry(
+                title: trimmedTitle,
+                href: resolvedHref,
+                children: children
+            ))
         }
 
-        elementStack.removeLast()
+        return entries
     }
 }
 
-// MARK: - NCX Parser (EPUB 2 fallback)
+// MARK: - NCX Parser (EPUB 2 fallback, SwiftSoup)
 
-/// Parses the NCX file for EPUB 2 table of contents
-private class NCXParser: NSObject, XMLParserDelegate {
+/// Parses the NCX file for EPUB 2 table of contents using SwiftSoup XML parser
+private class NCXParser {
     private let data: Data
     private let basePath: String
-
-    private var items: [EPUBTOCEntry] = []
-    private var itemStack: [[EPUBTOCEntry]] = [[]]
-    private var currentTitle = ""
-    private var currentHref = ""
-    private var inNavPoint = false
-    private var inText = false
-    private var currentElement = ""
 
     init(data: Data, basePath: String) {
         self.data = data
@@ -422,65 +380,53 @@ private class NCXParser: NSObject, XMLParserDelegate {
     }
 
     func parse() -> [EPUBTOCEntry] {
-        let parser = XMLParser(data: data)
-        parser.delegate = self
-        parser.parse()
-        return itemStack.first ?? []
+        guard let xml = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1) else {
+            return []
+        }
+
+        do {
+            let doc = try SwiftSoup.parse(xml, "", Parser.xmlParser())
+
+            // Find the navMap element
+            guard let navMap = try doc.select("navMap").first() else { return [] }
+
+            // Parse top-level navPoints
+            return parseNavPoints(in: navMap)
+        } catch {
+            return []
+        }
     }
 
-    func parser(_ parser: XMLParser, didStartElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?,
-                attributes attributeDict: [String: String] = [:]) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-        currentElement = localName
+    private func parseNavPoints(in parent: Element) -> [EPUBTOCEntry] {
+        var entries: [EPUBTOCEntry] = []
 
-        switch localName {
-        case "navPoint":
-            inNavPoint = true
-            currentTitle = ""
-            currentHref = ""
-            itemStack.append([])
+        for navPoint in parent.children().array() {
+            guard navPoint.tagName().lowercased() == "navpoint" else { continue }
 
-        case "text":
-            if inNavPoint { inText = true }
-
-        case "content":
-            if inNavPoint {
-                currentHref = attributeDict["src"] ?? ""
+            // Get title from navLabel > text
+            let title: String
+            if let textEl = try? navPoint.select("navLabel text").first() {
+                title = (try? textEl.text())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            } else {
+                title = ""
             }
 
-        default:
-            break
+            // Get href from content[@src]
+            let href: String
+            if let contentEl = try? navPoint.select("content").first(),
+               let src = try? contentEl.attr("src"), !src.isEmpty {
+                href = src.removingPercentEncoding ?? src
+            } else {
+                href = ""
+            }
+
+            // Parse nested navPoints for children
+            let children = parseNavPoints(in: navPoint)
+
+            entries.append(EPUBTOCEntry(title: title, href: href, children: children))
         }
-    }
 
-    func parser(_ parser: XMLParser, foundCharacters string: String) {
-        if inText {
-            currentTitle += string
-        }
-    }
-
-    func parser(_ parser: XMLParser, didEndElement elementName: String,
-                namespaceURI: String?, qualifiedName qName: String?) {
-        let localName = elementName.components(separatedBy: ":").last ?? elementName
-
-        switch localName {
-        case "text":
-            inText = false
-
-        case "navPoint":
-            let title = currentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            let href = currentHref.removingPercentEncoding ?? currentHref
-            let children = itemStack.removeLast()
-            if itemStack.isEmpty { itemStack.append([]) }
-            let entry = EPUBTOCEntry(title: title, href: href, children: children)
-            itemStack[itemStack.count - 1].append(entry)
-            inNavPoint = !itemStack.isEmpty && itemStack.count > 1
-            currentTitle = ""
-            currentHref = ""
-
-        default:
-            break
-        }
+        return entries
     }
 }

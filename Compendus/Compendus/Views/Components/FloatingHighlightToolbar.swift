@@ -2,8 +2,8 @@
 //  FloatingHighlightToolbar.swift
 //  Compendus
 //
-//  Floating color picker toolbar that appears near selected text.
-//  Styled to resemble the native iOS text callout bar.
+//  Floating context menu that appears near selected text.
+//  Styled to resemble the native Apple Books highlight menu.
 //
 
 import SwiftUI
@@ -19,7 +19,7 @@ struct FloatingHighlightToolbar: View {
 
     // Show above selection when there's enough room; otherwise below.
     private var showAbove: Bool {
-        selectionRect.minY > 60
+        selectionRect.minY > 220
     }
 
     private var toolbarY: CGFloat {
@@ -31,9 +31,10 @@ struct FloatingHighlightToolbar: View {
     }
 
     private var toolbarX: CGFloat {
-        let half: CGFloat = 130
+        let menuWidth: CGFloat = 220
+        let half = menuWidth / 2
         let x = selectionRect.midX
-        return max(half, min(x, containerSize.width - half))
+        return max(half + 8, min(x, containerSize.width - half - 8))
     }
 
     var body: some View {
@@ -43,83 +44,86 @@ struct FloatingHighlightToolbar: View {
                 .contentShape(Rectangle())
                 .onTapGesture { onDismiss() }
 
-            // Toolbar
-            HStack(spacing: 0) {
-                // Preset colors
-                ForEach(BookHighlight.colors, id: \.hex) { color in
+            // Context menu
+            VStack(spacing: 0) {
+                // Color dots row
+                HStack(spacing: 12) {
+                    ForEach(BookHighlight.colors, id: \.hex) { color in
+                        Button {
+                            onSelectColor(color.hex)
+                        } label: {
+                            Circle()
+                                .fill(Color(uiColor: UIColor(hex: color.hex) ?? .yellow))
+                                .frame(width: 28, height: 28)
+                        }
+                    }
+
+                    // Custom color picker
                     Button {
-                        onSelectColor(color.hex)
+                        onCustomColor()
                     } label: {
-                        Circle()
-                            .fill(Color(uiColor: UIColor(hex: color.hex) ?? .yellow))
-                            .frame(width: 26, height: 26)
-                    }
-                    .padding(.horizontal, 6)
-                }
-
-                separator
-
-                // Custom color picker
-                Button {
-                    onCustomColor()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                AngularGradient(
-                                    colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red],
-                                    center: .center
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    AngularGradient(
+                                        colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red],
+                                        center: .center
+                                    )
                                 )
-                            )
-                            .frame(width: 26, height: 26)
-                        Circle()
-                            .fill(.white)
-                            .frame(width: 12, height: 12)
+                                .frame(width: 28, height: 28)
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 12, height: 12)
+                        }
                     }
                 }
-                .padding(.horizontal, 6)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
 
-                separator
+                Divider()
 
-                // Note
-                Button {
+                // Menu items
+                menuItem(icon: "note.text", label: "Add Note") {
                     onAddNote()
-                } label: {
-                    Image(systemName: "note.text")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
                 }
 
-                // Copy
-                Button {
+                Divider()
+
+                menuItem(icon: "doc.on.doc", label: "Copy") {
                     onCopy()
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .frame(width: 220)
             .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.regularMaterial)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .strokeBorder(.separator, lineWidth: 0.5)
                     }
-                    .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                    .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
                     .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .position(x: toolbarX, y: toolbarY)
         }
     }
 
-    private var separator: some View {
-        Divider()
-            .frame(height: 22)
-            .padding(.horizontal, 2)
+    private func menuItem(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                    .frame(width: 22)
+                Text(label)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
     }
 }
