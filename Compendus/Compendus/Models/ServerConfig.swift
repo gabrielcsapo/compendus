@@ -66,12 +66,12 @@ class ServerConfig {
         apiURL("/books/\(bookId)/as-cbz")
     }
 
-    /// Build a URL for triggering PDF → EPUB conversion
+    /// Build a URL for triggering EPUB conversion (supports PDF, MOBI, AZW3)
     func convertToEpubURL(for bookId: String) -> URL? {
         apiURL("/api/books/\(bookId)/convert-to-epub")
     }
 
-    /// Build a URL for downloading the converted EPUB
+    /// Build a URL for downloading the converted EPUB (auto-converts MOBI/AZW3 on first request)
     func bookAsEpubURL(for bookId: String) -> URL? {
         apiURL("/books/\(bookId)/as-epub")
     }

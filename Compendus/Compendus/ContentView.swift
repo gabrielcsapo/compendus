@@ -10,6 +10,7 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(ServerConfig.self) private var serverConfig
+    @Environment(ReaderSettings.self) private var readerSettings
     @Environment(\.modelContext) private var modelContext
     @Environment(\.deepLinkBookId) private var deepLinkBookId
     @State private var selectedTab = 1
@@ -50,6 +51,7 @@ struct ContentView: View {
                 }
                 .fullScreenCover(item: $deepLinkedBook) { book in
                     ReaderContainerView(book: book)
+                        .environment(readerSettings)
                 }
                 .task {
                     // One-time migration of old Readium-format highlight locators

@@ -14,6 +14,7 @@ struct DownloadedBookDetailView: View {
     @Environment(APIService.self) private var apiService
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(StorageManager.self) private var storageManager
+    @Environment(ReaderSettings.self) private var readerSettings
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -80,6 +81,7 @@ struct DownloadedBookDetailView: View {
             ReaderContainerView(book: bookToOpen)
                 .environment(apiService)
                 .environment(storageManager)
+                .environment(readerSettings)
                 .modelContext(modelContext)
         }
     }

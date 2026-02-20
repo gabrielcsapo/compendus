@@ -43,8 +43,8 @@ class APIService {
 
     // MARK: - Books
 
-    /// Fetch all books from the server with optional type filter
-    func fetchBooks(limit: Int = 50, offset: Int = 0, type: String? = nil) async throws -> BooksResponse {
+    /// Fetch all books from the server with optional type filter and sorting
+    func fetchBooks(limit: Int = 50, offset: Int = 0, type: String? = nil, orderBy: String? = nil, order: String? = nil) async throws -> BooksResponse {
         guard config.isConfigured else {
             throw APIError.serverNotConfigured
         }
@@ -52,6 +52,12 @@ class APIService {
         var urlString = "/api/books?limit=\(limit)&offset=\(offset)"
         if let type = type {
             urlString += "&type=\(type)"
+        }
+        if let orderBy = orderBy {
+            urlString += "&orderBy=\(orderBy)"
+        }
+        if let order = order {
+            urlString += "&order=\(order)"
         }
 
         guard let url = config.apiURL(urlString) else {
@@ -134,8 +140,8 @@ class APIService {
 
     // MARK: - Conversions
 
-    /// Trigger PDF → EPUB conversion on the server
-    func convertPdfToEpub(bookId: String) async throws -> ConversionResponse {
+    /// Trigger EPUB conversion on the server (supports PDF, MOBI, AZW3)
+    func convertToEpub(bookId: String) async throws -> ConversionResponse {
         guard config.isConfigured else { throw APIError.serverNotConfigured }
         guard let url = config.convertToEpubURL(for: bookId) else { throw APIError.invalidURL }
 

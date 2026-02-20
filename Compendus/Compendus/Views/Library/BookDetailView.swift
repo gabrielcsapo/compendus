@@ -10,11 +10,13 @@ import SwiftData
 
 struct BookDetailView: View {
     let book: Book
+    var onRead: ((DownloadedBook) -> Void)?
 
     @Environment(ServerConfig.self) private var serverConfig
     @Environment(APIService.self) private var apiService
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(StorageManager.self) private var storageManager
+    @Environment(ReaderSettings.self) private var readerSettings
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -54,7 +56,7 @@ struct BookDetailView: View {
                         .padding(.top, 20)
                         .padding(.horizontal, 20)
 
-                    // PDF → EPUB conversion
+                    // PDF → EPUB conversion (MOBI/AZW/AZW3 auto-convert on download)
                     if book.format.lowercased() == "pdf" {
                         convertToEpubSection
                             .padding(.top, 12)
@@ -101,6 +103,7 @@ struct BookDetailView: View {
                 ReaderContainerView(book: book, preferEpub: readAsEpub)
                     .environment(apiService)
                     .environment(storageManager)
+                    .environment(readerSettings)
                     .modelContext(modelContext)
             }
             .onChange(of: bookToRead) { _, newValue in
@@ -270,8 +273,19 @@ struct BookDetailView: View {
         AnimatedDownloadButton(
             state: downloadButtonState,
             onTap: {
-                if isDownloaded {
-                    bookToRead = downloadedBook
+                if isDownloaded, let downloaded = downloadedBook {
+                    if let onRead {
+                        // Dismiss sheet and let parent present the reader full-screen
+                        dismiss()
+                        onRead(downloaded)
+                    } else {
+                        // Fallback: present locally
+                        if ["mobi", "azw", "azw3"].contains(book.format.lowercased()),
+                           downloaded.hasEpubVersion {
+                            readAsEpub = true
+                        }
+                        bookToRead = downloaded
+                    }
                 } else {
                     downloadBook()
                 }
@@ -518,8 +532,13 @@ struct BookDetailView: View {
             if isDownloaded {
                 if downloadedBook?.hasEpubVersion == true {
                     Button {
-                        readAsEpub = true
-                        bookToRead = downloadedBook
+                        if let onRead, let downloaded = downloadedBook {
+                            dismiss()
+                            onRead(downloaded)
+                        } else {
+                            readAsEpub = true
+                            bookToRead = downloadedBook
+                        }
                     } label: {
                         Label("Read as EPUB", systemImage: "book")
                             .font(.subheadline)
@@ -558,7 +577,7 @@ struct BookDetailView: View {
 
         Task {
             do {
-                let response = try await apiService.convertPdfToEpub(bookId: book.id)
+                let response = try await apiService.convertToEpub(bookId: book.id)
 
                 await MainActor.run {
                     if response.alreadyConverted == true {

@@ -1,5 +1,5 @@
 import { db, books } from "../db";
-import { eq, or, inArray, sql } from "drizzle-orm";
+import { eq, or, inArray, sql, asc, desc } from "drizzle-orm";
 import { searchBooks as searchBooksLib } from "../search";
 import type { Book } from "../db/schema";
 
@@ -261,10 +261,12 @@ export async function apiListBooks(
     limit?: number;
     offset?: number;
     type?: "ebook" | "audiobook" | "comic";
+    orderBy?: "title" | "createdAt";
+    order?: "asc" | "desc";
   },
   baseUrl: string,
 ): Promise<ApiSearchResponse | ApiErrorResponse> {
-  const { limit = 20, offset = 0, type } = options;
+  const { limit = 20, offset = 0, type, orderBy = "createdAt", order = "desc" } = options;
 
   if (limit > 100) {
     return {
@@ -291,6 +293,11 @@ export async function apiListBooks(
         countQuery = countQuery.where(inArray(books.format, formats));
       }
     }
+
+    // Apply ordering
+    const orderColumn = orderBy === "title" ? books.title : books.createdAt;
+    const orderFn = order === "asc" ? asc : desc;
+    query = query.orderBy(orderFn(orderColumn));
 
     // Run both queries in parallel
     const [results, countResult] = await Promise.all([

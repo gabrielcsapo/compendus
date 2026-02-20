@@ -1,17 +1,21 @@
 import { Hono } from "hono";
 import { readFile } from "fs/promises";
 import { existsSync, statSync, writeFileSync } from "fs";
-import { resolve } from "path";
+import { resolve, extname } from "path";
 import { eq } from "drizzle-orm";
 import { db, books } from "../../app/lib/db";
 import { createJob, updateJobProgress, getJob } from "../../app/lib/jobs";
 import { convertPdfToEpub } from "../../app/lib/processing/pdf-to-epub";
+import { convertMobiToEpub } from "../../app/lib/processing/mobi-to-epub";
 
 const app = new Hono();
 
+const CONVERTIBLE_FORMATS = ["pdf", "mobi", "azw3"];
+
 /**
  * POST /api/books/:id/convert-to-epub
- * Triggers PDF → EPUB conversion as a background job.
+ * Triggers EPUB conversion as a background job.
+ * Supports PDF, MOBI, and AZW3 formats.
  * Returns immediately with a jobId for progress tracking.
  */
 app.post("/api/books/:id/convert-to-epub", async (c) => {
@@ -26,8 +30,12 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
     return c.json({ success: false, error: "Book not found" }, 404);
   }
 
-  if (book.format !== "pdf") {
-    return c.json({ success: false, error: "not_pdf", message: "Only PDF books can be converted to EPUB" }, 400);
+  if (!CONVERTIBLE_FORMATS.includes(book.format)) {
+    return c.json({
+      success: false,
+      error: "not_convertible",
+      message: "Only PDF and MOBI/AZW3 books can be converted to EPUB",
+    }, 400);
   }
 
   // Check if already converted (allow force reconversion)
@@ -49,10 +57,11 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
     return c.json({ success: true, jobId, pending: true });
   }
 
-  // Verify PDF file exists
-  const pdfPath = resolve(process.cwd(), "data", "books", `${bookId}.pdf`);
-  if (!existsSync(pdfPath)) {
-    return c.json({ success: false, error: "PDF file not found on disk" }, 404);
+  // Verify source file exists
+  const ext = book.fileName ? extname(book.fileName) : `.${book.format}`;
+  const bookPath = resolve(process.cwd(), "data", "books", `${bookId}${ext}`);
+  if (!existsSync(bookPath)) {
+    return c.json({ success: false, error: "Source file not found on disk" }, 404);
   }
 
   // Create job and return immediately
@@ -61,9 +70,13 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
   // Run conversion in background
   (async () => {
     try {
-      updateJobProgress(jobId, { status: "running", progress: 1, message: "Reading PDF file..." });
+      updateJobProgress(jobId, {
+        status: "running",
+        progress: 1,
+        message: `Reading ${book.format.toUpperCase()} file...`,
+      });
 
-      const pdfBuffer = await readFile(pdfPath);
+      const fileBuffer = await readFile(bookPath);
 
       // Parse metadata from DB
       const authors = book.authors ? JSON.parse(book.authors) : [];
@@ -73,11 +86,16 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
         language: book.language ?? undefined,
       };
 
-      const epubBuffer = await convertPdfToEpub(pdfBuffer, metadata, {
-        onProgress: (percent, message) => {
-          updateJobProgress(jobId, { status: "running", progress: percent, message });
-        },
-      });
+      const onProgress = (percent: number, message: string) => {
+        updateJobProgress(jobId, { status: "running", progress: percent, message });
+      };
+
+      let epubBuffer: Buffer;
+      if (book.format === "pdf") {
+        epubBuffer = await convertPdfToEpub(fileBuffer, metadata, { onProgress });
+      } else {
+        epubBuffer = await convertMobiToEpub(fileBuffer, metadata, { onProgress });
+      }
 
       // Store the converted EPUB
       const epubPath = resolve(process.cwd(), "data", "books", `${bookId}.epub`);
@@ -100,10 +118,10 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
         result: { bookId },
       });
 
-      console.log(`[Convert] PDF → EPUB conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`);
+      console.log(`[Convert] ${book.format.toUpperCase()} → EPUB conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[Convert] PDF → EPUB conversion failed for ${bookId}:`, errorMessage);
+      console.error(`[Convert] ${book.format.toUpperCase()} → EPUB conversion failed for ${bookId}:`, errorMessage);
 
       updateJobProgress(jobId, {
         status: "error",

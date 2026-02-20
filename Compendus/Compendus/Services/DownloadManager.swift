@@ -75,7 +75,9 @@ class DownloadManager: NSObject {
 
         // Determine download URL and final format
         // For CBR files, download as CBZ for offline reading support
+        // For MOBI/AZW/AZW3 files, download as EPUB (server auto-converts)
         let isCbr = book.format.lowercased() == "cbr"
+        let isMobi = ["mobi", "azw", "azw3"].contains(book.format.lowercased())
         let downloadURL: URL?
         let localFormat: String
 
@@ -84,6 +86,11 @@ class DownloadManager: NSObject {
             downloadURL = config.bookAsCbzURL(for: book.id)
             localFormat = "cbz"
             print("[DownloadManager] Converting CBR to CBZ for offline reading: \(book.id)")
+        } else if isMobi {
+            // Download MOBI/AZW/AZW3 as EPUB (server converts on the fly)
+            downloadURL = config.bookAsEpubURL(for: book.id)
+            localFormat = "epub"
+            print("[DownloadManager] Converting MOBI to EPUB for download: \(book.id)")
         } else {
             downloadURL = apiService.bookDownloadURL(bookId: book.id, format: book.format)
             localFormat = book.format
@@ -143,8 +150,8 @@ class DownloadManager: NSObject {
             localPath: "books/\(fileName)",
             coverData: coverData
         )
-        // Override format if we converted CBR to CBZ
-        if isCbr {
+        // Override format if we converted CBR to CBZ or MOBI to EPUB
+        if isCbr || isMobi {
             downloadedBook.format = localFormat
         }
         downloadedBook.fileSize = actualFileSize
