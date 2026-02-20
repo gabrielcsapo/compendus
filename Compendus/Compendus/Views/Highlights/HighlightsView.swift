@@ -13,6 +13,7 @@ struct HighlightsView: View {
     @Query private var allBooks: [DownloadedBook]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(ReaderSettings.self) private var readerSettings
     @State private var searchText = ""
     @State private var bookToOpen: DownloadedBook?
     @State private var editingHighlight: BookHighlight?
@@ -89,6 +90,7 @@ struct HighlightsView: View {
             .searchable(text: $searchText, prompt: "Search highlights")
             .fullScreenCover(item: $bookToOpen) { book in
                 ReaderContainerView(book: book)
+                    .environment(readerSettings)
             }
             .sheet(item: $editingHighlight) { highlight in
                 EditNoteSheet(highlight: highlight) {

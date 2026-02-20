@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { readFile, open } from "fs/promises";
-import { resolve } from "path";
-import { existsSync, statSync, createReadStream } from "fs";
+import { resolve, extname } from "path";
+import { existsSync, statSync, createReadStream, writeFileSync } from "fs";
+import { eq } from "drizzle-orm";
 import { getComicPage, getComicPageCount, convertCbrToCbz } from "../../app/lib/processing/comic";
 import { extractEpubResource } from "../../app/lib/processing/epub";
+import { convertMobiToEpub } from "../../app/lib/processing/mobi-to-epub";
+import { db, books } from "../../app/lib/db";
 import type { BookFormat } from "../../app/lib/types";
 
 const app = new Hono();
@@ -56,24 +59,82 @@ app.get("/books/:id/as-cbz", async (c) => {
   return new Response("Comic not found", { status: 404 });
 });
 
-// GET /books/:id/as-epub - serve converted EPUB for PDF books
+// GET /books/:id/as-epub - serve converted EPUB (auto-converts MOBI/AZW3 on first request)
 app.get("/books/:id/as-epub", async (c) => {
   const bookId = c.req.param("id");
   const epubPath = resolve(process.cwd(), "data", "books", `${bookId}.epub`);
 
-  if (!existsSync(epubPath)) {
-    return c.json({ error: "No converted EPUB available" }, 404);
+  // Serve cached conversion if it exists
+  if (existsSync(epubPath)) {
+    const buffer = await readFile(epubPath);
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/epub+zip",
+        "Content-Disposition": `attachment; filename="${bookId}.epub"`,
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
   }
 
-  const buffer = await readFile(epubPath);
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": "application/epub+zip",
-      "Content-Disposition": `attachment; filename="${bookId}.epub"`,
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=3600",
-    },
+  // Look up book to check if it's a convertible format
+  const book = await db.query.books.findFirst({
+    where: eq(books.id, bookId),
   });
+
+  if (!book) {
+    return c.json({ error: "Book not found" }, 404);
+  }
+
+  if (["mobi", "azw3"].includes(book.format)) {
+    try {
+      // Auto-convert MOBI/AZW3 → EPUB
+      const ext = book.fileName ? extname(book.fileName) : `.${book.format}`;
+      const mobiPath = resolve(process.cwd(), "data", "books", `${bookId}${ext}`);
+
+      if (!existsSync(mobiPath)) {
+        return c.json({ error: "Source file not found on disk" }, 404);
+      }
+
+      console.log(`[as-epub] Auto-converting ${book.format.toUpperCase()} → EPUB for ${bookId}`);
+
+      const mobiBuffer = await readFile(mobiPath);
+      const authors = book.authors ? JSON.parse(book.authors) : [];
+      const epubBuffer = await convertMobiToEpub(mobiBuffer, {
+        title: book.title ?? undefined,
+        authors: Array.isArray(authors) ? authors : [],
+        language: book.language ?? undefined,
+      });
+
+      // Cache the result
+      writeFileSync(epubPath, epubBuffer);
+      const epubSize = statSync(epubPath).size;
+      await db
+        .update(books)
+        .set({
+          convertedEpubPath: `data/books/${bookId}.epub`,
+          convertedEpubSize: epubSize,
+        })
+        .where(eq(books.id, bookId));
+
+      console.log(`[as-epub] Conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`);
+
+      return new Response(new Uint8Array(epubBuffer), {
+        headers: {
+          "Content-Type": "application/epub+zip",
+          "Content-Disposition": `attachment; filename="${bookId}.epub"`,
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[as-epub] MOBI → EPUB conversion failed for ${bookId}:`, errorMessage);
+      return c.json({ error: "Conversion failed", details: errorMessage }, 500);
+    }
+  }
+
+  return c.json({ error: "No converted EPUB available" }, 404);
 });
 
 // GET /books/* - serve book files with range request support for audio

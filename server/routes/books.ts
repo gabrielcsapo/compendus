@@ -8,9 +8,14 @@ app.get("/api/books", async (c) => {
   const limit = parseInt(c.req.query("limit") || "20", 10);
   const offset = parseInt(c.req.query("offset") || "0", 10);
   const type = c.req.query("type") as "ebook" | "audiobook" | "comic" | undefined;
+  const orderBy = c.req.query("orderBy") as "title" | "createdAt" | undefined;
+  const order = c.req.query("order") as "asc" | "desc" | undefined;
 
   const baseUrl = new URL(c.req.url).origin;
-  const result = await apiListBooks({ limit, offset, type: type || undefined }, baseUrl);
+  const result = await apiListBooks(
+    { limit, offset, type: type || undefined, orderBy: orderBy || undefined, order: order || undefined },
+    baseUrl,
+  );
   return c.json(result, result.success ? 200 : 400);
 });
 

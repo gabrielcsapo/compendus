@@ -34,10 +34,43 @@ enum BookFilter: String, CaseIterable {
     }
 }
 
+enum BookSort: String, CaseIterable {
+    case recent = "Recently Added"
+    case titleAsc = "Title A-Z"
+    case titleDesc = "Title Z-A"
+    case oldest = "Oldest First"
+
+    var icon: String {
+        switch self {
+        case .recent: return "clock"
+        case .titleAsc: return "textformat.abc"
+        case .titleDesc: return "textformat.abc"
+        case .oldest: return "calendar"
+        }
+    }
+
+    /// API orderBy parameter
+    var apiOrderBy: String {
+        switch self {
+        case .recent, .oldest: return "createdAt"
+        case .titleAsc, .titleDesc: return "title"
+        }
+    }
+
+    /// API order parameter
+    var apiOrder: String {
+        switch self {
+        case .recent, .titleDesc: return "desc"
+        case .titleAsc, .oldest: return "asc"
+        }
+    }
+}
+
 struct LibraryView: View {
     @Environment(APIService.self) private var apiService
     @Environment(ServerConfig.self) private var serverConfig
     @Environment(DownloadManager.self) private var downloadManager
+    @Environment(ReaderSettings.self) private var readerSettings
     @Environment(\.modelContext) private var modelContext
 
     // Query for recently read books (for Continue Reading section)
@@ -60,6 +93,7 @@ struct LibraryView: View {
     @State private var totalCount: Int = 0
     @State private var selectedBook: Book?
     @State private var selectedFilter: BookFilter = .all
+    @State private var selectedSort: BookSort = .recent
     @State private var bookToRead: DownloadedBook?
     @State private var downloadingBooks: Set<String> = []
 
@@ -163,6 +197,22 @@ struct LibraryView: View {
                         Label("Filter", systemImage: selectedFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(BookSort.allCases, id: \.self) { sort in
+                            Button {
+                                selectedSort = sort
+                            } label: {
+                                Label(sort.rawValue, systemImage: sort.icon)
+                                if selectedSort == sort {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Sort", systemImage: "arrow.up.arrow.down")
+                    }
+                }
             }
             .searchable(text: $searchText, prompt: "Search books...")
             .onChange(of: searchText) { _, newValue in
@@ -179,6 +229,11 @@ struct LibraryView: View {
                     await loadBooks()
                 }
             }
+            .onChange(of: selectedSort) { _, _ in
+                Task {
+                    await loadBooks()
+                }
+            }
             .refreshable {
                 await loadBooks()
             }
@@ -188,10 +243,13 @@ struct LibraryView: View {
                 }
             }
             .sheet(item: $selectedBook) { book in
-                BookDetailView(book: book)
+                BookDetailView(book: book) { downloaded in
+                    bookToRead = downloaded
+                }
             }
             .fullScreenCover(item: $bookToRead) { book in
                 ReaderContainerView(book: book)
+                    .environment(readerSettings)
             }
         }
     }
@@ -202,7 +260,7 @@ struct LibraryView: View {
         offset = 0
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType)
+            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
             books = response.books
             totalCount = response.totalCount ?? response.books.count
             hasMore = response.books.count >= limit
@@ -228,7 +286,7 @@ struct LibraryView: View {
         isLoading = true
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType)
+            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
             let newBooks = response.books
             books.append(contentsOf: newBooks)
             hasMore = newBooks.count >= limit

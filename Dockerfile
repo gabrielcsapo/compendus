@@ -12,9 +12,11 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
-COPY . .
 
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
+
+COPY . .
 
 EXPOSE 3000 3001
 

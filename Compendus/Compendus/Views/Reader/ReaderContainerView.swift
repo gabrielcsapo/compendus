@@ -75,8 +75,16 @@ struct ReaderContainerView: View {
                 UnifiedReaderView(book: book, preferEpub: preferEpub)
             }
         case "mobi", "azw", "azw3":
-            ReaderShell(book: book, showsDismissButton: false) {
-                UnsupportedFormatView(format: book.format, message: "MOBI support requires server-side conversion")
+            // MOBI books are converted to EPUB on download. This case handles
+            // books downloaded before conversion support was added.
+            if book.hasEpubVersion {
+                ReaderShell(book: book, showsDismissButton: false) {
+                    UnifiedReaderView(book: book, preferEpub: true)
+                }
+            } else {
+                ReaderShell(book: book, showsDismissButton: false) {
+                    UnsupportedFormatView(format: book.format, message: "Please re-download this book to convert it to EPUB.")
+                }
             }
         case "cbr", "cbz":
             ReaderShell(book: book, showsDismissButton: false) {

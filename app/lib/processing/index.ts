@@ -203,6 +203,7 @@ function detectFormat(fileName: string, buffer: Buffer): BookFormat | null {
   if (ext === ".pdf") return "pdf";
   if (ext === ".epub") return "epub";
   if (ext === ".mobi") return "mobi";
+  if (ext === ".azw") return "mobi";
   if (ext === ".azw3") return "azw3";
   if (ext === ".cbr") return "cbr";
   if (ext === ".cbz") return "cbz";

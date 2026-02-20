@@ -172,6 +172,18 @@ export const apiSpec: ApiSpec = {
           default: 0,
           constraints: { min: 0 },
         },
+        {
+          name: "orderBy",
+          type: "string",
+          description: "Field to sort by: 'title' or 'createdAt'",
+          default: "createdAt",
+        },
+        {
+          name: "order",
+          type: "string",
+          description: "Sort direction: 'asc' or 'desc'",
+          default: "desc",
+        },
       ],
       responses: {
         success: {
