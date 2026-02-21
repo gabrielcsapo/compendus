@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { buttonStyles } from "../lib/styles";
 
 export function DarkModeToggle() {
   const [isDark, setIsDark] = useState(false);
@@ -27,7 +28,7 @@ export function DarkModeToggle() {
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <button className="btn btn-ghost p-2 rounded-lg w-10 h-10" aria-label="Toggle theme">
+      <button className={`${buttonStyles.base} ${buttonStyles.ghost} p-2 rounded-lg w-10 h-10`} aria-label="Toggle theme">
         <span className="w-5 h-5" />
       </button>
     );
@@ -36,7 +37,7 @@ export function DarkModeToggle() {
   return (
     <button
       onClick={toggleDarkMode}
-      className="btn btn-ghost p-2 rounded-lg"
+      className={`${buttonStyles.base} ${buttonStyles.ghost} p-2 rounded-lg`}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {isDark ? (

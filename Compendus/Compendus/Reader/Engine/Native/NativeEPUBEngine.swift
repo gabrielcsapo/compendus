@@ -21,6 +21,9 @@ class NativeEPUBEngine: ReaderEngine {
     var isReady: Bool = false
     var errorMessage: String?
 
+    /// Whether the reader is currently in two-page spread mode.
+    var isSpreadMode: Bool = false
+
     var onSelectionChanged: ((ReaderSelection?) -> Void)?
     var onHighlightTapped: ((String) -> Void)?
     var onTapZone: ((String) -> Void)?
@@ -41,9 +44,13 @@ class NativeEPUBEngine: ReaderEngine {
         let fontFamily: ReaderFont
         let fontSize: Double
         let lineHeight: Double
+        let layout: ReaderLayout
     }
     private var settingsSnapshot: SettingsSnapshot?
     private var currentSettings: ReaderSettings?
+
+    /// Gutter width between pages in spread mode (must match NativePageViewController.gutterWidth)
+    private let spreadGutterWidth: CGFloat = 16
 
     // Content cache
     private var parsedChapters: [Int: [ContentNode]] = [:]
@@ -65,6 +72,29 @@ class NativeEPUBEngine: ReaderEngine {
 
     // Deferred initial load (waits for view to have proper size)
     private var pendingInitialLoad: (spineIndex: Int, progression: Double?)?
+
+    /// Number of pages visible in a single spread (1 or 2).
+    private var pagesPerSpread: Int {
+        let settings = currentSettings ?? ReaderSettings()
+        let resolved = settings.resolvedLayout(for: viewportSize.width)
+        return resolved == .twoPage ? 2 : 1
+    }
+
+    /// The effective width of a single page for pagination.
+    private var effectivePageWidth: CGFloat {
+        if pagesPerSpread == 2 {
+            return (viewportSize.width - spreadGutterWidth) / 2
+        }
+        return viewportSize.width
+    }
+
+    /// Align a page index to spread boundaries (even index in two-page mode).
+    private func alignToSpread(_ pageIndex: Int) -> Int {
+        if pagesPerSpread == 2 {
+            return pageIndex - (pageIndex % 2)
+        }
+        return pageIndex
+    }
 
     init(bookURL: URL) {
         self.bookURL = bookURL
@@ -128,6 +158,18 @@ class NativeEPUBEngine: ReaderEngine {
                     self.pendingInitialLoad = nil
                     logger.info("Executing deferred load: spine \(pending.spineIndex), progression \(pending.progression ?? -1)")
                     self.loadChapter(at: pending.spineIndex, progression: pending.progression)
+                }
+            }
+
+            pageVC.onViewResized = { [weak self] newSize in
+                guard let self = self, self.isReady else { return }
+                let oldWidth = self.viewportSize.width
+                self.viewportSize = newSize
+                logger.info("View resized to \(newSize.width)x\(newSize.height)")
+
+                // Re-paginate if the width changed (layout mode may have changed)
+                if abs(newSize.width - oldWidth) > 1 {
+                    self.invalidateAndReload()
                 }
             }
 
@@ -251,12 +293,21 @@ class NativeEPUBEngine: ReaderEngine {
         guard let nodes = parsedChapters[spineIndex] else { return }
         logger.info("Parsed \(nodes.count) content nodes")
 
-        // Build attributed string if not cached (or settings changed)
+        // Resolve layout mode and compute per-page dimensions
         let settings = currentSettings ?? ReaderSettings()
-        let insets = NativePaginationEngine.insets(for: viewportSize.width)
-        let contentWidth = viewportSize.width - insets.left - insets.right
+        let resolvedLayout = settings.resolvedLayout(for: viewportSize.width)
+        let isTwoPage = resolvedLayout == .twoPage
+        isSpreadMode = isTwoPage
+
+        let pageWidth = isTwoPage ? (viewportSize.width - spreadGutterWidth) / 2 : viewportSize.width
+        let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+        let contentWidth = pageWidth - insets.left - insets.right
         let contentHeight = viewportSize.height - insets.top - insets.bottom
-        logger.info("Viewport: \(self.viewportSize.width)x\(self.viewportSize.height), contentWidth: \(contentWidth)")
+        let pageViewportSize = CGSize(width: pageWidth, height: viewportSize.height)
+
+        logger.info("Viewport: \(self.viewportSize.width)x\(self.viewportSize.height), pageWidth: \(pageWidth), contentWidth: \(contentWidth), twoPage: \(isTwoPage)")
+
+        // Build attributed string
         let builder = AttributedStringBuilder(settings: settings, contentWidth: max(1, contentWidth), contentHeight: max(1, contentHeight))
         let (attrString, offsetMap) = builder.build(from: nodes)
         chapterStrings[spineIndex] = attrString
@@ -274,17 +325,17 @@ class NativeEPUBEngine: ReaderEngine {
         currentMediaAttachments = builder.mediaAttachments
         currentFloatingElements = builder.floatingElements
 
-        // Paginate
+        // Paginate using per-page viewport size
         let pages = NativePaginationEngine.paginate(
             attributedString: attrString,
-            viewportSize: viewportSize,
+            viewportSize: pageViewportSize,
             contentInsets: insets
         )
         chapterPages[spineIndex] = pages
         updateSpinePageCount(pages.count)
         logger.info("Paginated into \(pages.count) pages")
 
-        // Determine starting page
+        // Determine starting page (aligned to spread boundaries)
         var startPage = 0
         if startAtEnd {
             startPage = max(0, pages.count - 1)
@@ -292,8 +343,12 @@ class NativeEPUBEngine: ReaderEngine {
             startPage = Int(round(progression * Double(max(1, pages.count - 1))))
             startPage = max(0, min(startPage, pages.count - 1))
         }
+        startPage = alignToSpread(startPage)
 
         currentPageIndex = startPage
+
+        // Configure layout mode on the page view controller
+        pageViewController?.configureLayout(twoPage: isTwoPage)
 
         // Display
         let manifestItem = parser.manifestItem(forSpineIndex: spineIndex)
@@ -352,6 +407,16 @@ class NativeEPUBEngine: ReaderEngine {
         }
     }
 
+    /// Invalidate caches and reload the current chapter, preserving position.
+    private func invalidateAndReload() {
+        chapterStrings.removeAll()
+        chapterPages.removeAll()
+        chapterOffsetMaps.removeAll()
+
+        let savedProgression = currentLocation?.progression ?? 0
+        loadChapter(at: currentSpineIndex, progression: savedProgression)
+    }
+
     // MARK: - Location Tracking
 
     private func updateLocation() {
@@ -406,8 +471,11 @@ class NativeEPUBEngine: ReaderEngine {
     func goForward() async {
         guard let pages = chapterPages[currentSpineIndex] else { return }
 
-        if currentPageIndex < pages.count - 1 {
-            currentPageIndex += 1
+        let advance = pagesPerSpread
+        let nextPage = currentPageIndex + advance
+
+        if nextPage < pages.count {
+            currentPageIndex = nextPage
             pageViewController?.showPage(currentPageIndex)
             updateLocation()
         } else {
@@ -420,8 +488,15 @@ class NativeEPUBEngine: ReaderEngine {
     }
 
     func goBackward() async {
-        if currentPageIndex > 0 {
-            currentPageIndex -= 1
+        let retreat = pagesPerSpread
+
+        if currentPageIndex >= retreat {
+            currentPageIndex -= retreat
+            currentPageIndex = alignToSpread(currentPageIndex)
+            pageViewController?.showPage(currentPageIndex)
+            updateLocation()
+        } else if currentPageIndex > 0 {
+            currentPageIndex = 0
             pageViewController?.showPage(currentPageIndex)
             updateLocation()
         } else {
@@ -628,29 +703,25 @@ class NativeEPUBEngine: ReaderEngine {
             settingsSnapshot?.theme != settings.theme ||
             settingsSnapshot?.fontFamily != settings.fontFamily ||
             settingsSnapshot?.fontSize != settings.fontSize ||
-            settingsSnapshot?.lineHeight != settings.lineHeight
+            settingsSnapshot?.lineHeight != settings.lineHeight ||
+            settingsSnapshot?.layout != settings.layout
 
         currentSettings = settings
         settingsSnapshot = SettingsSnapshot(
             theme: settings.theme,
             fontFamily: settings.fontFamily,
             fontSize: settings.fontSize,
-            lineHeight: settings.lineHeight
+            lineHeight: settings.lineHeight,
+            layout: settings.layout
         )
 
         guard settingsChanged, isReady else { return }
 
-        // Invalidate cached attributed strings and paginations
-        chapterStrings.removeAll()
-        chapterPages.removeAll()
-        chapterOffsetMaps.removeAll()
-
         // Apply theme immediately
         pageViewController?.applyTheme(backgroundColor: settings.theme.backgroundColor)
 
-        // Rebuild current chapter preserving progression
-        let savedProgression = currentLocation?.progression ?? 0
-        loadChapter(at: currentSpineIndex, progression: savedProgression)
+        // Invalidate caches and rebuild
+        invalidateAndReload()
     }
 
     func serializeLocation() -> String? {

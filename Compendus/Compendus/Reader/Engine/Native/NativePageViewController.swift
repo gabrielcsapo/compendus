@@ -3,7 +3,7 @@
 //  Compendus
 //
 //  UIViewController hosting a non-editable UITextView for native EPUB rendering.
-//  Displays one page at a time with tap zone navigation and text selection support.
+//  Displays one or two pages at a time with tap zone navigation and text selection support.
 //
 
 import UIKit
@@ -14,6 +14,23 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     // MARK: - Views
 
     private(set) var textView: UITextView!
+
+    // Second text view for right page in two-page (spread) mode
+    private var secondTextView: UITextView?
+
+    // Visual divider between pages in spread mode
+    private var gutterView: UIView?
+
+    // MARK: - Layout State
+
+    /// Whether we're currently in two-page spread mode
+    private(set) var isTwoPageMode: Bool = false
+
+    /// Gutter width between the two pages
+    private let gutterWidth: CGFloat = 16
+
+    /// Active constraints for the text views (replaced when layout mode changes)
+    private var layoutConstraints: [NSLayoutConstraint] = []
 
     // MARK: - Content State
 
@@ -53,6 +70,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     var onViewReady: ((CGSize) -> Void)?
     private var hasNotifiedReady = false
 
+    /// Called when the view size changes after initial layout (rotation, window resize).
+    var onViewResized: ((CGSize) -> Void)?
+    private var lastReportedSize: CGSize = .zero
+    private var resizeDebounceTask: Task<Void, Never>?
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -75,44 +97,76 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         suppressNativeEditMenu(in: textView)
+        if let stv = secondTextView { suppressNativeEditMenu(in: stv) }
         notifyReadyIfNeeded()
+        notifyResizeIfNeeded()
     }
 
     private func notifyReadyIfNeeded() {
         guard !hasNotifiedReady,
               view.bounds.width > 0, view.bounds.height > 0 else { return }
         hasNotifiedReady = true
+        lastReportedSize = view.bounds.size
         onViewReady?(view.bounds.size)
     }
+
+    private func notifyResizeIfNeeded() {
+        guard hasNotifiedReady else { return }
+        let newSize = view.bounds.size
+        guard newSize.width > 0, newSize.height > 0,
+              newSize != lastReportedSize else { return }
+
+        lastReportedSize = newSize
+
+        // Debounce to avoid excessive re-pagination during live resize
+        resizeDebounceTask?.cancel()
+        resizeDebounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            onViewResized?(newSize)
+        }
+    }
+
+    // MARK: - Text View Setup
 
     private func setupTextView() {
         // Use TextKit 1 explicitly. Our hit-testing methods access layoutManager
         // which forces a TextKit 2 → 1 compatibility switch mid-lifecycle,
         // corrupting the rendering pipeline. Starting in TK1 avoids this.
-        textView = UITextView(usingTextLayoutManager: false)
-        textView.isEditable = false
-        textView.isScrollEnabled = false
-        textView.isSelectable = true
-        textView.textContainerInset = NativePaginationEngine.defaultInsets
-        textView.textContainer.lineFragmentPadding = 0
-        textView.backgroundColor = .white
-        textView.delegate = self
-        textView.translatesAutoresizingMaskIntoConstraints = false
-
-        // Disable link interactions (we handle taps ourselves)
-        textView.isUserInteractionEnabled = true
-        textView.dataDetectorTypes = []
-        textView.linkTextAttributes = [:]
+        textView = makeTextView()
 
         view.addSubview(textView)
-        NSLayoutConstraint.activate([
+
+        // Default single-page constraints
+        layoutConstraints = [
             textView.topAnchor.constraint(equalTo: view.topAnchor),
             textView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             textView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             textView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
+        ]
+        NSLayoutConstraint.activate(layoutConstraints)
 
         suppressNativeEditMenu(in: textView)
+    }
+
+    /// Factory for creating a configured UITextView (used for both left and right pages).
+    private func makeTextView() -> UITextView {
+        let tv = UITextView(usingTextLayoutManager: false)
+        tv.isEditable = false
+        tv.isScrollEnabled = false
+        tv.isSelectable = true
+        tv.textContainerInset = NativePaginationEngine.defaultInsets
+        tv.textContainer.lineFragmentPadding = 0
+        tv.backgroundColor = .white
+        tv.delegate = self
+        tv.translatesAutoresizingMaskIntoConstraints = false
+
+        // Disable link interactions (we handle taps ourselves)
+        tv.isUserInteractionEnabled = true
+        tv.dataDetectorTypes = []
+        tv.linkTextAttributes = [:]
+
+        return tv
     }
 
     private func setupGestures() {
@@ -129,6 +183,81 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipeRight(_:)))
         swipeRight.direction = .right
         view.addGestureRecognizer(swipeRight)
+    }
+
+    // MARK: - Two-Page Layout Configuration
+
+    /// Switch between single-page and two-page spread layout.
+    func configureLayout(twoPage: Bool) {
+        guard twoPage != isTwoPageMode else { return }
+        isTwoPageMode = twoPage
+
+        if twoPage {
+            setupSpreadLayout()
+        } else {
+            tearDownSpreadLayout()
+        }
+    }
+
+    private func setupSpreadLayout() {
+        // Create second text view
+        let stv = makeTextView()
+        stv.backgroundColor = textView.backgroundColor
+        view.addSubview(stv)
+        secondTextView = stv
+
+        // Create gutter divider
+        let gutter = UIView()
+        gutter.backgroundColor = textView.backgroundColor
+        gutter.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(gutter)
+        gutterView = gutter
+
+        // Replace constraints
+        NSLayoutConstraint.deactivate(layoutConstraints)
+
+        let halfWidth = (view.bounds.width - gutterWidth) / 2
+
+        layoutConstraints = [
+            // Left text view
+            textView.topAnchor.constraint(equalTo: view.topAnchor),
+            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            textView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            textView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.5, constant: -gutterWidth / 2),
+
+            // Gutter
+            gutter.topAnchor.constraint(equalTo: view.topAnchor),
+            gutter.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            gutter.leadingAnchor.constraint(equalTo: textView.trailingAnchor),
+            gutter.widthAnchor.constraint(equalToConstant: gutterWidth),
+
+            // Right text view
+            stv.topAnchor.constraint(equalTo: view.topAnchor),
+            stv.leadingAnchor.constraint(equalTo: gutter.trailingAnchor),
+            stv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stv.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ]
+        NSLayoutConstraint.activate(layoutConstraints)
+
+        suppressNativeEditMenu(in: stv)
+    }
+
+    private func tearDownSpreadLayout() {
+        secondTextView?.removeFromSuperview()
+        secondTextView = nil
+
+        gutterView?.removeFromSuperview()
+        gutterView = nil
+
+        // Restore single-page constraints
+        NSLayoutConstraint.deactivate(layoutConstraints)
+        layoutConstraints = [
+            textView.topAnchor.constraint(equalTo: view.topAnchor),
+            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            textView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ]
+        NSLayoutConstraint.activate(layoutConstraints)
     }
 
     // MARK: - Edit Menu Suppression
@@ -163,10 +292,19 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         self.floatingElements = floatingElements
 
         // Use responsive insets
-        let insets = NativePaginationEngine.insets(for: view.bounds.width)
+        let insets = NativePaginationEngine.insets(for: pageWidth(), isTwoPageMode: isTwoPageMode)
         textView.textContainerInset = insets
+        secondTextView?.textContainerInset = insets
 
         showCurrentPage()
+    }
+
+    /// The effective width of a single page (half of view width in spread mode).
+    private func pageWidth() -> CGFloat {
+        if isTwoPageMode {
+            return (view.bounds.width - gutterWidth) / 2
+        }
+        return view.bounds.width
     }
 
     /// Navigate to a specific page index.
@@ -194,29 +332,53 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
         suppressSelectionCallbacks = true
 
-        let page = pages[currentPageIndex]
+        // Render left page
+        renderPage(at: currentPageIndex, into: textView, fullString: fullString)
+
+        // Render right page in two-page mode
+        if isTwoPageMode, let stv = secondTextView {
+            let rightPageIndex = currentPageIndex + 1
+            if rightPageIndex < pages.count {
+                renderPage(at: rightPageIndex, into: stv, fullString: fullString)
+            } else {
+                // Last page is alone on the left; right page is empty
+                stv.attributedText = NSAttributedString(string: "")
+                stv.contentInset.top = 0
+            }
+        }
+
+        suppressSelectionCallbacks = false
+
+        // Apply floating images with exclusion paths (must be before inline players)
+        overlayFloatingImages(for: currentPageIndex, in: textView)
+        if isTwoPageMode, let stv = secondTextView, currentPageIndex + 1 < pages.count {
+            overlayFloatingImages(for: currentPageIndex + 1, in: stv)
+        }
+
+        // Overlay inline players for media attachments
+        overlayInlinePlayers(for: currentPageIndex, in: textView)
+        if isTwoPageMode, let stv = secondTextView, currentPageIndex + 1 < pages.count {
+            overlayInlinePlayers(for: currentPageIndex + 1, in: stv)
+        }
+    }
+
+    /// Render a single page into the given text view.
+    private func renderPage(at pageIndex: Int, into targetTextView: UITextView, fullString: NSAttributedString) {
+        let page = pages[pageIndex]
         let safeRange = NSIntersectionRange(page.range, NSRange(location: 0, length: fullString.length))
         let pageString = fullString.attributedSubstring(from: safeRange)
 
         // Detect blank pages (empty or whitespace-only content)
         let trimmed = pageString.string.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            textView.attributedText = blankPagePlaceholder()
-            centerTextVertically()
+            targetTextView.attributedText = blankPagePlaceholder()
+            centerTextVertically(in: targetTextView)
         } else {
             // Apply highlights that overlap with this page
             let highlightedString = applyHighlightsToPage(pageString, pageRange: safeRange)
-            textView.attributedText = highlightedString
-            textView.contentInset.top = 0
+            targetTextView.attributedText = highlightedString
+            targetTextView.contentInset.top = 0
         }
-
-        suppressSelectionCallbacks = false
-
-        // Apply floating images with exclusion paths (must be before inline players)
-        overlayFloatingImages()
-
-        // Overlay inline players for media attachments on this page
-        overlayInlinePlayers()
     }
 
     private func blankPagePlaceholder() -> NSAttributedString {
@@ -231,13 +393,13 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         return NSAttributedString(string: "This page is blank", attributes: attrs)
     }
 
-    private func centerTextVertically() {
-        let textSize = textView.sizeThatFits(CGSize(
-            width: textView.bounds.width,
+    private func centerTextVertically(in targetTextView: UITextView) {
+        let textSize = targetTextView.sizeThatFits(CGSize(
+            width: targetTextView.bounds.width,
             height: .greatestFiniteMagnitude
         ))
-        let offset = max(0, (textView.bounds.height - textSize.height) / 2)
-        textView.contentInset.top = offset
+        let offset = max(0, (targetTextView.bounds.height - textSize.height) / 2)
+        targetTextView.contentInset.top = offset
     }
 
     // MARK: - Highlight Application
@@ -282,12 +444,22 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     func applyTheme(backgroundColor: UIColor) {
         view.backgroundColor = backgroundColor
         textView.backgroundColor = backgroundColor
+        secondTextView?.backgroundColor = backgroundColor
+        gutterView?.backgroundColor = backgroundColor
     }
 
     // MARK: - UITextViewDelegate
 
     func textViewDidChangeSelection(_ textView: UITextView) {
         guard !suppressSelectionCallbacks else { return }
+
+        // Determine which page this text view represents
+        let pageIndex: Int
+        if textView === self.secondTextView {
+            pageIndex = currentPageIndex + 1
+        } else {
+            pageIndex = currentPageIndex
+        }
 
         let selectedRange = textView.selectedRange
         guard selectedRange.length > 0 else {
@@ -301,15 +473,20 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             return
         }
 
+        guard pageIndex < pages.count else {
+            onSelectionChanged?(nil)
+            return
+        }
+
         // Convert page-local selection range to full chapter range
-        let pageRange = pages[currentPageIndex].range
+        let pageRange = pages[pageIndex].range
         let fullRange = NSRange(
             location: pageRange.location + selectedRange.location,
             length: selectedRange.length
         )
 
         // Get bounding rect of selection for toolbar positioning
-        let frame = selectionBoundingRect(for: selectedRange)
+        let frame = selectionBoundingRect(for: selectedRange, in: textView)
 
         // Build locator JSON
         let locator: [String: Any] = [
@@ -337,14 +514,14 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         onSelectionChanged?(selection)
     }
 
-    private func selectionBoundingRect(for range: NSRange) -> CGRect? {
-        guard let start = textView.position(from: textView.beginningOfDocument, offset: range.location),
-              let end = textView.position(from: start, offset: range.length),
-              let textRange = textView.textRange(from: start, to: end) else {
+    private func selectionBoundingRect(for range: NSRange, in targetTextView: UITextView) -> CGRect? {
+        guard let start = targetTextView.position(from: targetTextView.beginningOfDocument, offset: range.location),
+              let end = targetTextView.position(from: start, offset: range.length),
+              let textRange = targetTextView.textRange(from: start, to: end) else {
             return nil
         }
 
-        let rects = textView.selectionRects(for: textRange)
+        let rects = targetTextView.selectionRects(for: textRange)
         guard !rects.isEmpty else { return nil }
 
         var boundingRect = rects[0].rect
@@ -353,14 +530,28 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         }
 
         // Convert to view coordinates
-        return textView.convert(boundingRect, to: view)
+        return targetTextView.convert(boundingRect, to: view)
     }
 
     func clearSelection() {
         suppressSelectionCallbacks = true
         textView.selectedTextRange = nil
+        secondTextView?.selectedTextRange = nil
         suppressSelectionCallbacks = false
         onSelectionChanged?(nil)
+    }
+
+    // MARK: - Target Text View Detection
+
+    /// Determine which text view and page index a point (in view coords) corresponds to.
+    private func targetTextView(for point: CGPoint) -> (UITextView, Int) {
+        if isTwoPageMode, let stv = secondTextView {
+            let pointInSTV = view.convert(point, to: stv)
+            if stv.bounds.contains(pointInSTV) {
+                return (stv, currentPageIndex + 1)
+            }
+        }
+        return (textView, currentPageIndex)
     }
 
     // MARK: - Gesture Handlers
@@ -375,21 +566,28 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             }
         }
 
-        // Check if user has text selected — if so, clear selection
+        // Check if user has text selected on either text view — if so, clear selection
         if let selectedRange = textView.selectedTextRange, !selectedRange.isEmpty {
             clearSelection()
             return
         }
+        if let stv = secondTextView, let selectedRange = stv.selectedTextRange, !selectedRange.isEmpty {
+            clearSelection()
+            return
+        }
+
+        // Determine which text view and page was tapped
+        let (tappedTV, tappedPageIndex) = targetTextView(for: point)
 
         // Check if tap is on a highlight
-        let textViewPoint = gesture.location(in: textView)
-        if let highlightId = highlightAtPoint(textViewPoint) {
+        let textViewPoint = gesture.location(in: tappedTV)
+        if let highlightId = highlightAtPoint(textViewPoint, in: tappedTV, pageIndex: tappedPageIndex) {
             onHighlightTapped?(highlightId)
             return
         }
 
         // Check if tap is on a link
-        if let linkURL = linkAtPoint(textViewPoint) {
+        if let linkURL = linkAtPoint(textViewPoint, in: tappedTV) {
             onLinkTapped?(linkURL)
             return
         }
@@ -415,16 +613,16 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     // MARK: - Link Hit Testing
 
-    private func linkAtPoint(_ point: CGPoint) -> URL? {
-        let layoutManager = textView.layoutManager
-        let textContainer = textView.textContainer
+    private func linkAtPoint(_ point: CGPoint, in targetTextView: UITextView) -> URL? {
+        let layoutManager = targetTextView.layoutManager
+        let textContainer = targetTextView.textContainer
         let characterIndex = layoutManager.characterIndex(
             for: point,
             in: textContainer,
             fractionOfDistanceBetweenInsertionPoints: nil
         )
 
-        guard let attrString = textView.attributedText,
+        guard let attrString = targetTextView.attributedText,
               characterIndex < attrString.length else { return nil }
 
         let attrs = attrString.attributes(at: characterIndex, effectiveRange: nil)
@@ -434,15 +632,15 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     // MARK: - Floating Images (CSS float)
 
     /// Position floating images as subviews and set exclusion paths for text wrapping.
-    private func overlayFloatingImages() {
-        guard !floatingElements.isEmpty, currentPageIndex < pages.count else { return }
+    private func overlayFloatingImages(for pageIndex: Int, in targetTextView: UITextView) {
+        guard !floatingElements.isEmpty, pageIndex < pages.count else { return }
 
-        let pageRange = pages[currentPageIndex].range
-        let containerWidth = textView.textContainer.size.width
+        let pageRange = pages[pageIndex].range
+        let containerWidth = targetTextView.textContainer.size.width
 
         // First pass: determine which floats are on this page and their Y positions
-        textView.layoutIfNeeded()
-        let layoutManager = textView.layoutManager
+        targetTextView.layoutIfNeeded()
+        let layoutManager = targetTextView.layoutManager
 
         var exclusionRects: [CGRect] = []
 
@@ -453,7 +651,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             // Convert to page-local character index
             let localIndex = floatEl.markerIndex - pageRange.location
             guard localIndex >= 0,
-                  let attrText = textView.attributedText,
+                  let attrText = targetTextView.attributedText,
                   localIndex < attrText.length else { continue }
 
             // Find Y position of the marker character
@@ -516,11 +714,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
             // Convert from text container coords to textView coords (add insets)
             var viewFrame = imageRect
-            viewFrame.origin.x += textView.textContainerInset.left
-            viewFrame.origin.y += textView.textContainerInset.top
+            viewFrame.origin.x += targetTextView.textContainerInset.left
+            viewFrame.origin.y += targetTextView.textContainerInset.top
 
             // Convert to self.view coordinates
-            let finalFrame = textView.convert(viewFrame, to: view)
+            let finalFrame = targetTextView.convert(viewFrame, to: view)
             imageView.frame = finalFrame
 
             view.addSubview(imageView)
@@ -530,8 +728,8 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         // Apply exclusion paths — text will reflow around these rects
         if !exclusionRects.isEmpty {
             let paths = exclusionRects.map { UIBezierPath(rect: $0) }
-            textView.textContainer.exclusionPaths = paths
-            textView.layoutIfNeeded()
+            targetTextView.textContainer.exclusionPaths = paths
+            targetTextView.layoutIfNeeded()
         }
     }
 
@@ -542,6 +740,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         }
         floatingImageViews.removeAll()
         textView.textContainer.exclusionPaths = []
+        secondTextView?.textContainer.exclusionPaths = []
     }
 
     // MARK: - Inline Media Players
@@ -551,15 +750,14 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         removeInlinePlayers()
     }
 
-    /// Create and position inline player views over media attachments on the current page.
-    private func overlayInlinePlayers() {
-        guard !mediaAttachments.isEmpty, currentPageIndex < pages.count else { return }
+    /// Create and position inline player views over media attachments on the given page.
+    private func overlayInlinePlayers(for pageIndex: Int, in targetTextView: UITextView) {
+        guard !mediaAttachments.isEmpty, pageIndex < pages.count else { return }
 
-        let pageRange = pages[currentPageIndex].range
-        textView.layoutIfNeeded()
+        let pageRange = pages[pageIndex].range
+        targetTextView.layoutIfNeeded()
 
-        let layoutManager = textView.layoutManager
-        let textContainer = textView.textContainer
+        let layoutManager = targetTextView.layoutManager
 
         for media in mediaAttachments {
             // Check if this attachment overlaps with the current page
@@ -571,7 +769,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             let attachCharIndex = overlap.location - pageRange.location
 
             guard attachCharIndex >= 0,
-                  let attrText = textView.attributedText,
+                  let attrText = targetTextView.attributedText,
                   attachCharIndex < attrText.length else { continue }
 
             // Get the attachment size from the NSTextAttachment bounds
@@ -607,11 +805,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             )
 
             // Adjust for text container insets
-            rect.origin.x += textView.textContainerInset.left
-            rect.origin.y += textView.textContainerInset.top
+            rect.origin.x += targetTextView.textContainerInset.left
+            rect.origin.y += targetTextView.textContainerInset.top
 
             // Convert to self.view coordinates
-            let viewRect = textView.convert(rect, to: view)
+            let viewRect = targetTextView.convert(rect, to: view)
 
             let mode: InlineMediaPlayerView.Mode = media.kind == .audio ? .audio : .video
             let playerView = InlineMediaPlayerView(url: media.url, mode: mode)
@@ -632,12 +830,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     // MARK: - Highlight Hit Testing
 
-    private func highlightAtPoint(_ point: CGPoint) -> String? {
-        guard !highlightRanges.isEmpty else { return nil }
+    private func highlightAtPoint(_ point: CGPoint, in targetTextView: UITextView, pageIndex: Int) -> String? {
+        guard !highlightRanges.isEmpty, pageIndex < pages.count else { return nil }
 
         // Find the character index at the tap point
-        let layoutManager = textView.layoutManager
-        let textContainer = textView.textContainer
+        let layoutManager = targetTextView.layoutManager
+        let textContainer = targetTextView.textContainer
         let characterIndex = layoutManager.characterIndex(
             for: point,
             in: textContainer,
@@ -645,7 +843,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         )
 
         // Convert page-local index to full chapter index
-        let pageRange = pages[currentPageIndex].range
+        let pageRange = pages[pageIndex].range
         let fullIndex = pageRange.location + characterIndex
 
         // Check if this index falls within any highlight range

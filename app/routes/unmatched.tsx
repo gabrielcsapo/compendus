@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
+import { buttonStyles } from "../lib/styles";
 import {
   getUnmatchedBooks,
   getUnmatchedBooksCount,
@@ -214,7 +215,7 @@ export default function UnmatchedBooks() {
               You processed {processedCount} {processedCount === 1 ? "book" : "books"} this session.
             </p>
           )}
-          <Link to="/" className="btn btn-primary">
+          <Link to="/" className={`${buttonStyles.base} ${buttonStyles.primary}`}>
             Back to Library
           </Link>
         </div>
@@ -476,7 +477,7 @@ export default function UnmatchedBooks() {
                     className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-foreground"
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
-                  <button onClick={handleSearch} disabled={searching} className="btn btn-primary">
+                  <button onClick={handleSearch} disabled={searching} className={`${buttonStyles.base} ${buttonStyles.primary}`}>
                     {searching ? "..." : "Search"}
                   </button>
                 </div>

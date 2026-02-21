@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import { buttonStyles } from "../../lib/styles";
 import { useEditorSession } from "./hooks/useEditorSession";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorSidebar } from "./EditorSidebar";
@@ -203,7 +204,7 @@ export function EpubEditorShell({ bookId, bookTitle, returnUrl }: EpubEditorShel
             </svg>
             <p className="text-error font-medium mb-1">Failed to load editor</p>
             <p className="text-foreground-muted text-sm mb-4">{session.error}</p>
-            <a href={returnUrl} className="btn btn-secondary">
+            <a href={returnUrl} className={`${buttonStyles.base} ${buttonStyles.secondary}`}>
               Back to book
             </a>
           </div>

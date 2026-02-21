@@ -24,6 +24,7 @@ struct ReaderSettingsView: View {
                 themeSection
 
                 if format == .epub {
+                    layoutSection
                     fontSection
                     fontSizeSection
                     lineHeightSection
@@ -80,6 +81,36 @@ struct ReaderSettingsView: View {
                 Spacer()
             }
             .padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - Layout Section
+
+    @ViewBuilder
+    private var layoutSection: some View {
+        @Bindable var settings = readerSettings
+
+        Section {
+            ForEach(ReaderLayout.allCases) { layout in
+                Button {
+                    settings.layout = layout
+                } label: {
+                    HStack {
+                        Label(layout.displayName, systemImage: layout.icon)
+                        Spacer()
+                        if settings.layout == layout {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.blue)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                }
+                .foregroundStyle(.primary)
+            }
+        } header: {
+            Text("Layout")
+        } footer: {
+            Text("Auto uses two-page layout on iPad and Mac when there is enough screen width.")
         }
     }
 

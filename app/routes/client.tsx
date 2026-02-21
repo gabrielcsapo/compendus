@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { inputStyles } from "../lib/styles";
 
 export function TestHydrated() {
   const hydrated = React.useSyncExternalStore(
@@ -12,5 +13,5 @@ export function TestHydrated() {
 }
 
 export function TestClientState() {
-  return <input className="input py-0" data-testid="client-state" placeholder="client-state" />;
+  return <input className={`${inputStyles} py-0`} data-testid="client-state" placeholder="client-state" />;
 }
