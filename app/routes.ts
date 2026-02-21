@@ -7,6 +7,7 @@ export default [
 
   route("book/:id", "routes/book.$id.tsx"),
   route("book/:id/read", "routes/book.$id.read.tsx"),
+  route("book/:id/edit", "routes/book.$id.edit.tsx"),
 
   route("highlights", "routes/highlights.tsx"),
 

@@ -5,6 +5,7 @@ import { getBookType, type BookType } from "../lib/book-types";
 
 interface BookCardProps {
   book: Book;
+  size?: "default" | "compact";
 }
 
 function TypeIcon({ type }: { type: BookType }) {
@@ -32,10 +33,11 @@ function getBadgeStyles(type: BookType): string {
   return "bg-primary-light text-primary";
 }
 
-export function BookCard({ book }: BookCardProps) {
+export function BookCard({ book, size = "default" }: BookCardProps) {
   const authors = book.authors ? JSON.parse(book.authors) : [];
   const progressPercent = Math.round((book.readingProgress || 0) * 100);
   const bookType = getBookType(book.format, book.bookTypeOverride);
+  const compact = size === "compact";
 
   return (
     <div className="group relative bg-surface border border-border rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30">
@@ -81,10 +83,10 @@ export function BookCard({ book }: BookCardProps) {
       </div>
 
       {/* Info */}
-      <Link to={`/book/${book.id}`} className="block p-4">
-        <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-foreground">{book.title}</h3>
+      <Link to={`/book/${book.id}`} className={compact ? "block p-2" : "block p-4"}>
+        <h3 className={`font-semibold line-clamp-2 mb-1 text-foreground ${compact ? "text-xs" : "text-sm"}`}>{book.title}</h3>
         {authors.length > 0 && (
-          <p className="text-xs text-foreground-muted line-clamp-1">
+          <p className={`text-foreground-muted line-clamp-1 ${compact ? "text-[10px]" : "text-xs"}`}>
             <AuthorLinks authors={authors} asSpan />
           </p>
         )}
@@ -92,13 +94,13 @@ export function BookCard({ book }: BookCardProps) {
         {/* Progress bar */}
         {progressPercent > 0 && (
           <div className="mt-2">
-            <div className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+            <div className={`bg-surface-elevated rounded-full overflow-hidden ${compact ? "h-1" : "h-1.5"}`}>
               <div
                 className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-xs text-foreground-muted mt-1">{progressPercent}%</p>
+            {!compact && <p className="text-xs text-foreground-muted mt-1">{progressPercent}%</p>}
           </div>
         )}
       </Link>

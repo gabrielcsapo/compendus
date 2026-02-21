@@ -218,7 +218,7 @@ export default function Home({ loaderData }: { loaderData: LoaderData }) {
       {currentPage === 1 && recentBooks.length > 0 && (
         <section className="mb-10">
           <h2 className="text-lg font-semibold mb-4 text-foreground">Continue Reading</h2>
-          <BookGrid books={recentBooks} />
+          <BookGrid books={recentBooks} size="compact" />
         </section>
       )}
 

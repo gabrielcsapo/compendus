@@ -10,6 +10,7 @@ import { wishlistRoutes } from "./routes/wishlist";
 import { jobsRoutes } from "./routes/jobs";
 import { readerRoutes } from "./routes/reader";
 import { convertRoutes } from "./routes/convert";
+import { editorRoutes } from "./routes/editor";
 import { assetsRoutes } from "./routes/assets";
 
 const app = new Hono();
@@ -19,7 +20,7 @@ app.use(
   "*",
   cors({
     origin: "*",
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
   }),
 );
@@ -33,6 +34,7 @@ app.route("/", jobsRoutes);
 app.route("/", wishlistRoutes);
 app.route("/", readerRoutes);
 app.route("/", convertRoutes);
+app.route("/", editorRoutes);
 
 // Static asset routes
 app.route("/", assetsRoutes);
