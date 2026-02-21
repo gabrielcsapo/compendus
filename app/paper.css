@@ -53,12 +53,6 @@
   --shadow-btn-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
   --color-btn-border: #e2e8f0;
 
-  /* Button Color Variants */
-  --btn-color-primary: var(--color-primary);
-  --btn-color-secondary: var(--color-secondary);
-  --btn-color-success: var(--color-success);
-  --btn-color-warning: var(--color-warning);
-  --btn-color-danger: var(--color-danger);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -195,19 +189,38 @@
 }
 
 /* Button Color Variants */
-@utility btn-* {
-  border-color: --value(--btn-color-*);
-  color: --value(--btn-color-*);
-  &:hover {
-    background-color: --value(--btn-color-*);
-    @apply text-white;
-  }
-}
-
 @utility btn-primary {
   @apply bg-primary text-white border-primary;
   &:hover {
     @apply bg-primary-hover border-primary-hover;
+  }
+}
+
+@utility btn-secondary {
+  @apply border-secondary text-secondary;
+  &:hover {
+    @apply bg-secondary text-white;
+  }
+}
+
+@utility btn-success {
+  @apply border-success text-success;
+  &:hover {
+    @apply bg-success text-white;
+  }
+}
+
+@utility btn-warning {
+  @apply border-warning text-warning;
+  &:hover {
+    @apply bg-warning text-white;
+  }
+}
+
+@utility btn-danger {
+  @apply border-danger text-white bg-danger;
+  &:hover {
+    @apply bg-danger/90;
   }
 }
 

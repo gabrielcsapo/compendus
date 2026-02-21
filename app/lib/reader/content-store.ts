@@ -261,3 +261,16 @@ function updateCacheOrder(bookId: string): void {
     cacheOrder.push(bookId);
   }
 }
+
+/**
+ * Invalidate cached content for a book (e.g., after EPUB edit and save).
+ * Removes both the raw key and the "epub" override key.
+ */
+export function invalidateContent(bookId: string): void {
+  const keys = [bookId, `${bookId}:epub`];
+  for (const key of keys) {
+    const idx = cacheOrder.indexOf(key);
+    if (idx > -1) cacheOrder.splice(idx, 1);
+    contentCache.delete(key);
+  }
+}

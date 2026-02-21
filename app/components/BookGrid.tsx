@@ -4,9 +4,10 @@ import type { Book } from "../lib/db/schema";
 interface BookGridProps {
   books: Book[];
   emptyMessage?: string;
+  size?: "default" | "compact";
 }
 
-export function BookGrid({ books, emptyMessage = "No books found" }: BookGridProps) {
+export function BookGrid({ books, emptyMessage = "No books found", size = "default" }: BookGridProps) {
   if (books.length === 0) {
     return (
       <div className="text-center py-16">
@@ -30,10 +31,14 @@ export function BookGrid({ books, emptyMessage = "No books found" }: BookGridPro
     );
   }
 
+  const gridClass = size === "compact"
+    ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3"
+    : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5";
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+    <div className={gridClass}>
       {books.map((book) => (
-        <BookCard key={book.id} book={book} />
+        <BookCard key={book.id} book={book} size={size} />
       ))}
     </div>
   );
