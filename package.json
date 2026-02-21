@@ -28,6 +28,7 @@
     "@hono/node-server": "^1.19.9",
     "@lingo-reader/epub-parser": "^0.4.5",
     "@lingo-reader/mobi-parser": "^0.4.5",
+    "@tanstack/react-virtual": "^3.13.18",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
     "canvas": "^3.2.1",

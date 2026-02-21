@@ -233,6 +233,19 @@ export function SearchCommandPalette() {
             Type to search your library
           </div>
         )}
+
+        {/* Advanced search link */}
+        <div className="border-t border-border px-4 py-3 flex justify-end">
+          <button
+            className="text-sm text-foreground-muted hover:text-primary font-medium transition-colors"
+            onClick={() => {
+              close();
+              navigate("/search");
+            }}
+          >
+            Advanced Search &rarr;
+          </button>
+        </div>
       </div>
     </div>
   );

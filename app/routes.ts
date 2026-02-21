@@ -18,6 +18,7 @@ export default [
 
   route("tags", "routes/tags.tsx"),
   route("unmatched", "routes/unmatched.tsx"),
+  route("batch-edit", "routes/batch-edit.tsx"),
 
   route("discover", "routes/discover.tsx", [
     index("routes/discover._index.tsx"),

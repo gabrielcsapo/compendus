@@ -109,24 +109,32 @@ export function Footer({ variant = "full" }: FooterProps) {
             </ul>
           </div>
 
-          {/* Resources */}
+          {/* Admin */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">Resources</h3>
+            <h3 className="font-semibold text-foreground mb-4">Admin</h3>
             <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  to="/batch-edit"
+                  className="text-foreground-muted hover:text-foreground transition-colors"
+                >
+                  Batch Edit
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/data"
+                  className="text-foreground-muted hover:text-foreground transition-colors"
+                >
+                  Data Administration
+                </Link>
+              </li>
               <li>
                 <Link
                   to="/docs"
                   className="text-foreground-muted hover:text-foreground transition-colors"
                 >
                   API Documentation
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/admin.data"
-                  className="text-foreground-muted hover:text-foreground transition-colors"
-                >
-                  Data Administration
                 </Link>
               </li>
             </ul>

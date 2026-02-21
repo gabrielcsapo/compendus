@@ -11,6 +11,8 @@ interface MetadataRefreshButtonProps {
   bookTitle: string;
   bookAuthors: string[];
   bookFormat?: BookFormat;
+  hasCover?: boolean;
+  coverUrl?: string;
 }
 
 export function MetadataRefreshButton({
@@ -18,12 +20,16 @@ export function MetadataRefreshButton({
   bookTitle,
   bookAuthors,
   bookFormat,
+  hasCover,
+  coverUrl,
 }: MetadataRefreshButtonProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState(bookTitle);
+  const [pendingMetadata, setPendingMetadata] = useState<MetadataSearchResult | null>(null);
+  const [showCoverPrompt, setShowCoverPrompt] = useState(false);
 
   const handleAutoRefresh = async () => {
     setLoading(true);
@@ -61,11 +67,23 @@ export function MetadataRefreshButton({
   };
 
   const handleApply = async (metadata: MetadataSearchResult) => {
+    if (hasCover) {
+      setPendingMetadata(metadata);
+      setShowCoverPrompt(true);
+      return;
+    }
+
+    await doApplyMetadata(metadata);
+  };
+
+  const doApplyMetadata = async (metadata: MetadataSearchResult, skipCover = false) => {
     setLoading(true);
     setMessage(null);
+    setShowCoverPrompt(false);
+    setPendingMetadata(null);
 
     try {
-      const result = await applyMetadata(bookId, metadata);
+      const result = await applyMetadata(bookId, metadata, { skipCover });
       setMessage(result.message);
       if (result.success) {
         // Reload to show updated data
@@ -189,6 +207,69 @@ export function MetadataRefreshButton({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Cover update prompt */}
+      {showCoverPrompt && pendingMetadata && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface border border-border rounded-xl p-6 max-w-lg w-full">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Update Cover Image?</h3>
+            <p className="text-foreground-muted mb-4">
+              This book already has a cover. Would you like to replace it with the one from the metadata source?
+            </p>
+
+            <div className="flex gap-4 justify-center mb-6">
+              {coverUrl && (
+                <div className="text-center">
+                  <p className="text-xs font-medium text-foreground-muted mb-2">Current</p>
+                  <div className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated">
+                    <img
+                      src={coverUrl}
+                      alt="Current cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+              {(pendingMetadata.coverUrlHQ || pendingMetadata.coverUrl) && (
+                <div className="text-center">
+                  <p className="text-xs font-medium text-foreground-muted mb-2">New</p>
+                  <div className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated">
+                    <img
+                      src={pendingMetadata.coverUrlHQ || pendingMetadata.coverUrl || ""}
+                      alt="New cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowCoverPrompt(false);
+                  setPendingMetadata(null);
+                }}
+                className="px-4 py-2 text-foreground-muted hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => doApplyMetadata(pendingMetadata, true)}
+                className="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-surface-elevated transition-colors"
+              >
+                Keep Current Cover
+              </button>
+              <button
+                onClick={() => doApplyMetadata(pendingMetadata, false)}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+              >
+                Use New Cover
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
