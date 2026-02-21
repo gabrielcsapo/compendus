@@ -33,5 +33,6 @@ if (migrationsFolder) {
   migrate(db, { migrationsFolder });
 }
 
+
 // Export types
 export * from "./schema";

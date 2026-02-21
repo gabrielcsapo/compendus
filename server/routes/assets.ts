@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { readFile, open } from "fs/promises";
+import { readFile } from "fs/promises";
 import { resolve, extname } from "path";
 import { existsSync, statSync, createReadStream, writeFileSync } from "fs";
 import { eq } from "drizzle-orm";
@@ -168,13 +168,19 @@ app.get("/books/:filepath{.+}", async (c) => {
     const fileSize = stat.size;
     const rangeHeader = c.req.header("range");
 
+    // Cap range responses to 1MB chunks to avoid reading entire large files into memory.
+    // Browsers will request additional ranges as needed during playback.
+    const MAX_CHUNK = 1024 * 1024; // 1MB
+
     if (rangeHeader) {
       const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
       if (match) {
         const start = match[1] ? parseInt(match[1], 10) : 0;
-        const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+        // For open-ended ranges (bytes=0-), cap at MAX_CHUNK instead of entire file
+        const requestedEnd = match[2] ? parseInt(match[2], 10) : start + MAX_CHUNK - 1;
+        const end = Math.min(requestedEnd, fileSize - 1);
 
-        if (start >= fileSize || end >= fileSize || start > end) {
+        if (start >= fileSize || start > end) {
           return new Response("Range Not Satisfiable", {
             status: 416,
             headers: {
@@ -184,12 +190,27 @@ app.get("/books/:filepath{.+}", async (c) => {
         }
 
         const chunkSize = end - start + 1;
-        const fileHandle = await open(filePath, "r");
-        const buffer = Buffer.alloc(chunkSize);
-        await fileHandle.read(buffer, 0, chunkSize, start);
-        await fileHandle.close();
 
-        return new Response(buffer, {
+        // Stream the range using createReadStream instead of reading into a buffer
+        const stream = createReadStream(filePath, { start, end });
+        const readableStream = new ReadableStream({
+          start(controller) {
+            stream.on("data", (chunk: Buffer) => {
+              controller.enqueue(new Uint8Array(chunk));
+            });
+            stream.on("end", () => {
+              controller.close();
+            });
+            stream.on("error", (err) => {
+              controller.error(err);
+            });
+          },
+          cancel() {
+            stream.destroy();
+          },
+        });
+
+        return new Response(readableStream, {
           status: 206,
           headers: {
             "Content-Type": contentType,

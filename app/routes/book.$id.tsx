@@ -1,5 +1,5 @@
 import { Link, type LoaderFunctionArgs } from "react-router";
-import { buttonStyles } from "../lib/styles";
+import { buttonStyles, badgeStyles } from "../lib/styles";
 import { getBook, getLinkedFormats } from "../actions/books";
 import { getTagsForBook } from "../actions/tags";
 import { getCollectionsForBook } from "../actions/collections";
@@ -43,27 +43,35 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
 
   return (
     <main className="container my-8 px-6 mx-auto">
-      <div className="mb-6">
+      <div className="mb-8">
         <Link
           to="/"
-          className="text-primary hover:text-primary-hover transition-colors font-medium"
+          className="inline-flex items-center gap-1.5 text-sm text-foreground-muted hover:text-primary transition-colors group"
         >
-          &larr; Back to Library
+          <svg
+            className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Library
         </Link>
       </div>
 
-      <div className="grid md:grid-cols-[280px_1fr] gap-8">
+      <div className="grid md:grid-cols-[280px_1fr] gap-8 items-start">
         {/* Cover & Actions */}
-        <div className="space-y-4">
+        <aside className="space-y-4 md:sticky md:top-8 md:self-start max-w-xs mx-auto md:max-w-none md:mx-0">
           {/* Cover */}
           <div>
-            <CoverDropZone
-              bookId={book.id}
-              coverPath={book.coverPath}
-              coverColor={book.coverColor}
-              title={book.title}
-              updatedAt={book.updatedAt}
-            />
+            <div className="shadow-paper rounded-xl overflow-hidden">
+              <CoverDropZone
+                bookId={book.id}
+                coverPath={book.coverPath}
+                coverColor={book.coverColor}
+                title={book.title}
+                updatedAt={book.updatedAt}
+              />
+            </div>
             <p className="text-xs text-foreground-muted text-center mt-2">
               Drop image or <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">⌘/Ctrl</kbd>+<kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">V</kbd> to paste
             </p>
@@ -154,131 +162,159 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
               {/* Cover actions */}
               <CoverExtractButton bookId={book.id} bookFormat={book.format} />
               <CoverUploadButton bookId={book.id} hasCover={!!book.coverPath} />
-              {/* Edit & Delete */}
-              <EditBookButton book={book} tags={tags} />
-              {/* Edit EPUB content */}
-              {(book.format === "epub" || book.convertedEpubPath) && (
-                <Link
-                  to={`/book/${book.id}/edit`}
-                  className={`${buttonStyles.base} ${buttonStyles.secondary} w-full flex items-center gap-2`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  Edit EPUB Content
-                </Link>
-              )}
               <DeleteBookButton book={book} />
             </div>
           </details>
-        </div>
+        </aside>
 
-        {/* Details */}
-        <div className="bg-surface border border-border rounded-xl p-6">
-          <h1 className="text-2xl font-bold mb-2 text-foreground">{book.title}</h1>
-          {book.subtitle && <p className="text-lg text-foreground-muted mb-4">{book.subtitle}</p>}
-
-          {authors.length > 0 && (
-            <p className="text-foreground-muted mb-4">
-              by <AuthorLinks authors={authors} className="text-primary hover:text-primary-hover" />
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2 mb-6">
-            <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-primary-light text-primary uppercase">
-              {book.format}
-            </span>
-            {book.language && (
-              <span className="inline-block px-3 py-1 text-sm rounded-full bg-surface-elevated text-foreground-muted">
-                {book.language}
-              </span>
-            )}
-            {book.pageCount && (
-              <span className="inline-block px-3 py-1 text-sm rounded-full bg-surface-elevated text-foreground-muted">
-                {book.pageCount} pages
-              </span>
-            )}
-          </div>
-
-          {book.description && (
-            <div className="mb-6">
-              <h2 className="font-semibold mb-2 text-foreground">Description</h2>
-              <p className="text-foreground-muted whitespace-pre-line leading-relaxed">
-                {book.description}
-              </p>
-            </div>
-          )}
-
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="mb-6">
-              <h2 className="font-semibold mb-2 text-foreground">Tags</h2>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
+        {/* Content */}
+        <div className="space-y-6">
+          {/* Header — no card background, page-level prominence */}
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                {book.title}
+              </h1>
+              <div className="flex items-center gap-2 shrink-0 pt-1">
+                <EditBookButton book={book} tags={tags} />
+                {(book.format === "epub" || book.convertedEpubPath) && (
                   <Link
-                    key={tag.id}
-                    to={`/tags?tag=${tag.id}`}
-                    className="inline-block px-3 py-1 text-sm rounded-full bg-secondary-light text-secondary hover:opacity-80 transition-opacity"
-                    style={
-                      tag.color
-                        ? {
-                            backgroundColor: tag.color + "20",
-                            color: tag.color,
-                          }
-                        : undefined
-                    }
+                    to={`/book/${book.id}/edit`}
+                    className={`${buttonStyles.base} ${buttonStyles.ghost} px-2.5`}
+                    title="Edit EPUB Content"
                   >
-                    {tag.name}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
                   </Link>
-                ))}
+                )}
               </div>
             </div>
+
+            {book.subtitle && (
+              <p className="text-xl text-foreground-muted font-light">{book.subtitle}</p>
+            )}
+
+            {authors.length > 0 && (
+              <p className="text-lg text-foreground-muted">
+                by <AuthorLinks authors={authors} className="text-primary hover:text-primary-hover font-medium" />
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className={`${badgeStyles.base} ${badgeStyles.primary} uppercase`}>
+                {book.format}
+              </span>
+              {book.language && (
+                <span className={`${badgeStyles.base} ${badgeStyles.neutral}`}>
+                  {book.language}
+                </span>
+              )}
+              {book.pageCount && (
+                <span className={`${badgeStyles.base} ${badgeStyles.neutral}`}>
+                  {book.pageCount} pages
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          {book.description && (
+            <section className="bg-surface border border-border rounded-xl p-6 shadow-paper">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground-muted mb-3">
+                Description
+              </h2>
+              <p className="text-foreground whitespace-pre-line leading-relaxed">
+                {book.description}
+              </p>
+            </section>
           )}
 
-          {/* Collections */}
-          <BookCollectionsManager bookId={book.id} currentCollections={collections} />
+          {/* Tags & Collections */}
+          <section className="bg-surface border border-border rounded-xl p-6 shadow-paper">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground-muted mb-4">
+              Organization
+            </h2>
 
-          {/* Metadata */}
-          <div className="border-t border-border pt-4 mt-6">
-            <h2 className="font-semibold mb-3 text-foreground">Details</h2>
-            <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+            {tags.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-medium text-foreground-muted mb-2">Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <Link
+                      key={tag.id}
+                      to={`/tags?tag=${tag.id}`}
+                      className="inline-block px-3 py-1 text-sm rounded-full bg-secondary-light text-secondary hover:opacity-80 transition-opacity"
+                      style={
+                        tag.color
+                          ? {
+                              backgroundColor: tag.color + "20",
+                              color: tag.color,
+                            }
+                          : undefined
+                      }
+                    >
+                      {tag.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <BookCollectionsManager bookId={book.id} currentCollections={collections} />
+          </section>
+
+          {/* Details */}
+          <section className="bg-surface border border-border rounded-xl p-6 shadow-paper">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground-muted mb-4">
+              Details
+            </h2>
+            <dl className="divide-y divide-border text-sm">
               {book.pageCount && (
-                <>
+                <div className="flex justify-between py-3">
                   <dt className="text-foreground-muted">Pages</dt>
-                  <dd className="text-foreground">{book.pageCount}</dd>
-                </>
+                  <dd className="font-medium text-foreground">{book.pageCount}</dd>
+                </div>
               )}
               {book.publisher && (
-                <>
+                <div className="flex justify-between py-3">
                   <dt className="text-foreground-muted">Publisher</dt>
-                  <dd className="text-foreground">{book.publisher}</dd>
-                </>
+                  <dd className="font-medium text-foreground">{book.publisher}</dd>
+                </div>
               )}
               {book.publishedDate && (
-                <>
+                <div className="flex justify-between py-3">
                   <dt className="text-foreground-muted">Published</dt>
-                  <dd className="text-foreground">{book.publishedDate}</dd>
-                </>
+                  <dd className="font-medium text-foreground">{book.publishedDate}</dd>
+                </div>
               )}
               {book.isbn && (
-                <>
+                <div className="flex justify-between py-3">
                   <dt className="text-foreground-muted">ISBN</dt>
-                  <dd className="text-foreground">{book.isbn}</dd>
-                </>
+                  <dd className="font-medium text-foreground font-mono">{book.isbn}</dd>
+                </div>
               )}
-              <dt className="text-foreground-muted">File Size</dt>
-              <dd className="text-foreground">{formatFileSize(book.fileSize)}</dd>
-              <dt className="text-foreground-muted">Added</dt>
-              <dd className="text-foreground">{book.importedAt?.toLocaleDateString()}</dd>
-              <dt className="text-foreground-muted">Filename</dt>
-              <dd className="text-foreground break-all">{book.fileName}</dd>
-              <dt className="text-foreground-muted">Location</dt>
-              <dd className="text-foreground break-all font-mono text-xs">{book.filePath}</dd>
+              <div className="flex justify-between py-3">
+                <dt className="text-foreground-muted">File Size</dt>
+                <dd className="font-medium text-foreground">{formatFileSize(book.fileSize)}</dd>
+              </div>
+              <div className="flex justify-between py-3">
+                <dt className="text-foreground-muted">Added</dt>
+                <dd className="font-medium text-foreground">{book.importedAt?.toLocaleDateString()}</dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt className="text-foreground-muted shrink-0">Filename</dt>
+                <dd className="font-medium text-foreground break-all text-right">{book.fileName}</dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt className="text-foreground-muted shrink-0">Location</dt>
+                <dd className="text-foreground break-all font-mono text-xs text-right">{book.filePath}</dd>
+              </div>
             </dl>
 
             {/* Metadata refresh */}
-            <MetadataRefreshButton bookId={book.id} bookTitle={book.title} bookAuthors={authors} bookFormat={book.format as BookFormat} />
-          </div>
+            <MetadataRefreshButton bookId={book.id} bookTitle={book.title} bookAuthors={authors} bookFormat={book.format as BookFormat} hasCover={!!book.coverPath} coverUrl={book.coverPath ? `/covers/${book.id}.jpg?v=${book.updatedAt?.getTime() || ""}` : undefined} />
+          </section>
         </div>
       </div>
     </main>

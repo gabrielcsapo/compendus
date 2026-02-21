@@ -43,6 +43,10 @@ export default function UnmatchedBooks() {
   const [previewContent, setPreviewContent] = useState<PageContent | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  // Cover prompt state
+  const [pendingMetadata, setPendingMetadata] = useState<MetadataSearchResult | null>(null);
+  const [showCoverPrompt, setShowCoverPrompt] = useState(false);
+
   // Delete state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -132,11 +136,26 @@ export default function UnmatchedBooks() {
   const handleApply = async (metadata: MetadataSearchResult) => {
     if (!currentBook) return;
 
+    // If book already has a cover, ask whether to update it
+    if (currentBook.coverPath) {
+      setPendingMetadata(metadata);
+      setShowCoverPrompt(true);
+      return;
+    }
+
+    await doApplyMetadata(metadata);
+  };
+
+  const doApplyMetadata = async (metadata: MetadataSearchResult, skipCover = false) => {
+    if (!currentBook) return;
+
     setApplying(true);
     setMessage(null);
+    setShowCoverPrompt(false);
+    setPendingMetadata(null);
 
     try {
-      const result = await applyMetadata(currentBook.id, metadata);
+      const result = await applyMetadata(currentBook.id, metadata, { skipCover });
       if (result.success) {
         setProcessedCount((prev) => prev + 1);
         // Move to next book
@@ -209,7 +228,7 @@ export default function UnmatchedBooks() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-foreground mb-2">All caught up!</h2>
-          <p className="text-foreground-muted mb-2">All your books have cover images. Nice work!</p>
+          <p className="text-foreground-muted mb-2">All your books have been matched. Nice work!</p>
           {processedCount > 0 && (
             <p className="text-sm text-foreground-muted mb-6">
               You processed {processedCount} {processedCount === 1 ? "book" : "books"} this session.
@@ -284,14 +303,27 @@ export default function UnmatchedBooks() {
             <div className="grid md:grid-cols-[280px_1fr] gap-6">
               {/* Book info */}
               <div>
-                <ClickableCoverPlaceholder
-                  bookId={currentBook.id}
-                  bookFormat={currentBook.format}
-                  title={currentBook.title}
-                  coverColor={currentBook.coverColor}
-                  onSuccess={loadNextBook}
-                  className="aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-lg"
-                />
+                {currentBook.coverPath ? (
+                  <div
+                    className="aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-lg bg-surface-elevated"
+                    style={{ backgroundColor: currentBook.coverColor || undefined }}
+                  >
+                    <img
+                      src={`/covers/${currentBook.id}.jpg?v=${currentBook.updatedAt?.getTime() || ""}`}
+                      alt={currentBook.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <ClickableCoverPlaceholder
+                    bookId={currentBook.id}
+                    bookFormat={currentBook.format}
+                    title={currentBook.title}
+                    coverColor={currentBook.coverColor}
+                    onSuccess={loadNextBook}
+                    className="aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-lg"
+                  />
+                )}
                 <h3 className="font-semibold text-foreground mt-3 line-clamp-2">
                   {currentBook.title}
                 </h3>
@@ -526,12 +558,12 @@ export default function UnmatchedBooks() {
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-foreground truncate text-sm">
+                            <div className="flex items-start gap-2">
+                              <h4 className="font-medium text-foreground text-sm">
                                 {result.title}
                               </h4>
                               <span
-                                className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${
                                   result.source === "googlebooks"
                                     ? "bg-blue-100 text-blue-700"
                                     : "bg-green-100 text-green-700"
@@ -572,6 +604,71 @@ export default function UnmatchedBooks() {
           </div>
         </div>
       ) : null}
+
+      {/* Cover update prompt */}
+      {showCoverPrompt && pendingMetadata && currentBook && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-surface border border-border rounded-xl p-6 max-w-lg w-full">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Update Cover Image?</h3>
+            <p className="text-foreground-muted mb-4">
+              This book already has a cover. Would you like to replace it with the one from the metadata source?
+            </p>
+
+            {/* Side by side cover comparison */}
+            <div className="flex gap-4 justify-center mb-6">
+              <div className="text-center">
+                <p className="text-xs font-medium text-foreground-muted mb-2">Current</p>
+                <div
+                  className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated"
+                  style={{ backgroundColor: currentBook.coverColor || undefined }}
+                >
+                  <img
+                    src={`/covers/${currentBook.id}.jpg?v=${currentBook.updatedAt?.getTime() || ""}`}
+                    alt="Current cover"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              {(pendingMetadata.coverUrlHQ || pendingMetadata.coverUrl) && (
+                <div className="text-center">
+                  <p className="text-xs font-medium text-foreground-muted mb-2">New</p>
+                  <div className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated">
+                    <img
+                      src={pendingMetadata.coverUrlHQ || pendingMetadata.coverUrl || ""}
+                      alt="New cover"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowCoverPrompt(false);
+                  setPendingMetadata(null);
+                }}
+                className="px-4 py-2 text-foreground-muted hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => doApplyMetadata(pendingMetadata, true)}
+                className="px-4 py-2 border border-border rounded-lg text-foreground hover:bg-surface-elevated transition-colors"
+              >
+                Keep Current Cover
+              </button>
+              <button
+                onClick={() => doApplyMetadata(pendingMetadata, false)}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
+              >
+                Use New Cover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation dialog */}
       {showDeleteConfirm && currentBook && (

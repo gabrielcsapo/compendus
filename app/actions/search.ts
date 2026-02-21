@@ -2,20 +2,44 @@
 
 import {
   searchBooks as searchBooksLib,
+  searchBooksCount as searchBooksCountLib,
   type SearchOptions,
   type SearchResult,
+  type MissingField,
 } from "../lib/search";
+
+export type { MissingField };
 
 export async function searchBooks(
   query: string,
   options: Omit<SearchOptions, "query"> = {},
 ): Promise<SearchResult[]> {
-  if (!query || query.trim().length < 2) {
+  const hasQuery = query && query.trim().length >= 2;
+  const hasMissing = options.missing && options.missing.length > 0;
+
+  if (!hasQuery && !hasMissing) {
     return [];
   }
 
   return searchBooksLib({
-    query,
+    query: hasQuery ? query : undefined,
+    ...options,
+  });
+}
+
+export async function searchBooksCount(
+  query: string,
+  options: Omit<SearchOptions, "query" | "limit" | "offset"> = {},
+): Promise<number> {
+  const hasQuery = query && query.trim().length >= 2;
+  const hasMissing = options.missing && options.missing.length > 0;
+
+  if (!hasQuery && !hasMissing) {
+    return 0;
+  }
+
+  return searchBooksCountLib({
+    query: hasQuery ? query : undefined,
     ...options,
   });
 }

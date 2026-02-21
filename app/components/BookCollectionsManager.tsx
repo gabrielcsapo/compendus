@@ -65,7 +65,7 @@ export function BookCollectionsManager({
   const availableCollections = allCollections.filter((c) => !currentCollectionIds.has(c.id));
 
   return (
-    <div className="mb-6">
+    <div>
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-semibold text-foreground">Collections</h2>
         <div className="relative">

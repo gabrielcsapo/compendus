@@ -171,43 +171,45 @@ export async function updateBook(
 
   await db.update(books).set(updateData).where(eq(books.id, id));
 
-  // Write metadata to the actual book file if title/authors changed
+  // Write metadata to the actual book file if title/authors changed (fire-and-forget)
+  // This runs in the background so the response returns immediately.
+  // Large audio files can take a long time to rewrite.
   if ("title" in data || "authors" in data) {
     const updatedBook = await getBook(id);
     if (updatedBook) {
-      try {
-        const format = updatedBook.format as BookFormat;
-        const filePath = getBookFilePath(id, format);
-        const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
+      const format = updatedBook.format as BookFormat;
+      const filePath = getBookFilePath(id, format);
+      const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
 
-        // Load cover image for embedding if available
-        let coverImage: Buffer | null = null;
-        if (updatedBook.coverPath) {
-          try {
-            const { readFile } = await import("fs/promises");
-            coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
-          } catch {
-            // Cover file not found, proceed without embedding
+      (async () => {
+        try {
+          let coverImage: Buffer | null = null;
+          if (updatedBook.coverPath) {
+            try {
+              const { readFile } = await import("fs/promises");
+              coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
+            } catch {
+              // Cover file not found, proceed without embedding
+            }
           }
-        }
 
-        await writeMetadataToFile(filePath, format, {
-          title: updatedBook.title,
-          authors,
-          publisher: updatedBook.publisher,
-          description: updatedBook.description,
-          isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
-          language: updatedBook.language,
-          series: updatedBook.series,
-          seriesNumber: updatedBook.seriesNumber,
-          publishedDate: updatedBook.publishedDate,
-          coverImage,
-          coverMimeType: "image/jpeg",
-        });
-      } catch (error) {
-        // Don't fail the operation if file metadata update fails
-        console.error(`Error writing embedded metadata for book ${id}:`, error);
-      }
+          await writeMetadataToFile(filePath, format, {
+            title: updatedBook.title,
+            authors,
+            publisher: updatedBook.publisher,
+            description: updatedBook.description,
+            isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
+            language: updatedBook.language,
+            series: updatedBook.series,
+            seriesNumber: updatedBook.seriesNumber,
+            publishedDate: updatedBook.publishedDate,
+            coverImage,
+            coverMimeType: "image/jpeg",
+          });
+        } catch (error) {
+          console.error(`Error writing embedded metadata for book ${id}:`, error);
+        }
+      })();
     }
   }
 
@@ -351,7 +353,7 @@ export async function getUnmatchedBooks(limit: number = 50): Promise<Book[]> {
     .select()
     .from(books)
     .where(
-      sql`${books.coverPath} IS NULL AND (${books.matchSkipped} IS NULL OR ${books.matchSkipped} = 0)`,
+      sql`(${books.coverPath} IS NULL OR (${books.isbn} IS NULL AND ${books.isbn13} IS NULL AND ${books.isbn10} IS NULL)) AND (${books.matchSkipped} IS NULL OR ${books.matchSkipped} = 0)`,
     )
     .orderBy(desc(books.createdAt))
     .limit(limit);
@@ -365,7 +367,7 @@ export async function getUnmatchedBooksCount(): Promise<number> {
     .select({ count: sql<number>`count(*)` })
     .from(books)
     .where(
-      sql`${books.coverPath} IS NULL AND (${books.matchSkipped} IS NULL OR ${books.matchSkipped} = 0)`,
+      sql`(${books.coverPath} IS NULL OR (${books.isbn} IS NULL AND ${books.isbn13} IS NULL AND ${books.isbn10} IS NULL)) AND (${books.matchSkipped} IS NULL OR ${books.matchSkipped} = 0)`,
     )
     .get();
   return result?.count || 0;
@@ -554,43 +556,43 @@ export async function refreshMetadata(
     updateData.updatedAt = sql`(unixepoch())`;
     await db.update(books).set(updateData).where(eq(books.id, bookId));
 
-    // Write metadata to the actual book file
-    // This makes the file the source of truth for backups/migrations
     const updatedBook = await getBook(bookId);
     if (updatedBook) {
-      try {
-        const format = updatedBook.format as BookFormat;
-        const filePath = getBookFilePath(bookId, format);
-        const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
+      // Write metadata to the actual book file in the background (fire-and-forget).
+      // Large audio files can take a long time to rewrite.
+      const format = updatedBook.format as BookFormat;
+      const filePath = getBookFilePath(bookId, format);
+      const authors = updatedBook.authors ? JSON.parse(updatedBook.authors) : [];
 
-        // Load cover image for embedding if available
-        let coverImage: Buffer | null = null;
-        if (updatedBook.coverPath) {
-          try {
-            const { readFile } = await import("fs/promises");
-            coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
-          } catch {
-            // Cover file not found, proceed without embedding
+      (async () => {
+        try {
+          let coverImage: Buffer | null = null;
+          if (updatedBook.coverPath) {
+            try {
+              const { readFile } = await import("fs/promises");
+              coverImage = await readFile(resolveStoragePath(updatedBook.coverPath));
+            } catch {
+              // Cover file not found, proceed without embedding
+            }
           }
-        }
 
-        await writeMetadataToFile(filePath, format, {
-          title: updatedBook.title,
-          authors,
-          publisher: updatedBook.publisher,
-          description: updatedBook.description,
-          isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
-          language: updatedBook.language,
-          series: updatedBook.series,
-          seriesNumber: updatedBook.seriesNumber,
-          publishedDate: updatedBook.publishedDate,
-          coverImage,
-          coverMimeType: "image/jpeg",
-        });
-      } catch (error) {
-        // Don't fail the operation if file metadata update fails
-        console.error(`Error writing embedded metadata for book ${bookId}:`, error);
-      }
+          await writeMetadataToFile(filePath, format, {
+            title: updatedBook.title,
+            authors,
+            publisher: updatedBook.publisher,
+            description: updatedBook.description,
+            isbn: updatedBook.isbn13 || updatedBook.isbn10 || updatedBook.isbn,
+            language: updatedBook.language,
+            series: updatedBook.series,
+            seriesNumber: updatedBook.seriesNumber,
+            publishedDate: updatedBook.publishedDate,
+            coverImage,
+            coverMimeType: "image/jpeg",
+          });
+        } catch (error) {
+          console.error(`Error writing embedded metadata for book ${bookId}:`, error);
+        }
+      })();
 
       return {
         success: true,
@@ -660,6 +662,7 @@ async function createTagsFromSubjects(bookId: string, subjects: string[]): Promi
 export async function applyMetadata(
   bookId: string,
   metadata: MetadataSearchResult,
+  options?: { skipCover?: boolean },
 ): Promise<{ success: boolean; message: string; book?: Book }> {
   const book = await getBook(bookId);
   if (!book) {
@@ -764,74 +767,80 @@ export async function applyMetadata(
   };
 
   // Download and save cover - try multiple URLs until one works
-  const coverUrls = metadata.coverUrls || [];
+  if (!options?.skipCover) {
+    const coverUrls = metadata.coverUrls || [];
 
-  for (const coverUrl of coverUrls) {
-    try {
-      const coverResponse = await fetch(coverUrl);
+    for (const coverUrl of coverUrls) {
+      try {
+        const coverResponse = await fetch(coverUrl);
 
-      if (coverResponse.ok) {
-        const coverBuffer = Buffer.from(await coverResponse.arrayBuffer());
+        if (coverResponse.ok) {
+          const coverBuffer = Buffer.from(await coverResponse.arrayBuffer());
 
-        // Process with sharp for optimization (validates dimensions)
-        const result = await processAndStoreCover(coverBuffer, bookId);
-        if (result.path) {
-          updateData.coverPath = result.path;
-          if (result.dominantColor) {
-            updateData.coverColor = result.dominantColor;
+          // Process with sharp for optimization (validates dimensions)
+          const result = await processAndStoreCover(coverBuffer, bookId);
+          if (result.path) {
+            updateData.coverPath = result.path;
+            if (result.dominantColor) {
+              updateData.coverColor = result.dominantColor;
+            }
+            break; // Successfully saved, stop trying more URLs
           }
-          break; // Successfully saved, stop trying more URLs
+          // If result.path is null, the cover was rejected (placeholder), try next URL
         }
-        // If result.path is null, the cover was rejected (placeholder), try next URL
+      } catch {
+        // Failed to download cover, try next URL
       }
-    } catch {
-      // Failed to download cover, try next URL
     }
   }
 
   await db.update(books).set(updateData).where(eq(books.id, bookId));
 
-  // Write metadata to the actual book file (EPUB, PDF, audio)
-  // This makes the file the source of truth for backups/migrations
-  try {
+  // Write metadata to the actual book file in the background (fire-and-forget).
+  // Large audio files can take a long time to rewrite with ffmpeg/node-id3.
+  {
     const format = book.format as BookFormat;
     const filePath = getBookFilePath(bookId, format);
+    const coverPath = updateData.coverPath as string | undefined;
+    const skipCover = options?.skipCover;
 
-    // Load cover image for embedding if available
-    let coverImage: Buffer | null = null;
-    if (updateData.coverPath) {
+    (async () => {
       try {
-        const { readFile } = await import("fs/promises");
-        coverImage = await readFile(resolveStoragePath(updateData.coverPath as string));
-      } catch {
-        // Cover file not found, proceed without embedding
+        let coverImage: Buffer | null = null;
+        if (coverPath && !skipCover) {
+          try {
+            const { readFile } = await import("fs/promises");
+            coverImage = await readFile(resolveStoragePath(coverPath));
+          } catch {
+            // Cover file not found, proceed without embedding
+          }
+        }
+
+        const writeResult = await writeMetadataToFile(filePath, format, {
+          title: newTitle,
+          authors: newAuthors,
+          publisher: enrichedMetadata.publisher,
+          description: enrichedMetadata.description,
+          isbn: enrichedMetadata.isbn13 || enrichedMetadata.isbn10 || enrichedMetadata.isbn,
+          language: enrichedMetadata.language,
+          series: enrichedMetadata.series,
+          seriesNumber: enrichedMetadata.seriesNumber,
+          publishedDate: enrichedMetadata.publishedDate,
+          coverImage,
+          coverMimeType: "image/jpeg",
+        });
+
+        if (
+          !writeResult.success &&
+          writeResult.error &&
+          !writeResult.error.includes("does not support")
+        ) {
+          console.warn(`Failed to update embedded metadata for book ${bookId}:`, writeResult.error);
+        }
+      } catch (error) {
+        console.error(`Error writing embedded metadata for book ${bookId}:`, error);
       }
-    }
-
-    const writeResult = await writeMetadataToFile(filePath, format, {
-      title: newTitle,
-      authors: newAuthors,
-      publisher: enrichedMetadata.publisher,
-      description: enrichedMetadata.description,
-      isbn: enrichedMetadata.isbn13 || enrichedMetadata.isbn10 || enrichedMetadata.isbn,
-      language: enrichedMetadata.language,
-      series: enrichedMetadata.series,
-      seriesNumber: enrichedMetadata.seriesNumber,
-      publishedDate: enrichedMetadata.publishedDate,
-      coverImage,
-      coverMimeType: "image/jpeg",
-    });
-
-    if (
-      !writeResult.success &&
-      writeResult.error &&
-      !writeResult.error.includes("does not support")
-    ) {
-      console.warn(`Failed to update embedded metadata for book ${bookId}:`, writeResult.error);
-    }
-  } catch (error) {
-    // Don't fail the operation if file metadata update fails
-    console.error(`Error writing embedded metadata for book ${bookId}:`, error);
+    })();
   }
 
   // Auto-create tags from subjects

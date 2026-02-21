@@ -435,10 +435,13 @@ async function writeMp3Metadata(
     coverEmbedded = true;
   }
 
-  // Write tags to file
-  const result = NodeID3Module.update(tags, filePath);
+  // Use async file I/O to avoid blocking the event loop.
+  // node-id3's update(tags, filePath) is synchronous and blocks on large files.
+  const fileBuffer = await readFile(filePath);
+  const result = NodeID3Module.update(tags, fileBuffer);
 
-  if (result === true) {
+  if (result instanceof Buffer) {
+    await writeFile(filePath, result);
     return { success: true, format: "mp3", coverEmbedded };
   }
 
@@ -459,17 +462,18 @@ async function writeM4Metadata(
   format: "m4b" | "m4a",
   metadata: WritableMetadata,
 ): Promise<MetadataWriteResult> {
-  const { exec } = await import("child_process");
-  const { promisify } = await import("util");
+  const { spawn } = await import("child_process");
   const { tmpdir } = await import("os");
   const { join } = await import("path");
   const { rename, unlink } = await import("fs/promises");
 
-  const execAsync = promisify(exec);
-
   // Check if ffmpeg is available
   try {
-    await execAsync("ffmpeg -version");
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn("ffmpeg", ["-version"], { stdio: "ignore" });
+      proc.on("close", (code) => (code === 0 ? resolve() : reject()));
+      proc.on("error", reject);
+    });
   } catch {
     return {
       success: true,
@@ -523,26 +527,49 @@ async function writeM4Metadata(
   }
 
   try {
-    // Use ffmpeg to copy stream and update metadata
-    const escapedPath = filePath.replace(/"/g, '\\"');
-    const escapedTemp = tempPath.replace(/"/g, '\\"');
-    const metadataStr = metadataArgs
-      .map((arg) => `"${arg.replace(/"/g, '\\"')}"`)
-      .join(" ");
-
-    // Build ffmpeg command with optional cover
-    let ffmpegCmd: string;
+    // Build ffmpeg args array (using spawn avoids shell escaping issues and memory buffering)
+    let ffmpegArgs: string[];
     if (coverTempPath) {
-      const escapedCover = coverTempPath.replace(/"/g, '\\"');
       // With cover: map audio from input 0, video (cover) from input 1
-      ffmpegCmd = `ffmpeg -i "${escapedPath}" -i "${escapedCover}" -map 0:a -map 1:v -c:a copy -c:v mjpeg -disposition:v:0 attached_pic ${metadataStr} -y "${escapedTemp}"`;
+      ffmpegArgs = [
+        "-i", filePath,
+        "-i", coverTempPath,
+        "-map", "0:a",
+        "-map", "1:v",
+        "-c:a", "copy",
+        "-c:v", "mjpeg",
+        "-disposition:v:0", "attached_pic",
+        ...metadataArgs,
+        "-y", tempPath,
+      ];
       coverEmbedded = true;
     } else {
       // Without cover: just copy all streams
-      ffmpegCmd = `ffmpeg -i "${escapedPath}" -c copy ${metadataStr} -y "${escapedTemp}"`;
+      ffmpegArgs = [
+        "-i", filePath,
+        "-c", "copy",
+        ...metadataArgs,
+        "-y", tempPath,
+      ];
     }
 
-    await execAsync(ffmpegCmd, { maxBuffer: 50 * 1024 * 1024 });
+    // Use spawn instead of exec to avoid buffering all output in memory
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn("ffmpeg", ffmpegArgs, { stdio: ["ignore", "ignore", "pipe"] });
+      let stderr = "";
+      proc.stderr.on("data", (data: Buffer) => {
+        stderr += data.toString();
+        // Only keep last 1KB of stderr for error reporting
+        if (stderr.length > 1024) {
+          stderr = stderr.slice(-1024);
+        }
+      });
+      proc.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
+      });
+      proc.on("error", reject);
+    });
 
     // Replace original with updated file
     await unlink(filePath);

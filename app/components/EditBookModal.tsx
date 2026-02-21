@@ -7,7 +7,20 @@ import {
   addTagToBookByName,
   removeTagFromBook,
 } from "../actions/tags";
+import { getDistinctSeries, getDistinctAuthors } from "../actions/batch";
 import type { Book, Tag } from "../lib/db/schema";
+
+const LANGUAGES = [
+  "", "English", "Spanish", "French", "German", "Italian", "Portuguese",
+  "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi", "Dutch",
+  "Swedish", "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Turkish",
+  "Greek", "Hebrew", "Thai", "Vietnamese", "Indonesian", "Malay", "Romanian",
+  "Hungarian", "Bulgarian", "Croatian", "Serbian", "Slovak", "Slovenian",
+  "Ukrainian", "Lithuanian", "Latvian", "Estonian", "Catalan", "Basque",
+  "Galician", "Welsh", "Irish", "Scottish Gaelic", "Icelandic", "Farsi",
+  "Urdu", "Bengali", "Tamil", "Telugu", "Kannada", "Malayalam", "Swahili",
+  "Afrikaans", "Latin",
+];
 
 interface EditBookModalProps {
   isOpen: boolean;
@@ -47,18 +60,26 @@ export function EditBookModal({
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [seriesNames, setSeriesNames] = useState<string[]>([]);
+  const [authorNames, setAuthorNames] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load all tags for suggestions
+  // Load all tags, series names, and author names for suggestions
   useEffect(() => {
-    async function loadTags() {
-      const tags = await getTags();
+    async function loadData() {
+      const [tags, series, authors] = await Promise.all([
+        getTags(),
+        getDistinctSeries(),
+        getDistinctAuthors(),
+      ]);
       setAllTags(tags);
+      setSeriesNames(series);
+      setAuthorNames(authors);
     }
     if (isOpen) {
-      loadTags();
+      loadData();
     }
   }, [isOpen]);
 
@@ -270,12 +291,18 @@ export function EditBookModal({
               <input
                 type="text"
                 id="authors"
+                list="edit-modal-authors-list"
                 value={authors}
                 onChange={(e) => setAuthors(e.target.value)}
                 placeholder="e.g., John Doe, Jane Smith"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               />
+              <datalist id="edit-modal-authors-list">
+                {authorNames.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
             </div>
 
             {/* Publisher */}
@@ -342,15 +369,19 @@ export function EditBookModal({
               >
                 Language
               </label>
-              <input
-                type="text"
+              <select
                 id="language"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                placeholder="e.g., English"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
-              />
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang || "(none)"}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Page Count */}
@@ -383,12 +414,18 @@ export function EditBookModal({
               <input
                 type="text"
                 id="series"
+                list="edit-modal-series-list"
                 value={series}
                 onChange={(e) => setSeries(e.target.value)}
                 placeholder="e.g., Harry Potter"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               />
+              <datalist id="edit-modal-series-list">
+                {seriesNames.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </div>
 
             {/* Series Number */}
@@ -465,77 +502,62 @@ export function EditBookModal({
                 Tags
               </label>
 
-              {/* Current tags */}
-              <div className="flex flex-wrap gap-2 mb-3">
-                {bookTags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className="inline-flex items-center gap-1 px-3 py-1 text-sm rounded-full"
-                    style={
-                      tag.color
-                        ? {
-                            backgroundColor: tag.color + "20",
-                            color: tag.color,
-                          }
-                        : {
-                            backgroundColor: "var(--color-surface-elevated)",
-                            color: "var(--color-foreground-muted)",
-                          }
-                    }
-                  >
-                    {tag.name}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag.id)}
-                      className="ml-1 hover:opacity-70"
-                      disabled={isSubmitting}
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-                {bookTags.length === 0 && (
-                  <span className="text-sm text-foreground-muted">No tags</span>
-                )}
-              </div>
-
-              {/* Add tag input */}
               <div className="relative">
-                <input
-                  type="text"
-                  value={newTagName}
-                  onChange={(e) => {
-                    setNewTagName(e.target.value);
-                    setShowTagDropdown(true);
-                  }}
-                  onFocus={() => setShowTagDropdown(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (newTagName.trim()) {
-                        handleAddTag(newTagName);
+                <div className="flex flex-wrap items-center gap-1.5 border border-border rounded-lg px-3 py-2 bg-background min-h-[42px] focus-within:ring-2 focus-within:ring-primary focus-within:border-primary">
+                  {bookTags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-full shrink-0"
+                      style={
+                        tag.color
+                          ? {
+                              backgroundColor: tag.color + "20",
+                              color: tag.color,
+                            }
+                          : {
+                              backgroundColor: "var(--color-surface-elevated)",
+                              color: "var(--color-foreground-muted)",
+                            }
                       }
-                    }
-                    if (e.key === "Escape") {
-                      setShowTagDropdown(false);
-                    }
-                  }}
-                  placeholder="Add a tag..."
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled={isSubmitting}
-                />
+                    >
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag.id)}
+                        className="hover:opacity-60 leading-none"
+                        disabled={isSubmitting}
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => {
+                      setNewTagName(e.target.value);
+                      setShowTagDropdown(true);
+                    }}
+                    onFocus={() => setShowTagDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (newTagName.trim()) {
+                          handleAddTag(newTagName);
+                        }
+                      }
+                      if (e.key === "Escape") {
+                        setShowTagDropdown(false);
+                      }
+                      if (e.key === "Backspace" && !newTagName && bookTags.length > 0) {
+                        handleRemoveTag(bookTags[bookTags.length - 1].id);
+                      }
+                    }}
+                    placeholder={bookTags.length === 0 ? "Add tags..." : ""}
+                    className="flex-1 min-w-[80px] bg-transparent text-sm text-foreground outline-none border-none p-0"
+                    disabled={isSubmitting}
+                  />
+                </div>
 
                 {/* Tag suggestions dropdown */}
                 {showTagDropdown && (newTagName || filteredTags.length > 0) && (
@@ -563,7 +585,7 @@ export function EditBookModal({
                               d="M12 4v16m8-8H4"
                             />
                           </svg>
-                          Create "{newTagName}"
+                          Create &ldquo;{newTagName}&rdquo;
                         </button>
                       )}
                     {filteredTags.slice(0, 10).map((tag) => (
@@ -574,7 +596,7 @@ export function EditBookModal({
                         className="w-full px-3 py-2 text-left text-sm hover:bg-surface-elevated flex items-center gap-2"
                       >
                         <span
-                          className="w-3 h-3 rounded-full"
+                          className="w-3 h-3 rounded-full shrink-0"
                           style={{ backgroundColor: tag.color || "#888" }}
                         />
                         {tag.name}
