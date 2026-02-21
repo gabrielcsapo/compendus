@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { addToWantedList, isBookWanted, isBookOwned } from "../actions/wanted";
+import { badgeStyles } from "../lib/styles";
 
 export function Component() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,7 +173,7 @@ function ExternalBookCard({
           </div>
           <span
             className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
-              book.source === "googlebooks" ? "badge-primary" : "badge-success"
+              book.source === "googlebooks" ? badgeStyles.primary : badgeStyles.success
             }`}
           >
             {book.source === "googlebooks" ? "Google" : "OpenLib"}

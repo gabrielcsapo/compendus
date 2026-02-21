@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { buttonStyles } from "../../lib/styles";
 
 export function TestActionStateClient(props: {
   action: (prev: React.ReactNode) => Promise<React.ReactNode>;
@@ -9,7 +10,7 @@ export function TestActionStateClient(props: {
 
   return (
     <form data-testid="use-action-state-jsx" action={formAction}>
-      <button className="btn">test-useActionState</button>
+      <button className={buttonStyles.base}>test-useActionState</button>
       {isPending ? "pending..." : state}
     </form>
   );

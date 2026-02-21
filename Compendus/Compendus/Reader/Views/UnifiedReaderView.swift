@@ -249,6 +249,9 @@ struct UnifiedReaderView: View {
         .onChange(of: readerSettings.lineHeight) { _, _ in
             if !showingSettings { engine?.applySettings(readerSettings) }
         }
+        .onChange(of: readerSettings.layout) { _, _ in
+            if !showingSettings { engine?.applySettings(readerSettings) }
+        }
     }
 
     // MARK: - Reader Content
@@ -443,12 +446,20 @@ struct UnifiedReaderView: View {
                 } else if engine.totalPositions > 0,
                           let pageIndex = engine.currentLocation?.pageIndex {
                     let pagesBeforeCurrent = calculatePagesBeforeCurrent(engine: engine)
+                    let absolutePage = pagesBeforeCurrent + pageIndex + 1
                     Button {
                         showingPageJump = true
                     } label: {
-                        Text("Page \(pagesBeforeCurrent + pageIndex + 1) of \(engine.totalPositions)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if let nativeEngine = engine as? NativeEPUBEngine, nativeEngine.isSpreadMode {
+                            let rightPage = min(absolutePage + 1, engine.totalPositions)
+                            Text("Pages \(absolutePage)-\(rightPage) of \(engine.totalPositions)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Page \(absolutePage) of \(engine.totalPositions)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .buttonStyle(.plain)
                 } else {

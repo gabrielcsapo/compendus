@@ -8,6 +8,7 @@ import {
   type EndpointSpec,
   type ParamSpec,
 } from "../lib/api/spec";
+import { badgeStyles, codeBlockStyles } from "../lib/styles";
 
 type TabId = "overview" | "endpoints" | "static" | "types";
 
@@ -28,7 +29,7 @@ function CodeBlock({
 
   return (
     <div className="relative group">
-      <pre className="code-block">
+      <pre className={codeBlockStyles}>
         <code className={`language-${language}`}>{children}</code>
       </pre>
       <button
@@ -43,11 +44,11 @@ function CodeBlock({
 
 function MethodBadge({ method }: { method: string }) {
   const colors: Record<string, string> = {
-    GET: "badge-success",
-    POST: "badge-primary",
-    PUT: "badge-warning",
-    DELETE: "badge-danger",
-    OPTIONS: "badge-neutral",
+    GET: badgeStyles.success,
+    POST: badgeStyles.primary,
+    PUT: badgeStyles.warning,
+    DELETE: badgeStyles.danger,
+    OPTIONS: badgeStyles.neutral,
   };
 
   return (
@@ -178,7 +179,7 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
             </h4>
             <p className="text-sm text-foreground-muted mb-2">
               Status:{" "}
-              <code className="badge-success px-1 rounded">
+              <code className={`${badgeStyles.success} px-1 rounded`}>
                 {endpoint.responses.success.status}
               </code>
               {" — "}
@@ -215,7 +216,7 @@ function EndpointCard({ endpoint }: { endpoint: EndpointSpec }) {
                     {endpoint.responses.errors.map((error) => (
                       <tr key={error.code}>
                         <td className="pr-4 py-1">
-                          <code className="badge-danger px-1 rounded">
+                          <code className={`${badgeStyles.danger} px-1 rounded`}>
                             {error.status}
                           </code>
                         </td>

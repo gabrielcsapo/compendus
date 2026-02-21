@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { deleteBook } from "../actions/books";
+import { buttonStyles } from "../lib/styles";
 import type { Book } from "../lib/db/schema";
 
 interface DeleteBookButtonProps {
@@ -41,7 +42,7 @@ export function DeleteBookButton({ book }: DeleteBookButtonProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="btn btn-secondary w-full mt-2 text-center justify-center flex items-center gap-2 text-error hover:bg-error hover:text-white hover:border-error"
+        className={`${buttonStyles.base} ${buttonStyles.secondary} w-full mt-2 text-center justify-center flex items-center gap-2 text-error hover:bg-error hover:text-white hover:border-error`}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -80,7 +81,7 @@ export function DeleteBookButton({ book }: DeleteBookButtonProps) {
                 type="button"
                 onClick={handleClose}
                 disabled={isDeleting}
-                className="btn btn-secondary"
+                className={`${buttonStyles.base} ${buttonStyles.secondary}`}
               >
                 Cancel
               </button>
@@ -88,7 +89,7 @@ export function DeleteBookButton({ book }: DeleteBookButtonProps) {
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="btn bg-error text-white hover:bg-error/90 border-error"
+                className={`${buttonStyles.base} bg-error text-white hover:bg-error/90 border-error`}
               >
                 {isDeleting ? (
                   <>

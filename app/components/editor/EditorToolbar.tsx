@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "react-router";
+import { buttonStyles } from "../../lib/styles";
 
 interface EditorToolbarProps {
   bookTitle: string;
@@ -71,7 +72,7 @@ export function EditorToolbar({
       <button
         onClick={onSave}
         disabled={isSaving || !isDirty}
-        className="btn btn-primary text-sm px-4 py-1.5 flex items-center gap-2 disabled:opacity-50"
+        className={`${buttonStyles.base} ${buttonStyles.primary} text-sm px-4 py-1.5 flex items-center gap-2`}
       >
         {isSaving ? (
           <>

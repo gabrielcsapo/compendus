@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { refreshMetadata, searchMetadata, applyMetadata } from "../actions/books";
+import { buttonStyles, badgeStyles, inputStyles } from "../lib/styles";
 import type { MetadataSearchResult } from "../lib/metadata";
 import type { BookFormat } from "../lib/types";
 
@@ -83,11 +84,11 @@ export function MetadataRefreshButton({
         <button
           onClick={handleAutoRefresh}
           disabled={loading}
-          className="btn btn-secondary text-sm"
+          className={`${buttonStyles.base} ${buttonStyles.secondary} text-sm`}
         >
           {loading ? "Loading..." : "Auto-Refresh Metadata"}
         </button>
-        <button onClick={() => setShowSearch(!showSearch)} className="btn btn-secondary text-sm">
+        <button onClick={() => setShowSearch(!showSearch)} className={`${buttonStyles.base} ${buttonStyles.secondary} text-sm`}>
           {showSearch ? "Hide Search" : "Search Metadata"}
         </button>
       </div>
@@ -102,10 +103,10 @@ export function MetadataRefreshButton({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by title..."
-              className="input flex-1"
+              className={`${inputStyles} flex-1`}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
-            <button onClick={handleSearch} disabled={loading} className="btn">
+            <button onClick={handleSearch} disabled={loading} className={buttonStyles.base}>
               Search
             </button>
           </div>
@@ -132,8 +133,8 @@ export function MetadataRefreshButton({
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded ${
                             result.source === "googlebooks"
-                              ? "badge-primary"
-                              : "badge-success"
+                              ? badgeStyles.primary
+                              : badgeStyles.success
                           }`}
                         >
                           {result.source === "googlebooks" ? "Google" : "OpenLib"}

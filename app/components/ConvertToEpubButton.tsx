@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router";
+import { buttonStyles } from "../lib/styles";
 
 interface ConvertToEpubButtonProps {
   bookId: string;
@@ -112,7 +113,7 @@ export function ConvertToEpubButton({ bookId, hasEpub }: ConvertToEpubButtonProp
         </div>
         <Link
           to={`/book/${bookId}/read?format=epub`}
-          className="btn btn-secondary w-full text-center justify-center gap-2"
+          className={`${buttonStyles.base} ${buttonStyles.secondary} w-full text-center justify-center gap-2`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path

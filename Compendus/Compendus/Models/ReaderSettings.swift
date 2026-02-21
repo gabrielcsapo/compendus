@@ -80,6 +80,32 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+// MARK: - Reader Layout
+
+enum ReaderLayout: String, CaseIterable, Identifiable, Hashable {
+    case auto = "auto"
+    case single = "single"
+    case twoPage = "twoPage"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto: return "Auto"
+        case .single: return "Single Page"
+        case .twoPage: return "Two Pages"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .auto: return "rectangle.split.2x1"
+        case .single: return "rectangle"
+        case .twoPage: return "rectangle.split.2x1.fill"
+        }
+    }
+}
+
 // MARK: - Reader Font
 
 enum ReaderFont: String, CaseIterable, Identifiable, Hashable {
@@ -188,6 +214,13 @@ class ReaderSettings {
         }
     }
 
+    /// Page layout (auto, single, twoPage)
+    var layout: ReaderLayout {
+        didSet {
+            UserDefaults.standard.set(layout.rawValue, forKey: "readerLayout")
+        }
+    }
+
     init() {
         self.theme = ReaderTheme(rawValue: UserDefaults.standard.string(forKey: "readerTheme") ?? "light") ?? .light
         self.fontFamily = ReaderFont(rawValue: UserDefaults.standard.string(forKey: "readerFontFamily") ?? "serif") ?? .serif
@@ -204,6 +237,17 @@ class ReaderSettings {
         }
 
         self.lineHeight = UserDefaults.standard.object(forKey: "readerLineHeight") as? Double ?? 1.4
+        self.layout = ReaderLayout(rawValue: UserDefaults.standard.string(forKey: "readerLayout") ?? "auto") ?? .auto
+    }
+
+    /// Resolve the effective layout for a given viewport width.
+    func resolvedLayout(for viewportWidth: CGFloat) -> ReaderLayout {
+        switch layout {
+        case .auto:
+            return viewportWidth >= 700 ? .twoPage : .single
+        case .single, .twoPage:
+            return layout
+        }
     }
 
     // MARK: - Native Font Properties
