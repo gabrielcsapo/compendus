@@ -42,6 +42,7 @@ interface GetBooksOptions {
   collectionId?: string;
   tagId?: string;
   search?: string;
+  series?: string;
 }
 
 export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
@@ -55,6 +56,7 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
     collectionId,
     tagId,
     search,
+    series,
   } = options;
 
   let query = db.select().from(books).$dynamic();
@@ -82,6 +84,10 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
 
   if (search) {
     conditions.push(like(books.title, `%${search}%`));
+  }
+
+  if (series) {
+    conditions.push(eq(books.series, series));
   }
 
   if (collectionId) {
@@ -285,7 +291,7 @@ export async function getRecentBooks(limit: number = 10): Promise<Book[]> {
     .limit(limit);
 }
 
-export async function getBooksCount(type?: BookType, format?: string | string[]): Promise<number> {
+export async function getBooksCount(type?: BookType, format?: string | string[], series?: string): Promise<number> {
   const conditions = [];
 
   if (type) {
@@ -301,6 +307,10 @@ export async function getBooksCount(type?: BookType, format?: string | string[])
   if (format) {
     const fmts = Array.isArray(format) ? format : [format];
     conditions.push(inArray(books.format, fmts));
+  }
+
+  if (series) {
+    conditions.push(eq(books.series, series));
   }
 
   if (conditions.length > 0) {

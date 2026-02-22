@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 
 import { searchRoutes } from "./routes/search";
 import { booksRoutes } from "./routes/books";
+import { seriesRoutes } from "./routes/series";
 import { uploadRoutes } from "./routes/upload";
 import { coverRoutes } from "./routes/cover";
 import { wishlistRoutes } from "./routes/wishlist";
@@ -28,6 +29,7 @@ app.use(
 // API routes
 app.route("/", searchRoutes);
 app.route("/", booksRoutes);
+app.route("/", seriesRoutes);
 app.route("/", coverRoutes);
 app.route("/", uploadRoutes);
 app.route("/", jobsRoutes);

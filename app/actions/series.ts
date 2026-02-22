@@ -186,3 +186,77 @@ export async function findMissingSeriesBooks(seriesName: string): Promise<Metada
     return true;
   });
 }
+
+export interface SeriesWithCovers {
+  name: string;
+  bookCount: number;
+  coverBooks: Array<{
+    id: string;
+    coverPath: string | null;
+    coverColor: string | null;
+    updatedAt: Date | null;
+  }>;
+}
+
+/**
+ * Get all series with cover data for fan-out display
+ */
+export async function getSeriesWithCovers(): Promise<SeriesWithCovers[]> {
+  // Get all books that belong to a series
+  const seriesBooks = await db
+    .select({
+      id: books.id,
+      series: books.series,
+      coverPath: books.coverPath,
+      coverColor: books.coverColor,
+      updatedAt: books.updatedAt,
+    })
+    .from(books)
+    .where(isNotNull(books.series))
+    .orderBy(books.series);
+
+  // Group by series
+  const seriesMap = new Map<string, SeriesWithCovers>();
+
+  for (const book of seriesBooks) {
+    if (!book.series) continue;
+
+    const existing = seriesMap.get(book.series);
+    if (existing) {
+      existing.bookCount++;
+      // Keep up to 3 cover books (prefer ones with covers)
+      if (existing.coverBooks.length < 3) {
+        existing.coverBooks.push({
+          id: book.id,
+          coverPath: book.coverPath,
+          coverColor: book.coverColor,
+          updatedAt: book.updatedAt,
+        });
+      } else if (book.coverPath && existing.coverBooks.some(b => !b.coverPath)) {
+        // Replace a book without cover with one that has a cover
+        const noCoverIndex = existing.coverBooks.findIndex(b => !b.coverPath);
+        if (noCoverIndex !== -1) {
+          existing.coverBooks[noCoverIndex] = {
+            id: book.id,
+            coverPath: book.coverPath,
+            coverColor: book.coverColor,
+            updatedAt: book.updatedAt,
+          };
+        }
+      }
+    } else {
+      seriesMap.set(book.series, {
+        name: book.series,
+        bookCount: 1,
+        coverBooks: [{
+          id: book.id,
+          coverPath: book.coverPath,
+          coverColor: book.coverColor,
+          updatedAt: book.updatedAt,
+        }],
+      });
+    }
+  }
+
+  return Array.from(seriesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}

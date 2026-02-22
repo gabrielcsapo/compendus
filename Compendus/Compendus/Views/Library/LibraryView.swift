@@ -8,6 +8,18 @@
 import SwiftUI
 import SwiftData
 
+enum LibraryViewMode: String, CaseIterable {
+    case books = "Books"
+    case series = "Series"
+
+    var icon: String {
+        switch self {
+        case .books: return "book.closed"
+        case .series: return "books.vertical"
+        }
+    }
+}
+
 enum BookFilter: String, CaseIterable {
     case all = "All"
     case ebooks = "Ebooks"
@@ -96,6 +108,10 @@ struct LibraryView: View {
     @State private var selectedSort: BookSort = .recent
     @State private var bookToRead: DownloadedBook?
     @State private var downloadingBooks: Set<String> = []
+    @State private var viewMode: LibraryViewMode = .books
+    @State private var seriesItems: [SeriesItem] = []
+    @State private var selectedSeriesName: String? = nil
+    @State private var isLoadingSeries = false
 
     private let limit = 50
     private let columns = [
@@ -104,154 +120,273 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if books.isEmpty && isLoading {
-                    SkeletonBookGrid(count: 8)
-                } else if books.isEmpty && errorMessage != nil {
-                    ErrorStateView(message: errorMessage ?? "Unknown error") {
+            mainContent
+                .navigationTitle(navigationTitle)
+                .toolbar { libraryToolbar }
+                .searchable(text: $searchText, prompt: viewMode == .series && selectedSeriesName == nil ? "Search series..." : "Search books...")
+                .onChange(of: searchText) { _, newValue in
+                    Task {
+                        if viewMode == .series && selectedSeriesName == nil {
+                            // Search is handled locally for series
+                        } else if newValue.isEmpty {
+                            await loadBooks()
+                        } else {
+                            await searchBooks(query: newValue)
+                        }
+                    }
+                }
+                .onChange(of: selectedFilter) { _, _ in
+                    if viewMode == .books || selectedSeriesName != nil {
                         Task { await loadBooks() }
                     }
-                } else if books.isEmpty {
-                    LibraryEmptyStateView(
-                        state: emptyState,
-                        refreshAction: selectedFilter == .all ? { Task { await loadBooks() } } : nil
-                    )
-                } else {
-                    ScrollView {
-                        // Continue Reading section (only show when not searching or filtering)
-                        if !recentlyReadBooks.isEmpty && searchText.isEmpty && selectedFilter == .all {
-                            ContinueReadingSection(books: recentlyReadBooks) { book in
-                                bookToRead = book
-                            }
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-                        }
-
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(Array(books.enumerated()), id: \.element.id) { index, book in
-                                BookGridItem(book: book)
-                                    .onTapGesture {
-                                        selectedBook = book
-                                    }
-                                    .onAppear {
-                                        // Load more when nearing the end (within last 10 items)
-                                        if index >= books.count - 10 && hasMore && !isLoading {
-                                            Task { await loadMoreBooks() }
-                                        }
-                                    }
-                                    .contextMenu {
-                                        if let downloaded = downloadedBook(for: book.id) {
-                                            Button {
-                                                bookToRead = downloaded
-                                            } label: {
-                                                Label("Read", systemImage: "book.fill")
-                                            }
-                                        } else if downloadingBooks.contains(book.id) {
-                                            Button(role: .destructive) {
-                                                downloadManager.cancelDownload(bookId: book.id)
-                                                downloadingBooks.remove(book.id)
-                                            } label: {
-                                                Label("Cancel Download", systemImage: "xmark.circle")
-                                            }
-                                        } else {
-                                            Button {
-                                                downloadBook(book)
-                                            } label: {
-                                                Label("Download", systemImage: "arrow.down.circle")
-                                            }
-                                        }
-
-                                        Button {
-                                            selectedBook = book
-                                        } label: {
-                                            Label("View Details", systemImage: "info.circle")
-                                        }
-                                    }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 20)
-
-                        if isLoading && !books.isEmpty {
-                            ProgressView()
-                                .padding()
+                }
+                .onChange(of: selectedSort) { _, _ in
+                    if viewMode == .books || selectedSeriesName != nil {
+                        Task { await loadBooks() }
+                    }
+                }
+                .onChange(of: viewMode) { _, newValue in
+                    Task {
+                        if newValue == .series && selectedSeriesName == nil {
+                            await loadSeries()
+                        } else if newValue == .books && selectedSeriesName == nil {
+                            await loadBooks()
                         }
                     }
                 }
-            }
-            .navigationTitle(totalCount > 0 ? "Library (\(totalCount))" : "Library")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(BookFilter.allCases, id: \.self) { filter in
-                            Button {
-                                selectedFilter = filter
-                            } label: {
-                                Label(filter.rawValue, systemImage: filter.icon)
-                                if selectedFilter == filter {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    } label: {
-                        Label("Filter", systemImage: selectedFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(BookSort.allCases, id: \.self) { sort in
-                            Button {
-                                selectedSort = sort
-                            } label: {
-                                Label(sort.rawValue, systemImage: sort.icon)
-                                if selectedSort == sort {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    } label: {
-                        Label("Sort", systemImage: "arrow.up.arrow.down")
-                    }
-                }
-            }
-            .searchable(text: $searchText, prompt: "Search books...")
-            .onChange(of: searchText) { _, newValue in
-                Task {
-                    if newValue.isEmpty {
-                        await loadBooks()
+                .refreshable {
+                    if viewMode == .series && selectedSeriesName == nil {
+                        await loadSeries()
                     } else {
-                        await searchBooks(query: newValue)
+                        await loadBooks()
                     }
                 }
+                .task {
+                    if books.isEmpty && viewMode == .books {
+                        await loadBooks()
+                    }
+                }
+                .sheet(item: $selectedBook) { book in
+                    BookDetailView(book: book) { downloaded in
+                        bookToRead = downloaded
+                    }
+                }
+                .fullScreenCover(item: $bookToRead) { book in
+                    ReaderContainerView(book: book)
+                        .environment(readerSettings)
+                }
+        }
+    }
+
+    // MARK: - Main Content
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewMode == .series && selectedSeriesName == nil {
+            seriesGridContent
+        } else if books.isEmpty && isLoading {
+            SkeletonBookGrid(count: 8)
+        } else if books.isEmpty && errorMessage != nil {
+            ErrorStateView(message: errorMessage ?? "Unknown error") {
+                Task { await loadBooks() }
             }
-            .onChange(of: selectedFilter) { _, _ in
-                Task {
-                    await loadBooks()
+        } else if books.isEmpty {
+            LibraryEmptyStateView(
+                state: emptyState,
+                refreshAction: selectedFilter == .all ? { Task { await loadBooks() } } : nil
+            )
+        } else {
+            booksScrollContent
+        }
+    }
+
+    // MARK: - Books Scroll Content
+
+    private var booksScrollContent: some View {
+        ScrollView {
+            if selectedSeriesName != nil {
+                Button {
+                    selectedSeriesName = nil
+                    viewMode = .series
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.caption)
+                        Text("All Series")
+                            .font(.subheadline)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !recentlyReadBooks.isEmpty && searchText.isEmpty && selectedFilter == .all && selectedSeriesName == nil {
+                ContinueReadingSection(books: recentlyReadBooks) { book in
+                    bookToRead = book
+                }
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+            }
+
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(books.enumerated()), id: \.element.id) { index, book in
+                    bookGridCell(book: book, index: index)
                 }
             }
-            .onChange(of: selectedSort) { _, _ in
-                Task {
-                    await loadBooks()
-                }
-            }
-            .refreshable {
-                await loadBooks()
-            }
-            .task {
-                if books.isEmpty {
-                    await loadBooks()
-                }
-            }
-            .sheet(item: $selectedBook) { book in
-                BookDetailView(book: book) { downloaded in
-                    bookToRead = downloaded
-                }
-            }
-            .fullScreenCover(item: $bookToRead) { book in
-                ReaderContainerView(book: book)
-                    .environment(readerSettings)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
+
+            if isLoading && !books.isEmpty {
+                ProgressView()
+                    .padding()
             }
         }
+    }
+
+    private func bookGridCell(book: Book, index: Int) -> some View {
+        BookGridItem(book: book)
+            .onTapGesture {
+                selectedBook = book
+            }
+            .onAppear {
+                if index >= books.count - 10 && hasMore && !isLoading {
+                    Task { await loadMoreBooks() }
+                }
+            }
+            .contextMenu {
+                if let downloaded = downloadedBook(for: book.id) {
+                    Button {
+                        bookToRead = downloaded
+                    } label: {
+                        Label("Read", systemImage: "book.fill")
+                    }
+                } else if downloadingBooks.contains(book.id) {
+                    Button(role: .destructive) {
+                        downloadManager.cancelDownload(bookId: book.id)
+                        downloadingBooks.remove(book.id)
+                    } label: {
+                        Label("Cancel Download", systemImage: "xmark.circle")
+                    }
+                } else {
+                    Button {
+                        downloadBook(book)
+                    } label: {
+                        Label("Download", systemImage: "arrow.down.circle")
+                    }
+                }
+
+                Button {
+                    selectedBook = book
+                } label: {
+                    Label("View Details", systemImage: "info.circle")
+                }
+            }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var libraryToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Picker("View", selection: $viewMode) {
+                ForEach(LibraryViewMode.allCases, id: \.self) { mode in
+                    Label(mode.rawValue, systemImage: mode.icon)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 160)
+        }
+        if viewMode == .books || selectedSeriesName != nil {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    ForEach(BookFilter.allCases, id: \.self) { filter in
+                        Button {
+                            selectedFilter = filter
+                        } label: {
+                            Label(filter.rawValue, systemImage: filter.icon)
+                            if selectedFilter == filter {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Filter", systemImage: selectedFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    ForEach(BookSort.allCases, id: \.self) { sort in
+                        Button {
+                            selectedSort = sort
+                        } label: {
+                            Label(sort.rawValue, systemImage: sort.icon)
+                            if selectedSort == sort {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+            }
+        }
+    }
+
+    // MARK: - Navigation Title
+
+    private var navigationTitle: String {
+        if let seriesName = selectedSeriesName {
+            return seriesName
+        }
+        if viewMode == .series {
+            return seriesItems.isEmpty ? "Series" : "Series (\(seriesItems.count))"
+        }
+        return totalCount > 0 ? "Library (\(totalCount))" : "Library"
+    }
+
+    // MARK: - Series Grid
+
+    @ViewBuilder
+    private var seriesGridContent: some View {
+        if isLoadingSeries && seriesItems.isEmpty {
+            SkeletonBookGrid(count: 6)
+        } else if filteredSeriesItems.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+                Text(searchText.isEmpty ? "No series found" : "No matching series")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Text(searchText.isEmpty ? "Books with series metadata will appear here." : "Try a different search term.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.top, 80)
+        } else {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(filteredSeriesItems) { series in
+                        SeriesGridItem(series: series)
+                            .onTapGesture {
+                                selectedSeriesName = series.name
+                                viewMode = .books
+                                Task { await loadBooks() }
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
+    private var filteredSeriesItems: [SeriesItem] {
+        if searchText.isEmpty {
+            return seriesItems
+        }
+        return seriesItems.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     private func loadBooks() async {
@@ -260,7 +395,7 @@ struct LibraryView: View {
         offset = 0
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
+            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder, series: selectedSeriesName)
             books = response.books
             totalCount = response.totalCount ?? response.books.count
             hasMore = response.books.count >= limit
@@ -286,7 +421,7 @@ struct LibraryView: View {
         isLoading = true
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
+            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder, series: selectedSeriesName)
             let newBooks = response.books
             books.append(contentsOf: newBooks)
             hasMore = newBooks.count >= limit
@@ -296,6 +431,20 @@ struct LibraryView: View {
         }
 
         isLoading = false
+    }
+
+    private func loadSeries() async {
+        isLoadingSeries = true
+
+        do {
+            let response = try await apiService.fetchSeries()
+            seriesItems = response.series
+        } catch {
+            print("[LibraryView] Load series error: \(error)")
+            seriesItems = []
+        }
+
+        isLoadingSeries = false
     }
 
     private func searchBooks(query: String) async {

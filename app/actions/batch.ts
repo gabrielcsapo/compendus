@@ -9,6 +9,7 @@ import { addTagToBookByName, removeTagFromBook } from "../actions/tags";
 interface BatchBookUpdate {
   id: string;
   data?: Partial<{
+    title: string;
     series: string;
     seriesNumber: string;
     authors: string;

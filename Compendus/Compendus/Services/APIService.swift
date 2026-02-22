@@ -43,8 +43,8 @@ class APIService {
 
     // MARK: - Books
 
-    /// Fetch all books from the server with optional type filter and sorting
-    func fetchBooks(limit: Int = 50, offset: Int = 0, type: String? = nil, orderBy: String? = nil, order: String? = nil) async throws -> BooksResponse {
+    /// Fetch all books from the server with optional type filter, sorting, and series filter
+    func fetchBooks(limit: Int = 50, offset: Int = 0, type: String? = nil, orderBy: String? = nil, order: String? = nil, series: String? = nil) async throws -> BooksResponse {
         guard config.isConfigured else {
             throw APIError.serverNotConfigured
         }
@@ -59,8 +59,24 @@ class APIService {
         if let order = order {
             urlString += "&order=\(order)"
         }
+        if let series = series {
+            urlString += "&series=\(series.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? series)"
+        }
 
         guard let url = config.apiURL(urlString) else {
+            throw APIError.invalidURL
+        }
+
+        return try await fetch(url)
+    }
+
+    /// Fetch all series with cover data for fan-out display
+    func fetchSeries() async throws -> SeriesResponse {
+        guard config.isConfigured else {
+            throw APIError.serverNotConfigured
+        }
+
+        guard let url = config.apiURL("/api/series") else {
             throw APIError.invalidURL
         }
 

@@ -57,6 +57,7 @@ const FIELD_FILTER_OPTIONS: { value: FieldFilter; label: string; group: "missing
 ];
 
 interface BookEdits {
+  title?: string;
   authors?: string;
   series?: string;
   seriesNumber?: string;
@@ -132,6 +133,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   const [bulkLanguage, setBulkLanguage] = useState("");
   const [bulkCategory, setBulkCategory] = useState("");
 
+  // Column filter state
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
   // Tag input state per book (search text + dropdown visibility)
   const [tagInputState, setTagInputState] = useState<Record<string, string>>({});
   const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
@@ -168,7 +172,7 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         const q = searchQuery.toLowerCase();
         const bookEdits = edits.get(book.id);
         const fields = [
-          book.title,
+          bookEdits?.title ?? book.title,
           book.authors,
           book.description,
           bookEdits?.series ?? book.series,
@@ -186,6 +190,37 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         fields.push(tagNames);
         const haystack = fields.filter(Boolean).join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
+      }
+      // Apply column filters
+      const bookEditsForFilter = edits.get(book.id);
+      for (const [col, filterVal] of Object.entries(columnFilters)) {
+        if (!filterVal) continue;
+        const q = filterVal.toLowerCase();
+        let cellValue = "";
+        switch (col) {
+          case "title":
+            cellValue = (bookEditsForFilter?.title ?? book.title ?? "").toLowerCase();
+            break;
+          case "authors":
+            cellValue = (bookEditsForFilter?.authors ?? parseAuthors(book.authors)).toLowerCase();
+            break;
+          case "series":
+            cellValue = (bookEditsForFilter?.series ?? book.series ?? "").toLowerCase();
+            break;
+          case "seriesNumber":
+            cellValue = (bookEditsForFilter?.seriesNumber ?? book.seriesNumber ?? "").toLowerCase();
+            break;
+          case "tags":
+            cellValue = (bookTagsState[book.id] || []).map((t) => t.name).join(" ").toLowerCase();
+            break;
+          case "category":
+            cellValue = (bookEditsForFilter?.bookTypeOverride ?? book.bookTypeOverride ?? "").toLowerCase();
+            break;
+          case "language":
+            cellValue = (bookEditsForFilter?.language ?? book.language ?? "").toLowerCase();
+            break;
+        }
+        if (!cellValue.includes(q)) return false;
       }
       // Apply type filter
       if (typeFilter !== "all") {
@@ -254,7 +289,7 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
     });
 
     return filtered;
-  }, [allBooks, searchQuery, typeFilter, selectedIds, edits, bookTagsState, fieldFilters, sortBy]);
+  }, [allBooks, searchQuery, typeFilter, selectedIds, edits, bookTagsState, fieldFilters, sortBy, columnFilters]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredBooks.length,
@@ -499,6 +534,7 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       const updates: Array<{
         id: string;
         data?: Partial<{
+          title: string;
           series: string;
           seriesNumber: string;
           authors: string;
@@ -857,6 +893,74 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           <div className="px-2 py-2 w-28 shrink-0">Category</div>
           <div className="px-2 py-2 w-28 shrink-0">Language</div>
         </div>
+        {/* Column Filters Row */}
+        <div className="flex items-center border-t border-border/50">
+          <div className="px-3 py-1 w-10 shrink-0" />
+          <div className="px-2 py-1 w-12 shrink-0" />
+          <div className="px-2 py-1 min-w-[200px] flex-[2]">
+            <input
+              type="text"
+              value={columnFilters.title || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="Filter title..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 min-w-[160px] flex-[1.5]">
+            <input
+              type="text"
+              value={columnFilters.authors || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, authors: e.target.value }))}
+              placeholder="Filter authors..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 min-w-[140px] flex-1">
+            <input
+              type="text"
+              value={columnFilters.series || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, series: e.target.value }))}
+              placeholder="Filter series..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 w-20 shrink-0">
+            <input
+              type="text"
+              value={columnFilters.seriesNumber || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, seriesNumber: e.target.value }))}
+              placeholder="#"
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 min-w-[180px] flex-[1.5]">
+            <input
+              type="text"
+              value={columnFilters.tags || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, tags: e.target.value }))}
+              placeholder="Filter tags..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 w-28 shrink-0">
+            <input
+              type="text"
+              value={columnFilters.category || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, category: e.target.value }))}
+              placeholder="Filter..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+          <div className="px-2 py-1 w-28 shrink-0">
+            <input
+              type="text"
+              value={columnFilters.language || ""}
+              onChange={(e) => setColumnFilters((prev) => ({ ...prev, language: e.target.value }))}
+              placeholder="Filter..."
+              className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Bulk Actions Bar — pinned below column headers */}
@@ -1084,17 +1188,19 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Title */}
-                <div className="px-2 min-w-[200px] flex-[2] truncate">
-                  <Link
-                    to={`/book/${book.id}`}
-                    className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block"
-                  >
-                    {book.title}
-                  </Link>
-                  {book.description && (
-                    <span className="text-[10px] text-foreground-muted line-clamp-1 block">{book.description}</span>
-                  )}
-                  <span className="text-[10px] text-foreground-muted uppercase">{book.format}</span>
+                <div className={`px-2 min-w-[200px] flex-[2] ${isFieldModified(book.id, "title") ? modifiedCellClass : ""}`}>
+                  <input
+                    type="text"
+                    value={getEditValue(book.id, "title") ?? book.title}
+                    onChange={(e) => setEditValue(book.id, "title", e.target.value)}
+                    className={cellInputClass}
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-foreground-muted uppercase">{book.format}</span>
+                    {book.description && (
+                      <span className="text-[10px] text-foreground-muted line-clamp-1">{book.description}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Authors */}
