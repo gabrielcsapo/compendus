@@ -3,6 +3,7 @@
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -15,25 +16,30 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" ambiguous="YES" text="" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="obG-Y5-kRd">
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="obG-Y5-kRd">
                                 <rect key="frame" x="196.66666666666666" y="832" width="0.0" height="0.0"/>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="O3X-V2-50R">
-                                <rect key="frame" x="96.666666666666686" y="362" width="200" height="200"/>
+                            <imageView autoresizesSubviews="NO" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="O3X-V2-50R">
+                                <rect key="frame" x="96.666666666666686" y="326" width="200" height="200"/>
+                                <color key="backgroundColor" name="LaunchBackgroundColor"/>
+                                <color key="tintColor" name="LaunchBackgroundColor"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="200" id="fw0-Wd-9Xp"/>
                                     <constraint firstAttribute="height" constant="200" id="hgt-Wd-8Yq"/>
                                 </constraints>
+                                <preferredSymbolConfiguration key="preferredSymbolConfiguration" scale="default"/>
                             </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" red="0.6831054688" green="0.8447265625" blue="0.9829101562" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+                        <color key="backgroundColor" name="LaunchBackgroundColor"/>
                         <constraints>
+                            <constraint firstItem="O3X-V2-50R" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="ZIC-3D-ntw"/>
+                            <constraint firstAttribute="bottomMargin" secondItem="obG-Y5-kRd" secondAttribute="bottom" constant="-48" id="bSl-PJ-3SF"/>
                             <constraint firstItem="O3X-V2-50R" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="g4r-vu-hoz"/>
-                            <constraint firstItem="O3X-V2-50R" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="xrw-yN-Q4y"/>
+                            <constraint firstItem="O3X-V2-50R" firstAttribute="centerX" secondItem="obG-Y5-kRd" secondAttribute="centerX" id="oV6-s9-djP"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -44,5 +50,8 @@
     </scenes>
     <resources>
         <image name="LaunchImage" width="1024" height="1024"/>
+        <namedColor name="LaunchBackgroundColor">
+            <color red="0.68300002813339233" green="0.84500002861022949" blue="0.98299998044967651" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+        </namedColor>
     </resources>
 </document>

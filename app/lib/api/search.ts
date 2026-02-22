@@ -263,10 +263,11 @@ export async function apiListBooks(
     type?: "ebook" | "audiobook" | "comic";
     orderBy?: "title" | "createdAt";
     order?: "asc" | "desc";
+    series?: string;
   },
   baseUrl: string,
 ): Promise<ApiSearchResponse | ApiErrorResponse> {
-  const { limit = 20, offset = 0, type, orderBy = "createdAt", order = "desc" } = options;
+  const { limit = 20, offset = 0, type, orderBy = "createdAt", order = "desc", series } = options;
 
   if (limit > 100) {
     return {
@@ -292,6 +293,12 @@ export async function apiListBooks(
         query = query.where(inArray(books.format, formats));
         countQuery = countQuery.where(inArray(books.format, formats));
       }
+    }
+
+    // Filter by series if specified
+    if (series) {
+      query = query.where(eq(books.series, series));
+      countQuery = countQuery.where(eq(books.series, series));
     }
 
     // Apply ordering

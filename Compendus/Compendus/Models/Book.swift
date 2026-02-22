@@ -225,3 +225,25 @@ struct BookResponse: Codable {
     let success: Bool
     let book: Book
 }
+
+// MARK: - Series
+
+/// A book's cover info within a series response
+struct SeriesCoverBook: Codable, Identifiable, Hashable {
+    let id: String
+    let coverUrl: String?
+}
+
+/// A single series with book count and cover previews
+struct SeriesItem: Codable, Identifiable, Hashable {
+    var id: String { name }
+    let name: String
+    let bookCount: Int
+    let coverBooks: [SeriesCoverBook]
+}
+
+/// API response for /api/series
+struct SeriesResponse: Codable {
+    let success: Bool
+    let series: [SeriesItem]
+}
