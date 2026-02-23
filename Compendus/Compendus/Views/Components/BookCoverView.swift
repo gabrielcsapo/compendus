@@ -10,56 +10,16 @@ import SwiftUI
 struct BookCoverView: View {
     let bookId: String
     let format: String
-
-    @Environment(ServerConfig.self) private var serverConfig
+    var hasCover: Bool = true
 
     /// Standard book cover aspect ratio (2:3)
     private let bookAspectRatio: CGFloat = 2/3
 
     var body: some View {
-        AsyncImage(url: serverConfig.coverURL(for: bookId)) { phase in
-            switch phase {
-            case .empty:
-                placeholder
-                    .overlay {
-                        ShimmerRectangle(cornerRadius: 8)
-                    }
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            case .failure:
-                placeholder
-                    .overlay {
-                        Image(systemName: iconForFormat)
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                    }
-            @unknown default:
-                placeholder
-            }
-        }
-        .aspectRatio(bookAspectRatio, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-    }
-
-    private var placeholder: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color.gray.opacity(0.2))
-    }
-
-    private var iconForFormat: String {
-        switch format.lowercased() {
-        case "m4b", "mp3", "m4a":
-            return "headphones"
-        case "cbr", "cbz":
-            return "book.pages"
-        case "pdf":
-            return "doc.richtext"
-        default:
-            return "book.closed"
-        }
+        CachedCoverImage(bookId: bookId, hasCover: hasCover, format: format)
+            .aspectRatio(bookAspectRatio, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
     }
 }
 
@@ -116,5 +76,6 @@ struct DownloadedBookCoverView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     .environment(ServerConfig())
+    .environment(ImageCache())
     .padding()
 }

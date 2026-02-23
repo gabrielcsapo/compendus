@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router";
 import type { TypeFilter } from "./TypeTabs";
 
 interface FormatDropdownProps {
@@ -16,6 +17,7 @@ export function FormatDropdown({
   currentType,
   currentSort,
 }: FormatDropdownProps) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -53,11 +55,11 @@ export function FormatDropdown({
     const next = selectedFormats.includes(fmt)
       ? selectedFormats.filter((f) => f !== fmt)
       : [...selectedFormats, fmt];
-    window.location.href = buildUrl(next);
+    navigate(buildUrl(next));
   }
 
   function clearAll() {
-    window.location.href = buildUrl([]);
+    navigate(buildUrl([]));
   }
 
   const activeCount = selectedFormats.length;

@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
-import { existsSync } from "fs";
 import { eq } from "drizzle-orm";
 import { extractEpubResource } from "../../app/lib/processing/epub";
 import { getBookFilePath } from "../../app/lib/storage";
 import { renderPdfPage } from "../../app/lib/reader/pdf-renderer";
 import { db, books } from "../../app/lib/db";
+import { getFileStat, serveCachedResource, generateETag } from "../lib/file-serving";
 
 const app = new Hono();
 
@@ -28,18 +28,22 @@ app.get("/api/reader/:bookId/pdf-page/:pageNum", async (c) => {
 
     // Read PDF file
     const pdfPath = resolve("data", "books", `${bookId}.pdf`);
-    if (!existsSync(pdfPath)) {
+    const pdfStat = await getFileStat(pdfPath);
+    if (!pdfStat) {
       return new Response("PDF file not found", { status: 404 });
     }
 
     const buffer = await readFile(pdfPath);
     const pngBuffer = await renderPdfPage(buffer, bookId, pageNumber, scale);
 
+    const etag = generateETag(new Date(), pngBuffer.length);
     return new Response(new Uint8Array(pngBuffer), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
+        "Content-Length": String(pngBuffer.length),
         "Cache-Control": "public, max-age=31536000, immutable",
+        ETag: etag,
       },
     });
   } catch (error) {
@@ -68,28 +72,27 @@ app.get("/api/reader/:bookId/resource/*", async (c) => {
     if (book.format === "epub") {
       filePath = getBookFilePath(bookId, "epub");
     } else if (book.convertedEpubPath) {
-      // Non-EPUB book (e.g. PDF) with a converted EPUB version
       filePath = resolve("data", book.convertedEpubPath);
     } else {
       return new Response("Not found", { status: 404 });
     }
 
-    // Read EPUB file
-    const buffer = await readFile(filePath);
-
-    // Extract resource from EPUB
-    const resource = await extractEpubResource(buffer, resourcePath);
-
-    if (!resource) {
-      return new Response("Resource not found", { status: 404 });
+    const epubStat = await getFileStat(filePath);
+    if (!epubStat) {
+      return new Response("Not found", { status: 404 });
     }
 
-    return new Response(new Uint8Array(resource.data), {
-      headers: {
-        "Content-Type": resource.mimeType,
-        "Cache-Control": "public, max-age=86400",
+    // Use resource caching — extract once from ZIP, serve from disk thereafter
+    return serveCachedResource(
+      c,
+      `epub-reader-${bookId}`,
+      resourcePath,
+      async () => {
+        const buffer = await readFile(filePath);
+        return await extractEpubResource(buffer, resourcePath);
       },
-    });
+      "public, max-age=86400",
+    );
   } catch (error) {
     console.error("EPUB resource error:", error);
     return new Response("Error loading resource", { status: 500 });

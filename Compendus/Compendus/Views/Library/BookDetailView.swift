@@ -11,8 +11,9 @@ import SwiftData
 struct BookDetailView: View {
     let book: Book
     var onRead: ((DownloadedBook) -> Void)?
+    var onSeriesTap: ((String) -> Void)?
+    var onBookTap: ((Book) -> Void)?
 
-    @Environment(ServerConfig.self) private var serverConfig
     @Environment(APIService.self) private var apiService
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(StorageManager.self) private var storageManager
@@ -35,6 +36,7 @@ struct BookDetailView: View {
     @State private var conversionJobId: String?
     @State private var pollingTimer: Timer?
     @State private var readAsEpub = false
+    @State private var relatedBooks: [Book] = []
 
     enum ConversionState {
         case idle, starting, converting, completed, downloading, error(String)
@@ -78,6 +80,10 @@ struct BookDetailView: View {
                             .padding(.top, 24)
                             .padding(.horizontal, 20)
                     }
+
+                    relatedBooksContent
+                        .padding(.top, 24)
+                        .padding(.horizontal, 20)
                 }
                 .padding(.bottom, 40)
             }
@@ -93,6 +99,7 @@ struct BookDetailView: View {
             }
             .task {
                 checkIfDownloaded()
+                await loadRelatedBooks()
             }
             .alert("Download Failed", isPresented: $showingError) {
                 Button("OK", role: .cancel) { }
@@ -119,31 +126,11 @@ struct BookDetailView: View {
     @ViewBuilder
     private var heroCoverSection: some View {
         VStack {
-            if book.coverUrl != nil {
-                AsyncImage(url: serverConfig.coverURL(for: book.id)) { phase in
-                    switch phase {
-                    case .empty:
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.gray.opacity(0.2))
-                            .aspectRatio(2/3, contentMode: .fit)
-                            .frame(width: 200)
-                            .overlay { ProgressView() }
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                    case .failure:
-                        coverPlaceholderHero
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-            } else {
-                coverPlaceholderHero
-            }
+            CachedCoverImage(bookId: book.id, hasCover: book.coverUrl != nil, format: book.format)
+                .aspectRatio(2/3, contentMode: .fit)
+                .frame(width: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
@@ -156,29 +143,21 @@ struct BookDetailView: View {
     @ViewBuilder
     private var heroCoverBackground: some View {
         if book.coverUrl != nil {
-            AsyncImage(url: serverConfig.coverURL(for: book.id)) { phase in
-                if case .success(let image) = phase {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .blur(radius: 40)
-                        .overlay(Color(.systemBackground).opacity(0.6))
-                        .mask(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .black, location: 0),
-                                    .init(color: .black, location: 0.6),
-                                    .init(color: .clear, location: 1.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .clipped()
-                } else {
-                    neutralGradientBackground
-                }
-            }
+            CachedCoverImage(bookId: book.id, hasCover: true, format: book.format)
+                .blur(radius: 40)
+                .overlay(Color(.systemBackground).opacity(0.6))
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.6),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipped()
         } else {
             neutralGradientBackground
         }
@@ -190,20 +169,6 @@ struct BookDetailView: View {
             startPoint: .top,
             endPoint: .bottom
         )
-    }
-
-    @ViewBuilder
-    private var coverPlaceholderHero: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(Color.gray.opacity(0.2))
-            .aspectRatio(2/3, contentMode: .fit)
-            .frame(width: 200)
-            .overlay {
-                Image(systemName: "book.closed")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-            }
-            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
     }
 
     // MARK: - Title Block
@@ -442,9 +407,48 @@ struct BookDetailView: View {
                 DetailRow(label: "Language", value: language.uppercased())
             }
             if let series = book.series {
-                let value = book.seriesNumber != nil ? "\(series) #\(book.seriesNumber!)" : series
-                DetailRow(label: "Series", value: value)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Series")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        onSeriesTap?(series)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(book.seriesNumber != nil ? "\(series) #\(book.seriesNumber!)" : series)
+                                .font(.subheadline)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.accent)
+                    }
+                }
             }
+        }
+    }
+
+    // MARK: - Related Books
+
+    @ViewBuilder
+    private var relatedBooksContent: some View {
+        if !relatedBooks.isEmpty {
+            RelatedBooksSection(
+                title: "Related Books",
+                books: relatedBooks,
+                currentBookId: book.id
+            ) { tappedBook in
+                onBookTap?(tappedBook)
+            }
+        }
+    }
+
+    private func loadRelatedBooks() async {
+        do {
+            let response = try await apiService.fetchBook(id: book.id)
+            relatedBooks = response.relatedBooks ?? []
+        } catch {
+            // Silently fail — related books are supplementary
         }
     }
 
@@ -719,5 +723,6 @@ struct DetailRow: View {
         .environment(api)
         .environment(DownloadManager(config: config, apiService: api))
         .environment(StorageManager())
+        .environment(ImageCache())
         .modelContainer(for: DownloadedBook.self, inMemory: true)
 }

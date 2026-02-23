@@ -84,7 +84,7 @@ class APIService {
     }
 
     /// Fetch a single book by ID
-    func fetchBook(id: String) async throws -> Book {
+    func fetchBook(id: String) async throws -> BookResponse {
         guard config.isConfigured else {
             throw APIError.serverNotConfigured
         }
@@ -93,8 +93,7 @@ class APIService {
             throw APIError.invalidURL
         }
 
-        let response: BookResponse = try await fetch(url)
-        return response.book
+        return try await fetch(url)
     }
 
     /// Search books

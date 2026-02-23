@@ -376,14 +376,26 @@ async function writePdfMetadata(
   return { success: true, format: "pdf" };
 }
 
+// Threshold for using ffmpeg instead of in-memory node-id3 (100MB)
+const MP3_FFMPEG_THRESHOLD = 100 * 1024 * 1024;
+
 /**
  * Write metadata to an MP3 file using ID3 tags.
- * This updates ID3v2 tags which are visible in Finder and most media players.
+ * For large files (>100MB), uses ffmpeg to avoid loading the entire file into memory.
+ * For small files, uses node-id3 for richer ID3v2 tag support.
  */
 async function writeMp3Metadata(
   filePath: string,
   metadata: WritableMetadata,
 ): Promise<MetadataWriteResult> {
+  const { stat } = await import("fs/promises");
+  const fileStat = await stat(filePath);
+
+  // For large files, use ffmpeg (same approach as M4B) to avoid OOM
+  if (fileStat.size > MP3_FFMPEG_THRESHOLD) {
+    return writeMp3MetadataWithFfmpeg(filePath, metadata);
+  }
+
   // Build ID3 tags object
   const tags: NodeID3Module.Tags = {
     title: metadata.title,
@@ -451,6 +463,133 @@ async function writeMp3Metadata(
     error:
       result instanceof Error ? result.message : "Failed to write ID3 tags",
   };
+}
+
+/**
+ * Write MP3 metadata using ffmpeg (for large files that can't be loaded into memory).
+ * Uses stream copy to avoid re-encoding.
+ */
+async function writeMp3MetadataWithFfmpeg(
+  filePath: string,
+  metadata: WritableMetadata,
+): Promise<MetadataWriteResult> {
+  const { spawn } = await import("child_process");
+  const { tmpdir } = await import("os");
+  const { join } = await import("path");
+  const { rename, unlink } = await import("fs/promises");
+
+  // Check if ffmpeg is available
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn("ffmpeg", ["-version"], { stdio: "ignore" });
+      proc.on("close", (code) => (code === 0 ? resolve() : reject()));
+      proc.on("error", reject);
+    });
+  } catch {
+    return {
+      success: true,
+      format: "mp3",
+      error: "ffmpeg not installed - skipping MP3 metadata update for large file",
+    };
+  }
+
+  const metadataArgs: string[] = [];
+  metadataArgs.push("-metadata", `title=${metadata.title}`);
+
+  if (metadata.authors.length > 0) {
+    metadataArgs.push("-metadata", `artist=${metadata.authors.join(", ")}`);
+    metadataArgs.push("-metadata", `album_artist=${metadata.authors[0]}`);
+  }
+
+  if (metadata.publisher) {
+    metadataArgs.push("-metadata", `publisher=${metadata.publisher}`);
+  }
+
+  if (metadata.description) {
+    metadataArgs.push("-metadata", `comment=${metadata.description}`);
+  }
+
+  if (metadata.series) {
+    metadataArgs.push("-metadata", `album=${metadata.series}`);
+    if (metadata.seriesNumber) {
+      metadataArgs.push("-metadata", `track=${metadata.seriesNumber}`);
+    }
+  }
+
+  if (metadata.publishedDate) {
+    const year = metadata.publishedDate.match(/\d{4}/)?.[0];
+    if (year) {
+      metadataArgs.push("-metadata", `date=${year}`);
+    }
+  }
+
+  const tempPath = join(tmpdir(), `compendus-mp3-${Date.now()}.mp3`);
+  let coverTempPath: string | null = null;
+  let coverEmbedded = false;
+
+  if (metadata.coverImage) {
+    coverTempPath = join(tmpdir(), `compendus-cover-${Date.now()}.jpg`);
+    await writeFile(coverTempPath, metadata.coverImage);
+  }
+
+  try {
+    let ffmpegArgs: string[];
+    if (coverTempPath) {
+      ffmpegArgs = [
+        "-i", filePath,
+        "-i", coverTempPath,
+        "-map", "0:a",
+        "-map", "1:v",
+        "-c:a", "copy",
+        "-c:v", "mjpeg",
+        "-id3v2_version", "3",
+        "-disposition:v:0", "attached_pic",
+        ...metadataArgs,
+        "-y", tempPath,
+      ];
+      coverEmbedded = true;
+    } else {
+      ffmpegArgs = [
+        "-i", filePath,
+        "-c", "copy",
+        "-id3v2_version", "3",
+        ...metadataArgs,
+        "-y", tempPath,
+      ];
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn("ffmpeg", ffmpegArgs, { stdio: ["ignore", "ignore", "pipe"] });
+      let stderr = "";
+      proc.stderr.on("data", (data: Buffer) => {
+        stderr += data.toString();
+        if (stderr.length > 1024) {
+          stderr = stderr.slice(-1024);
+        }
+      });
+      proc.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
+      });
+      proc.on("error", reject);
+    });
+
+    await unlink(filePath);
+    await rename(tempPath, filePath);
+
+    return { success: true, format: "mp3", coverEmbedded };
+  } catch (error) {
+    try { await unlink(tempPath); } catch {}
+    return {
+      success: false,
+      format: "mp3",
+      error: error instanceof Error ? error.message : "Failed to write MP3 metadata with ffmpeg",
+    };
+  } finally {
+    if (coverTempPath) {
+      try { await unlink(coverTempPath); } catch {}
+    }
+  }
 }
 
 /**

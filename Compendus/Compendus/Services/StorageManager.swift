@@ -27,10 +27,16 @@ class StorageManager {
         documentsURL.appendingPathComponent("comic-cache", isDirectory: true)
     }
 
+    /// Cover cache directory URL
+    var coverCacheURL: URL {
+        documentsURL.appendingPathComponent("cover-cache", isDirectory: true)
+    }
+
     init() {
         // Create directories if needed
         try? fileManager.createDirectory(at: booksURL, withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: comicCacheURL, withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: coverCacheURL, withIntermediateDirectories: true)
     }
 
     /// Get total storage used by downloaded books
@@ -43,9 +49,14 @@ class StorageManager {
         return directorySize(at: comicCacheURL)
     }
 
+    /// Get total storage used by cover cache
+    func coverCacheSize() -> Int64 {
+        return directorySize(at: coverCacheURL)
+    }
+
     /// Get total storage used by the app
     func totalStorageUsed() -> Int64 {
-        return totalBooksStorageUsed() + comicCacheSize()
+        return totalBooksStorageUsed() + comicCacheSize() + coverCacheSize()
     }
 
     /// Get formatted storage string
@@ -64,6 +75,14 @@ class StorageManager {
     /// Clear comic cache
     func clearComicCache() throws {
         let contents = try fileManager.contentsOfDirectory(at: comicCacheURL, includingPropertiesForKeys: nil)
+        for url in contents {
+            try fileManager.removeItem(at: url)
+        }
+    }
+
+    /// Clear cover cache
+    func clearCoverCache() throws {
+        let contents = try fileManager.contentsOfDirectory(at: coverCacheURL, includingPropertiesForKeys: nil)
         for url in contents {
             try fileManager.removeItem(at: url)
         }

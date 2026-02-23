@@ -264,6 +264,64 @@ class DownloadManager: NSObject {
         return try? modelContext.fetch(descriptor).first
     }
 
+    // MARK: - Metadata Sync
+
+    /// Minimum interval between metadata syncs (1 hour)
+    private static let syncInterval: TimeInterval = 3600
+    private static let lastSyncKey = "lastMetadataSyncTimestamp"
+
+    /// Sync metadata for all downloaded books from the server.
+    /// Throttled to run at most once per hour.
+    @MainActor
+    func syncDownloadedBooksMetadata(modelContext: ModelContext) async {
+        // Throttle: skip if synced recently
+        let lastSync = UserDefaults.standard.double(forKey: Self.lastSyncKey)
+        if lastSync > 0 && Date.now.timeIntervalSince1970 - lastSync < Self.syncInterval {
+            return
+        }
+
+        guard config.isConfigured else { return }
+
+        let descriptor = FetchDescriptor<DownloadedBook>()
+        guard let downloadedBooks = try? modelContext.fetch(descriptor), !downloadedBooks.isEmpty else { return }
+
+        print("[DownloadManager] Syncing metadata for \(downloadedBooks.count) downloaded books")
+
+        await withTaskGroup(of: (String, Book?, Data?).self) { group in
+            for downloadedBook in downloadedBooks {
+                let bookId = downloadedBook.id
+                group.addTask {
+                    do {
+                        let book = try await self.apiService.fetchBook(id: bookId).book
+                        // Re-fetch cover if server has one
+                        var coverData: Data? = nil
+                        if book.coverUrl != nil {
+                            coverData = try? await self.apiService.fetchCover(bookId: bookId)
+                        }
+                        return (bookId, book, coverData)
+                    } catch {
+                        print("[DownloadManager] Failed to sync metadata for \(bookId): \(error.localizedDescription)")
+                        return (bookId, nil, nil)
+                    }
+                }
+            }
+
+            for await (bookId, book, coverData) in group {
+                guard let book = book,
+                      let downloadedBook = downloadedBooks.first(where: { $0.id == bookId }) else { continue }
+                downloadedBook.updateMetadata(from: book, coverData: coverData)
+            }
+        }
+
+        do {
+            try modelContext.save()
+            UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: Self.lastSyncKey)
+            print("[DownloadManager] Metadata sync complete")
+        } catch {
+            print("[DownloadManager] Failed to save synced metadata: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func downloadFile(from url: URL, bookId: String) async throws -> URL {

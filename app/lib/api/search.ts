@@ -1,6 +1,7 @@
 import { db, books } from "../db";
 import { eq, or, inArray, sql, asc, desc } from "drizzle-orm";
 import { searchBooks as searchBooksLib } from "../search";
+import { getRelatedBooks } from "../../actions/books";
 import type { Book } from "../db/schema";
 
 /**
@@ -63,6 +64,7 @@ interface ApiSearchResponse {
 interface ApiBookResponse {
   success: true;
   book: ApiBook;
+  relatedBooks: ApiBook[];
 }
 
 interface ApiErrorResponse {
@@ -207,9 +209,12 @@ export async function apiLookupByIsbn(
       };
     }
 
+    const related = await getRelatedBooks(result);
+
     return {
       success: true,
       book: toApiBook(result, baseUrl),
+      relatedBooks: related.map((b) => toApiBook(b, baseUrl)),
     };
   } catch (error) {
     console.error("API ISBN lookup error:", error);
@@ -239,9 +244,12 @@ export async function apiGetBook(
       };
     }
 
+    const related = await getRelatedBooks(result);
+
     return {
       success: true,
       book: toApiBook(result, baseUrl),
+      relatedBooks: related.map((b) => toApiBook(b, baseUrl)),
     };
   } catch (error) {
     console.error("API get book error:", error);
@@ -301,10 +309,14 @@ export async function apiListBooks(
       countQuery = countQuery.where(eq(books.series, series));
     }
 
-    // Apply ordering
-    const orderColumn = orderBy === "title" ? books.title : books.createdAt;
-    const orderFn = order === "asc" ? asc : desc;
-    query = query.orderBy(orderFn(orderColumn));
+    // Apply ordering — when filtering by series, sort by series number first
+    if (series) {
+      query = query.orderBy(asc(sql`CAST(${books.seriesNumber} AS REAL)`), asc(books.title));
+    } else {
+      const orderColumn = orderBy === "title" ? books.title : books.createdAt;
+      const orderFn = order === "asc" ? asc : desc;
+      query = query.orderBy(orderFn(orderColumn));
+    }
 
     // Run both queries in parallel
     const [results, countResult] = await Promise.all([

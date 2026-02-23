@@ -1,5 +1,7 @@
 "use client";
 
+import { useNavigate } from "react-router";
+
 export type SortOption = "recent" | "title-asc" | "title-desc" | "oldest";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -10,6 +12,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 export function SortDropdown({ currentSort }: { currentSort: SortOption }) {
+  const navigate = useNavigate();
+
   return (
     <div className="relative">
       <select
@@ -22,8 +26,8 @@ export function SortDropdown({ currentSort }: { currentSort: SortOption }) {
           } else {
             url.searchParams.set("sort", sort);
           }
-          url.searchParams.delete("page"); // Reset to page 1 when changing sort
-          window.location.href = url.toString();
+          url.searchParams.delete("page");
+          navigate(url.pathname + url.search);
         }}
         className="appearance-none bg-surface border border-border rounded-lg px-3 py-2 pr-8 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
       >

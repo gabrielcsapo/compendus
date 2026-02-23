@@ -30,4 +30,6 @@ export default [
   route("docs", "routes/docs.tsx"),
 
   route("admin/data", "routes/admin.data.tsx"),
+
+  route("_data/library", "routes/api.library.ts"),
 ] satisfies RouteConfig;

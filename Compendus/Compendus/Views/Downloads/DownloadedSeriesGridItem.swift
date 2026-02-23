@@ -1,14 +1,27 @@
 //
-//  SeriesGridItem.swift
+//  DownloadedSeriesGridItem.swift
 //  Compendus
 //
-//  Grid item component for displaying a series with fanned book covers
+//  Grid item for displaying a series from downloaded books with fanned covers
 //
 
 import SwiftUI
 
-struct SeriesGridItem: View {
-    let series: SeriesItem
+struct DownloadedSeriesCoverBook: Identifiable {
+    let id: String
+    let coverData: Data?
+}
+
+struct DownloadedSeriesItem: Identifiable {
+    var id: String { name }
+    let name: String
+    let bookCount: Int
+    let coverBooks: [DownloadedSeriesCoverBook]
+}
+
+struct DownloadedSeriesGridItem: View {
+    let series: DownloadedSeriesItem
+
     /// Standard book cover aspect ratio (2:3)
     private let bookAspectRatio: CGFloat = 2/3
 
@@ -19,10 +32,8 @@ struct SeriesGridItem: View {
                 if series.coverBooks.isEmpty {
                     placeholderCover
                 } else if series.coverBooks.count == 1 {
-                    // Single book — no fan
                     singleCover(series.coverBooks[0])
                 } else {
-                    // Multiple books — fan out
                     ForEach(Array(series.coverBooks.prefix(3).enumerated()), id: \.element.id) { index, book in
                         coverImage(book)
                             .rotationEffect(.degrees(rotation(for: index, total: min(series.coverBooks.count, 3))))
@@ -54,16 +65,25 @@ struct SeriesGridItem: View {
     // MARK: - Cover Views
 
     @ViewBuilder
-    private func singleCover(_ book: SeriesCoverBook) -> some View {
+    private func singleCover(_ book: DownloadedSeriesCoverBook) -> some View {
         coverImage(book)
     }
 
     @ViewBuilder
-    private func coverImage(_ book: SeriesCoverBook) -> some View {
-        CachedCoverImage(bookId: book.id, hasCover: book.coverUrl != nil)
-            .aspectRatio(bookAspectRatio, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+    private func coverImage(_ book: DownloadedSeriesCoverBook) -> some View {
+        if let data = book.coverData, let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .aspectRatio(bookAspectRatio, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+        } else {
+            gradientPlaceholder
+                .aspectRatio(bookAspectRatio, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+        }
     }
 
     @ViewBuilder
@@ -75,6 +95,18 @@ struct SeriesGridItem: View {
                     .font(.largeTitle)
                     .foregroundStyle(.secondary)
             }
+    }
+
+    @ViewBuilder
+    private var gradientPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(
+                LinearGradient(
+                    colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
     }
 
     // MARK: - Fan Layout
@@ -97,19 +129,17 @@ struct SeriesGridItem: View {
 }
 
 #Preview {
-    let series = SeriesItem(
+    let series = DownloadedSeriesItem(
         name: "The Expanse",
         bookCount: 5,
         coverBooks: [
-            SeriesCoverBook(id: "1", coverUrl: nil),
-            SeriesCoverBook(id: "2", coverUrl: nil),
-            SeriesCoverBook(id: "3", coverUrl: nil),
+            DownloadedSeriesCoverBook(id: "1", coverData: nil),
+            DownloadedSeriesCoverBook(id: "2", coverData: nil),
+            DownloadedSeriesCoverBook(id: "3", coverData: nil),
         ]
     )
 
-    SeriesGridItem(series: series)
-        .environment(ServerConfig())
-        .environment(ImageCache())
+    DownloadedSeriesGridItem(series: series)
         .frame(width: 180)
         .padding()
 }

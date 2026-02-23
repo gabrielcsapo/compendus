@@ -2,7 +2,8 @@
 //  HighlightsView.swift
 //  Compendus
 //
-//  App-wide highlights tab showing all highlights grouped by book
+//  App-wide highlights tab showing books with highlight counts,
+//  with drill-down to individual highlights per book.
 //
 
 import SwiftUI
@@ -12,13 +13,9 @@ struct HighlightsView: View {
     @Query(sort: \BookHighlight.createdAt, order: .reverse) private var allHighlights: [BookHighlight]
     @Query private var allBooks: [DownloadedBook]
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(ReaderSettings.self) private var readerSettings
     @State private var searchText = ""
-    @State private var bookToOpen: DownloadedBook?
-    @State private var editingHighlight: BookHighlight?
 
-    /// Highlights grouped by bookId, sorted by most recent highlight first
+    /// Books with highlights, sorted by most recent highlight first
     private var groupedHighlights: [(book: DownloadedBook?, bookId: String, highlights: [BookHighlight])] {
         let filtered = searchText.isEmpty ? allHighlights : allHighlights.filter { highlight in
             highlight.text.localizedCaseInsensitiveContains(searchText) ||
@@ -53,33 +50,8 @@ struct HighlightsView: View {
                 } else {
                     List {
                         ForEach(groupedHighlights, id: \.bookId) { group in
-                            Section {
-                                ForEach(group.highlights, id: \.id) { highlight in
-                                    HighlightRow(highlight: highlight)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            if let book = group.book {
-                                                bookToOpen = book
-                                            }
-                                        }
-                                        .swipeActions(edge: .leading) {
-                                            Button {
-                                                editingHighlight = highlight
-                                            } label: {
-                                                Label("Note", systemImage: "note.text")
-                                            }
-                                            .tint(.blue)
-                                        }
-                                }
-                                .onDelete { indexSet in
-                                    for index in indexSet {
-                                        let highlight = group.highlights[index]
-                                        modelContext.delete(highlight)
-                                    }
-                                    try? modelContext.save()
-                                }
-                            } header: {
-                                BookSectionHeader(book: group.book, highlightCount: group.highlights.count)
+                            NavigationLink(value: group.bookId) {
+                                BookHighlightRow(book: group.book, highlights: group.highlights)
                             }
                         }
                     }
@@ -88,66 +60,165 @@ struct HighlightsView: View {
             }
             .navigationTitle("Highlights")
             .searchable(text: $searchText, prompt: "Search highlights")
-            .fullScreenCover(item: $bookToOpen) { book in
-                ReaderContainerView(book: book)
-                    .environment(readerSettings)
-            }
-            .sheet(item: $editingHighlight) { highlight in
-                EditNoteSheet(highlight: highlight) {
-                    try? modelContext.save()
-                }
+            .navigationDestination(for: String.self) { bookId in
+                let highlights = groupedHighlights.first { $0.bookId == bookId }
+                BookHighlightsDetailView(
+                    book: highlights?.book,
+                    bookId: bookId,
+                    highlights: highlights?.highlights ?? []
+                )
             }
         }
     }
 }
 
-// MARK: - Book Section Header
+// MARK: - Book Highlight Row (top-level list item)
 
-private struct BookSectionHeader: View {
+private struct BookHighlightRow: View {
     let book: DownloadedBook?
-    let highlightCount: Int
+    let highlights: [BookHighlight]
+
+    private var mostRecentDate: Date? {
+        highlights.first?.createdAt
+    }
+
+    /// Distinct highlight colors used in this book
+    private var highlightColors: [UIColor] {
+        var seen = Set<String>()
+        var colors: [UIColor] = []
+        for h in highlights {
+            if seen.insert(h.color).inserted {
+                colors.append(h.uiColor)
+            }
+            if colors.count >= 4 { break }
+        }
+        return colors
+    }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             // Book cover thumbnail
             if let coverData = book?.coverData, let uiImage = UIImage(data: coverData) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 30, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .frame(width: 44, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(Color.gray.opacity(0.2))
-                    .frame(width: 30, height: 44)
+                    .frame(width: 44, height: 64)
                     .overlay {
                         Image(systemName: "book.closed")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(book?.title ?? "Unknown Book")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(2)
 
-                HStack(spacing: 4) {
-                    if let author = book?.authorsDisplay, !author.isEmpty {
-                        Text(author)
-                            .lineLimit(1)
-                    }
-                    Text("·")
-                    Text("\(highlightCount) highlight\(highlightCount == 1 ? "" : "s")")
+                if let author = book?.authorsDisplay, !author.isEmpty {
+                    Text(author)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
 
-            Spacer()
+                HStack(spacing: 8) {
+                    // Highlight count
+                    Label("\(highlights.count)", systemImage: "highlighter")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    // Color dots
+                    HStack(spacing: 4) {
+                        ForEach(highlightColors, id: \.self) { color in
+                            Circle()
+                                .fill(Color(uiColor: color))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Most recent date
+                    if let date = mostRecentDate {
+                        Text(date, style: .date)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Book Highlights Detail View
+
+private struct BookHighlightsDetailView: View {
+    let book: DownloadedBook?
+    let bookId: String
+    let highlights: [BookHighlight]
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(ReaderSettings.self) private var readerSettings
+    @State private var bookToOpen: DownloadedBook?
+    @State private var editingHighlight: BookHighlight?
+
+    var body: some View {
+        List {
+            ForEach(highlights, id: \.id) { highlight in
+                HighlightRow(highlight: highlight)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let book {
+                            bookToOpen = book
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            editingHighlight = highlight
+                        } label: {
+                            Label("Note", systemImage: "note.text")
+                        }
+                        .tint(.blue)
+                    }
+            }
+            .onDelete { indexSet in
+                for index in indexSet {
+                    let highlight = highlights[index]
+                    modelContext.delete(highlight)
+                }
+                try? modelContext.save()
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(book?.title ?? "Highlights")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if book != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        bookToOpen = book
+                    } label: {
+                        Label("Open Book", systemImage: "book")
+                    }
+                }
+            }
+        }
+        .fullScreenCover(item: $bookToOpen) { book in
+            ReaderContainerView(book: book)
+                .environment(readerSettings)
+        }
+        .sheet(item: $editingHighlight) { highlight in
+            EditNoteSheet(highlight: highlight) {
+                try? modelContext.save()
+            }
+        }
     }
 }
 

@@ -8,7 +8,11 @@ import { reactRouter } from "./react-router-vite/plugin.js";
 const API_SERVER = "http://localhost:3001";
 
 const proxyConfig = {
-  "/api": API_SERVER,
+  "/api": {
+    target: API_SERVER,
+    timeout: 0, // no timeout for large uploads
+    proxyTimeout: 0,
+  },
   "/books": API_SERVER,
   "/covers": API_SERVER,
   "/comic": API_SERVER,

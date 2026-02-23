@@ -81,6 +81,7 @@ enum BookSort: String, CaseIterable {
 struct LibraryView: View {
     @Environment(APIService.self) private var apiService
     @Environment(ServerConfig.self) private var serverConfig
+    @Environment(AppNavigation.self) private var appNavigation
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(ReaderSettings.self) private var readerSettings
     @Environment(\.modelContext) private var modelContext
@@ -154,6 +155,12 @@ struct LibraryView: View {
                         }
                     }
                 }
+                .onChange(of: appNavigation.pendingSeriesFilter) { _, newValue in
+                    applyPendingSeriesFilter()
+                }
+                .onAppear {
+                    applyPendingSeriesFilter()
+                }
                 .refreshable {
                     if viewMode == .series && selectedSeriesName == nil {
                         await loadSeries()
@@ -165,11 +172,23 @@ struct LibraryView: View {
                     if books.isEmpty && viewMode == .books {
                         await loadBooks()
                     }
+                    await downloadManager.syncDownloadedBooksMetadata(modelContext: modelContext)
                 }
                 .sheet(item: $selectedBook) { book in
-                    BookDetailView(book: book) { downloaded in
-                        bookToRead = downloaded
-                    }
+                    BookDetailView(
+                        book: book,
+                        onRead: { downloaded in
+                            bookToRead = downloaded
+                        },
+                        onSeriesTap: { seriesName in
+                            selectedSeriesName = seriesName
+                            viewMode = .books
+                            Task { await loadBooks() }
+                        },
+                        onBookTap: { tappedBook in
+                            selectedBook = tappedBook
+                        }
+                    )
                 }
                 .fullScreenCover(item: $bookToRead) { book in
                     ReaderContainerView(book: book)
@@ -245,7 +264,11 @@ struct LibraryView: View {
     }
 
     private func bookGridCell(book: Book, index: Int) -> some View {
-        BookGridItem(book: book)
+        BookGridItem(book: book, isDownloaded: downloadedBook(for: book.id) != nil, onSeriesTap: { seriesName in
+                selectedSeriesName = seriesName
+                viewMode = .books
+                Task { await loadBooks() }
+            })
             .onTapGesture {
                 selectedBook = book
             }
@@ -389,6 +412,15 @@ struct LibraryView: View {
         return seriesItems.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
+    private func applyPendingSeriesFilter() {
+        if let seriesName = appNavigation.pendingSeriesFilter {
+            selectedSeriesName = seriesName
+            viewMode = .books
+            appNavigation.pendingSeriesFilter = nil
+            Task { await loadBooks() }
+        }
+    }
+
     private func loadBooks() async {
         isLoading = true
         errorMessage = nil
@@ -504,6 +536,7 @@ struct LibraryView: View {
 #Preview {
     LibraryView()
         .environment(ServerConfig())
+        .environment(AppNavigation())
         .environment(APIService(config: ServerConfig()))
         .modelContainer(for: DownloadedBook.self, inMemory: true)
 }

@@ -142,6 +142,36 @@ final class DownloadedBook {
         return false
     }
 
+    /// Update metadata from a fresh server Book response
+    /// Preserves local-only fields (localPath, coverData, downloadedAt, reading progress, etc.)
+    func updateMetadata(from book: Book, coverData: Data? = nil) {
+        title = book.title
+        subtitle = book.subtitle
+        authors = book.authors
+        publisher = book.publisher
+        publishedDate = book.publishedDate
+        bookDescription = book.description
+        series = book.series
+        narrator = book.narrator
+        duration = book.duration
+        pageCount = book.pageCount
+
+        if let numStr = book.seriesNumber {
+            seriesNumber = Double(numStr)
+        } else {
+            seriesNumber = nil
+        }
+
+        if let chapters = book.chapters {
+            chaptersData = try? JSONEncoder().encode(chapters)
+        }
+
+        // Update cover if new data is provided
+        if let newCover = coverData {
+            self.coverData = newCover
+        }
+    }
+
     /// Create from a Book API response
     static func from(book: Book, localPath: String, coverData: Data? = nil) -> DownloadedBook {
         var chaptersData: Data? = nil

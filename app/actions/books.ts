@@ -112,15 +112,19 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<Book[]> {
     }
   }
 
-  // Apply ordering
-  const orderColumn = {
-    title: books.title,
-    createdAt: books.createdAt,
-    lastReadAt: books.lastReadAt,
-  }[orderBy];
+  // Apply ordering — when filtering by series, sort by series number first
+  if (series) {
+    query = query.orderBy(asc(sql`CAST(${books.seriesNumber} AS REAL)`), asc(books.title));
+  } else {
+    const orderColumn = {
+      title: books.title,
+      createdAt: books.createdAt,
+      lastReadAt: books.lastReadAt,
+    }[orderBy];
 
-  const orderFn = order === "asc" ? asc : desc;
-  query = query.orderBy(orderFn(orderColumn));
+    const orderFn = order === "asc" ? asc : desc;
+    query = query.orderBy(orderFn(orderColumn));
+  }
 
   // Apply pagination
   query = query.limit(limit).offset(offset);
@@ -441,6 +445,104 @@ export async function getLinkedFormats(bookId: string): Promise<Book[]> {
     );
 
   return linkedBooks;
+}
+
+/**
+ * Get related books based on series, shared tags, and same author.
+ * Returns up to `limit` books, prioritizing: series > tags > author.
+ */
+export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
+  const seen = new Set<string>([book.id]);
+  const related: Book[] = [];
+
+  // 1. Same series (highest priority)
+  if (book.series) {
+    const seriesBooks = await db
+      .select()
+      .from(books)
+      .where(and(eq(books.series, book.series), sql`${books.id} != ${book.id}`))
+      .orderBy(asc(books.seriesNumber));
+
+    for (const b of seriesBooks) {
+      if (!seen.has(b.id)) {
+        seen.add(b.id);
+        related.push(b);
+      }
+    }
+  }
+
+  // 2. Shared tags
+  if (related.length < limit) {
+    const bookTagIds = await db
+      .select({ tagId: booksTags.tagId })
+      .from(booksTags)
+      .where(eq(booksTags.bookId, book.id));
+
+    if (bookTagIds.length > 0) {
+      const tagIdList = bookTagIds.map((t) => t.tagId);
+      // Find books sharing these tags, ranked by overlap count
+      const tagMatches = await db
+        .select({
+          bookId: booksTags.bookId,
+          overlapCount: sql<number>`count(*)`,
+        })
+        .from(booksTags)
+        .where(
+          and(
+            inArray(booksTags.tagId, tagIdList),
+            sql`${booksTags.bookId} != ${book.id}`,
+          ),
+        )
+        .groupBy(booksTags.bookId)
+        .orderBy(desc(sql`count(*)`))
+        .limit(limit);
+
+      if (tagMatches.length > 0) {
+        const matchedIds = tagMatches
+          .map((m) => m.bookId)
+          .filter((id) => !seen.has(id));
+
+        if (matchedIds.length > 0) {
+          const tagBooks = await db
+            .select()
+            .from(books)
+            .where(inArray(books.id, matchedIds));
+
+          // Preserve overlap-count ordering
+          const bookMap = new Map(tagBooks.map((b) => [b.id, b]));
+          for (const id of matchedIds) {
+            const b = bookMap.get(id);
+            if (b && !seen.has(b.id)) {
+              seen.add(b.id);
+              related.push(b);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Same author (lowest priority)
+  if (related.length < limit && book.authors) {
+    try {
+      const authors: string[] = JSON.parse(book.authors);
+      for (const author of authors.slice(0, 2)) {
+        if (related.length >= limit) break;
+        const authorBooks = await getBooksByAuthor(author);
+        for (const b of authorBooks) {
+          if (!seen.has(b.id)) {
+            seen.add(b.id);
+            related.push(b);
+            if (related.length >= limit) break;
+          }
+        }
+      }
+    } catch {
+      // authors field not valid JSON
+    }
+  }
+
+  return related.slice(0, limit);
 }
 
 /**

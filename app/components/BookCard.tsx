@@ -83,11 +83,27 @@ export function BookCard({ book, size = "default" }: BookCardProps) {
       </div>
 
       {/* Info */}
-      <Link to={`/book/${book.id}`} className={compact ? "block p-2" : "block p-4"}>
-        <h3 className={`font-semibold line-clamp-2 mb-1 text-foreground ${compact ? "text-xs" : "text-sm"}`}>{book.title}</h3>
-        {authors.length > 0 && (
-          <p className={`text-foreground-muted line-clamp-1 ${compact ? "text-[10px]" : "text-xs"}`}>
-            <AuthorLinks authors={authors} asSpan />
+      <div className={compact ? "p-2" : "p-4"}>
+        <Link to={`/book/${book.id}`} className="block">
+          <h3 className={`font-semibold line-clamp-2 mb-1 text-foreground ${compact ? "text-xs" : "text-sm"}`}>{book.title}</h3>
+          {authors.length > 0 && (
+            <p className={`text-foreground-muted line-clamp-1 ${compact ? "text-[10px]" : "text-xs"}`}>
+              <AuthorLinks authors={authors} asSpan />
+            </p>
+          )}
+        </Link>
+
+        {book.series && (
+          <p className={`line-clamp-1 ${compact ? "text-[10px]" : "text-xs"}`}>
+            {!compact && book.seriesNumber && (
+              <span className="text-foreground-muted">#{book.seriesNumber} in </span>
+            )}
+            <Link
+              to={`/?series=${encodeURIComponent(book.series)}`}
+              className="text-primary hover:text-primary-hover font-medium"
+            >
+              {book.series}
+            </Link>
           </p>
         )}
 
@@ -103,7 +119,7 @@ export function BookCard({ book, size = "default" }: BookCardProps) {
             {!compact && <p className="text-xs text-foreground-muted mt-1">{progressPercent}%</p>}
           </div>
         )}
-      </Link>
+      </div>
     </div>
   );
 }

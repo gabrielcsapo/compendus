@@ -224,6 +224,7 @@ typealias SearchResponse = BooksResponse
 struct BookResponse: Codable {
     let success: Bool
     let book: Book
+    let relatedBooks: [Book]?
 }
 
 // MARK: - Series

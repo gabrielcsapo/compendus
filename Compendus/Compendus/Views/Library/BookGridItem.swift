@@ -9,39 +9,28 @@ import SwiftUI
 
 struct BookGridItem: View {
     let book: Book
-    @Environment(ServerConfig.self) private var serverConfig
+    var isDownloaded: Bool = false
+    var onSeriesTap: ((String) -> Void)?
 
     /// Standard book cover aspect ratio (2:3)
     private let bookAspectRatio: CGFloat = 2/3
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Cover image - only load if server has a cover
-            Group {
-                if book.coverUrl != nil {
-                    AsyncImage(url: serverConfig.coverURL(for: book.id)) { phase in
-                        switch phase {
-                        case .empty:
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .shimmer()
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        case .failure:
-                            placeholderCover
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                } else {
-                    placeholderCover
-                }
-            }
+            // Cover image
+            CachedCoverImage(bookId: book.id, hasCover: book.coverUrl != nil, format: book.format)
             .aspectRatio(bookAspectRatio, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+            .overlay(alignment: .topTrailing) {
+                if isDownloaded {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white)
+                        .background(Circle().fill(Color.accentColor).padding(2))
+                        .padding(6)
+                }
+            }
 
             // Title and author
             VStack(alignment: .leading, spacing: 2) {
@@ -55,6 +44,16 @@ struct BookGridItem: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
+                if let series = book.series {
+                    Text(book.seriesNumber != nil ? "#\(book.seriesNumber!) in \(series)" : series)
+                        .font(.caption2)
+                        .foregroundStyle(.tint)
+                        .lineLimit(1)
+                        .onTapGesture {
+                            onSeriesTap?(series)
+                        }
+                }
+
                 HStack(spacing: 4) {
                     formatBadge
 
@@ -67,29 +66,8 @@ struct BookGridItem: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format")
+        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format\(book.series != nil ? ", \(book.series!) series" : "")")
         .accessibilityHint("Double tap to view details")
-    }
-
-    private var bookIcon: String {
-        if book.isAudiobook {
-            return "headphones"
-        } else if book.isComic {
-            return "book.pages"
-        } else {
-            return "book.closed"
-        }
-    }
-
-    @ViewBuilder
-    private var placeholderCover: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color.gray.opacity(0.2))
-            .overlay {
-                Image(systemName: bookIcon)
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
-            }
     }
 
     @ViewBuilder
@@ -147,6 +125,7 @@ struct BookGridItem: View {
 /// Grid item for downloaded books
 struct DownloadedBookGridItem: View {
     let book: DownloadedBook
+    var onSeriesTap: ((String) -> Void)?
 
     /// Standard book cover aspect ratio (2:3)
     private let bookAspectRatio: CGFloat = 2/3
@@ -185,6 +164,16 @@ struct DownloadedBookGridItem: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
+                if let series = book.series {
+                    Text(book.seriesNumber != nil ? "#\(Int(book.seriesNumber!)) in \(series)" : series)
+                        .font(.caption2)
+                        .foregroundStyle(.tint)
+                        .lineLimit(1)
+                        .onTapGesture {
+                            onSeriesTap?(series)
+                        }
+                }
+
                 HStack(spacing: 4) {
                     formatBadge
 
@@ -197,7 +186,7 @@ struct DownloadedBookGridItem: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format, \(Int(book.readingProgress * 100))% complete")
+        .accessibilityLabel("\(book.title) by \(book.authorsDisplay), \(book.formatDisplay) format, \(Int(book.readingProgress * 100))% complete\(book.series != nil ? ", \(book.series!) series" : "")")
         .accessibilityHint("Double tap to view details")
     }
 
@@ -287,6 +276,7 @@ struct DownloadedBookGridItem: View {
 
     BookGridItem(book: book)
         .environment(ServerConfig())
+        .environment(ImageCache())
         .frame(width: 180)
         .padding()
 }

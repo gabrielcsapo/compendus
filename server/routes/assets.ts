@@ -1,13 +1,17 @@
 import { Hono } from "hono";
-import { readFile } from "fs/promises";
+import { readFile, stat, writeFile } from "fs/promises";
 import { resolve, extname } from "path";
-import { existsSync, statSync, createReadStream, writeFileSync } from "fs";
 import { eq } from "drizzle-orm";
 import { getComicPage, getComicPageCount, convertCbrToCbz } from "../../app/lib/processing/comic";
 import { extractEpubResource } from "../../app/lib/processing/epub";
 import { convertMobiToEpub } from "../../app/lib/processing/mobi-to-epub";
 import { db, books } from "../../app/lib/db";
 import type { BookFormat } from "../../app/lib/types";
+import {
+  getFileStat,
+  streamFileResponse,
+  serveCachedResource,
+} from "../lib/file-serving";
 
 const app = new Hono();
 
@@ -17,21 +21,19 @@ app.get("/books/:id/as-cbz", async (c) => {
 
   // First check if CBZ already exists (prefer native format)
   const cbzPath = resolve(process.cwd(), "data", "books", `${bookId}.cbz`);
-  if (existsSync(cbzPath)) {
-    const buffer = await readFile(cbzPath);
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": "application/vnd.comicbook+zip",
-        "Content-Disposition": `attachment; filename="${bookId}.cbz"`,
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
-      },
+  const cbzStat = await getFileStat(cbzPath);
+  if (cbzStat) {
+    return streamFileResponse(c, cbzPath, {
+      contentType: "application/vnd.comicbook+zip",
+      disposition: `attachment; filename="${bookId}.cbz"`,
+      cacheControl: "public, max-age=3600",
     });
   }
 
   // Check for CBR and convert
   const cbrPath = resolve(process.cwd(), "data", "books", `${bookId}.cbr`);
-  if (existsSync(cbrPath)) {
+  const cbrStat = await getFileStat(cbrPath);
+  if (cbrStat) {
     try {
       console.log(`[as-cbz] Converting CBR to CBZ for book ${bookId}`);
       const cbrBuffer = await readFile(cbrPath);
@@ -41,7 +43,7 @@ app.get("/books/:id/as-cbz", async (c) => {
         headers: {
           "Content-Type": "application/vnd.comicbook+zip",
           "Content-Disposition": `attachment; filename="${bookId}.cbz"`,
-          "Access-Control-Allow-Origin": "*",
+          "Content-Length": String(cbzBuffer.byteLength),
           "Cache-Control": "public, max-age=3600",
         },
       });
@@ -65,15 +67,12 @@ app.get("/books/:id/as-epub", async (c) => {
   const epubPath = resolve(process.cwd(), "data", "books", `${bookId}.epub`);
 
   // Serve cached conversion if it exists
-  if (existsSync(epubPath)) {
-    const buffer = await readFile(epubPath);
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": "application/epub+zip",
-        "Content-Disposition": `attachment; filename="${bookId}.epub"`,
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
-      },
+  const epubStat = await getFileStat(epubPath);
+  if (epubStat) {
+    return streamFileResponse(c, epubPath, {
+      contentType: "application/epub+zip",
+      disposition: `attachment; filename="${bookId}.epub"`,
+      cacheControl: "public, max-age=3600",
     });
   }
 
@@ -92,7 +91,8 @@ app.get("/books/:id/as-epub", async (c) => {
       const ext = book.fileName ? extname(book.fileName) : `.${book.format}`;
       const mobiPath = resolve(process.cwd(), "data", "books", `${bookId}${ext}`);
 
-      if (!existsSync(mobiPath)) {
+      const mobiStat = await getFileStat(mobiPath);
+      if (!mobiStat) {
         return c.json({ error: "Source file not found on disk" }, 404);
       }
 
@@ -107,23 +107,23 @@ app.get("/books/:id/as-epub", async (c) => {
       });
 
       // Cache the result
-      writeFileSync(epubPath, epubBuffer);
-      const epubSize = statSync(epubPath).size;
+      await writeFile(epubPath, epubBuffer);
+      const epubFileStat = await stat(epubPath);
       await db
         .update(books)
         .set({
           convertedEpubPath: `data/books/${bookId}.epub`,
-          convertedEpubSize: epubSize,
+          convertedEpubSize: epubFileStat.size,
         })
         .where(eq(books.id, bookId));
 
-      console.log(`[as-epub] Conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`);
+      console.log(`[as-epub] Conversion complete for ${bookId} (${(epubFileStat.size / 1024).toFixed(1)} KB)`);
 
       return new Response(new Uint8Array(epubBuffer), {
         headers: {
           "Content-Type": "application/epub+zip",
           "Content-Disposition": `attachment; filename="${bookId}.epub"`,
-          "Access-Control-Allow-Origin": "*",
+          "Content-Length": String(epubBuffer.byteLength),
           "Cache-Control": "public, max-age=3600",
         },
       });
@@ -137,131 +137,13 @@ app.get("/books/:id/as-epub", async (c) => {
   return c.json({ error: "No converted EPUB available" }, 404);
 });
 
-// GET /books/* - serve book files with range request support for audio
+// GET /books/* - serve book files with streaming and range request support
 app.get("/books/:filepath{.+}", async (c) => {
   const filepath = c.req.param("filepath");
-  const pathname = `/books/${filepath}`;
-  const filePath = resolve(process.cwd(), "data", pathname.slice(1));
+  const filePath = resolve(process.cwd(), "data", "books", filepath);
 
-  if (!existsSync(filePath)) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  const ext = pathname.split(".").pop();
-  const contentType =
-    {
-      pdf: "application/pdf",
-      epub: "application/epub+zip",
-      mobi: "application/x-mobipocket-ebook",
-      cbr: "application/vnd.comicbook-rar",
-      cbz: "application/vnd.comicbook+zip",
-      m4b: "audio/mp4",
-      m4a: "audio/mp4",
-      mp3: "audio/mpeg",
-    }[ext || ""] || "application/octet-stream";
-
-  // Check if this is an audio file that needs range request support
-  const isAudioFile = ["m4b", "m4a", "mp3"].includes(ext || "");
-
-  if (isAudioFile) {
-    const stat = statSync(filePath);
-    const fileSize = stat.size;
-    const rangeHeader = c.req.header("range");
-
-    // Cap range responses to 1MB chunks to avoid reading entire large files into memory.
-    // Browsers will request additional ranges as needed during playback.
-    const MAX_CHUNK = 1024 * 1024; // 1MB
-
-    if (rangeHeader) {
-      const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
-      if (match) {
-        const start = match[1] ? parseInt(match[1], 10) : 0;
-        // For open-ended ranges (bytes=0-), cap at MAX_CHUNK instead of entire file
-        const requestedEnd = match[2] ? parseInt(match[2], 10) : start + MAX_CHUNK - 1;
-        const end = Math.min(requestedEnd, fileSize - 1);
-
-        if (start >= fileSize || start > end) {
-          return new Response("Range Not Satisfiable", {
-            status: 416,
-            headers: {
-              "Content-Range": `bytes */${fileSize}`,
-            },
-          });
-        }
-
-        const chunkSize = end - start + 1;
-
-        // Stream the range using createReadStream instead of reading into a buffer
-        const stream = createReadStream(filePath, { start, end });
-        const readableStream = new ReadableStream({
-          start(controller) {
-            stream.on("data", (chunk: Buffer) => {
-              controller.enqueue(new Uint8Array(chunk));
-            });
-            stream.on("end", () => {
-              controller.close();
-            });
-            stream.on("error", (err) => {
-              controller.error(err);
-            });
-          },
-          cancel() {
-            stream.destroy();
-          },
-        });
-
-        return new Response(readableStream, {
-          status: 206,
-          headers: {
-            "Content-Type": contentType,
-            "Content-Length": String(chunkSize),
-            "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-            "Accept-Ranges": "bytes",
-            "Access-Control-Allow-Origin": "*",
-            "Cache-Control": "public, max-age=3600",
-          },
-        });
-      }
-    }
-
-    // No range header - stream the full file
-    const stream = createReadStream(filePath);
-    const readableStream = new ReadableStream({
-      start(controller) {
-        stream.on("data", (chunk: Buffer) => {
-          controller.enqueue(new Uint8Array(chunk));
-        });
-        stream.on("end", () => {
-          controller.close();
-        });
-        stream.on("error", (err) => {
-          controller.error(err);
-        });
-      },
-      cancel() {
-        stream.destroy();
-      },
-    });
-
-    return new Response(readableStream, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(fileSize),
-        "Accept-Ranges": "bytes",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
-      },
-    });
-  }
-
-  // Non-audio files: return full file
-  const buffer = await readFile(filePath);
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": contentType,
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "public, max-age=3600",
-    },
+  return streamFileResponse(c, filePath, {
+    cacheControl: "public, max-age=3600",
   });
 });
 
@@ -270,16 +152,9 @@ app.get("/covers/:filename", async (c) => {
   const filename = c.req.param("filename");
   const filePath = resolve(process.cwd(), "data", "covers", filename);
 
-  if (!existsSync(filePath)) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  const buffer = await readFile(filePath);
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=31536000, immutable",
-    },
+  return streamFileResponse(c, filePath, {
+    contentType: "image/jpeg",
+    cacheControl: "public, max-age=31536000, immutable",
   });
 });
 
@@ -290,64 +165,49 @@ app.get("/mobi-images/:rest{.+}", async (c) => {
   let filePath: string;
 
   if (pathParts.length >= 2) {
-    // New format: /mobi-images/{bookId}/{filename}
     const [bookId, ...restParts] = pathParts;
     const filename = restParts.join("/");
     filePath = resolve(process.cwd(), "images", bookId, filename);
   } else {
-    // Legacy format: /mobi-images/{filename}
     filePath = resolve(process.cwd(), "images", pathParts[0]);
   }
 
-  if (!existsSync(filePath)) {
-    return new Response("Not found", { status: 404 });
-  }
-
-  const buffer = await readFile(filePath);
-  const ext = filePath.split(".").pop()?.toLowerCase();
-  const contentType =
-    {
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      webp: "image/webp",
-    }[ext || ""] || "image/jpeg";
-
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=86400",
-    },
+  return streamFileResponse(c, filePath, {
+    cacheControl: "public, max-age=86400",
   });
 });
 
-// GET /comic/:id/:format/page/:pageNum - serve comic book pages
+// GET /comic/:id/:format/page/:pageNum - serve comic book pages with disk caching
 app.get("/comic/:id/:format/page/:pageNum", async (c) => {
   const bookId = c.req.param("id");
   const format = c.req.param("format");
   const pageNum = parseInt(c.req.param("pageNum"), 10);
   const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.${format}`);
 
-  if (existsSync(bookPath)) {
-    try {
-      const buffer = await readFile(bookPath);
-      const page = await getComicPage(buffer, format as BookFormat, pageNum);
-
-      if (page) {
-        return new Response(new Uint8Array(page.data), {
-          headers: {
-            "Content-Type": page.mimeType,
-            "Cache-Control": "public, max-age=31536000",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Error extracting comic page:", error);
-    }
+  const bookStat = await getFileStat(bookPath);
+  if (!bookStat) {
+    return new Response("Page not found", { status: 404 });
   }
 
-  return new Response("Page not found", { status: 404 });
+  // Use resource caching — extract once, serve from disk thereafter
+  const resourcePath = `page-${pageNum}.bin`;
+  return serveCachedResource(
+    c,
+    `comic-${bookId}-${format}`,
+    resourcePath,
+    async () => {
+      try {
+        const buffer = await readFile(bookPath);
+        const page = await getComicPage(buffer, format as BookFormat, pageNum);
+        if (!page) return null;
+        return { data: Buffer.from(page.data), mimeType: page.mimeType };
+      } catch (error) {
+        console.error("Error extracting comic page:", error);
+        return null;
+      }
+    },
+    "public, max-age=31536000, immutable",
+  );
 });
 
 // GET /comic/:id/:format/info - get comic book page count
@@ -356,20 +216,22 @@ app.get("/comic/:id/:format/info", async (c) => {
   const format = c.req.param("format");
   const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.${format}`);
 
-  if (existsSync(bookPath)) {
-    try {
-      const buffer = await readFile(bookPath);
-      const pageCount = await getComicPageCount(buffer, format as BookFormat);
-      return c.json({ pageCount });
-    } catch (error) {
-      console.error("Error getting comic info:", error);
-    }
+  const bookStat = await getFileStat(bookPath);
+  if (!bookStat) {
+    return new Response("Comic not found", { status: 404 });
   }
 
-  return new Response("Comic not found", { status: 404 });
+  try {
+    const buffer = await readFile(bookPath);
+    const pageCount = await getComicPageCount(buffer, format as BookFormat);
+    return c.json({ pageCount });
+  } catch (error) {
+    console.error("Error getting comic info:", error);
+    return new Response("Comic not found", { status: 404 });
+  }
 });
 
-// GET /book/:id/* - serve EPUB internal resources (images, css, etc.)
+// GET /book/:id/* - serve EPUB internal resources with disk caching
 app.get("/book/:id/:rest{.+}", async (c) => {
   const bookId = c.req.param("id");
   const resourcePath = c.req.param("rest");
@@ -380,26 +242,27 @@ app.get("/book/:id/:rest{.+}", async (c) => {
   }
 
   const bookPath = resolve(process.cwd(), "data", "books", `${bookId}.epub`);
-
-  if (existsSync(bookPath)) {
-    try {
-      const buffer = await readFile(bookPath);
-      const resource = await extractEpubResource(buffer, resourcePath);
-
-      if (resource) {
-        return new Response(new Uint8Array(resource.data), {
-          headers: {
-            "Content-Type": resource.mimeType,
-            "Cache-Control": "public, max-age=31536000",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Error extracting EPUB resource:", error);
-    }
+  const bookStat = await getFileStat(bookPath);
+  if (!bookStat) {
+    return new Response("Resource not found", { status: 404 });
   }
 
-  return new Response("Resource not found", { status: 404 });
+  // Use resource caching — extract once from ZIP, serve from disk thereafter
+  return serveCachedResource(
+    c,
+    `epub-${bookId}`,
+    resourcePath,
+    async () => {
+      try {
+        const buffer = await readFile(bookPath);
+        return await extractEpubResource(buffer, resourcePath);
+      } catch (error) {
+        console.error("Error extracting EPUB resource:", error);
+        return null;
+      }
+    },
+    "public, max-age=31536000, immutable",
+  );
 });
 
 export { app as assetsRoutes };

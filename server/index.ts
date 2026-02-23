@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { compress } from "hono/compress";
+import { etag } from "hono/etag";
 import { serve } from "@hono/node-server";
 
 import { searchRoutes } from "./routes/search";
@@ -25,6 +27,12 @@ app.use(
     allowHeaders: ["Content-Type"],
   }),
 );
+
+// Compression for text-based responses (JSON, HTML, CSS, JS)
+app.use("*", compress());
+
+// ETag support for API routes (conditional 304 responses)
+app.use("/api/*", etag());
 
 // API routes
 app.route("/", searchRoutes);
@@ -70,8 +78,13 @@ app.all("/api/*", (c) => {
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
 console.log(`[API Server] Starting on port ${PORT}`);
 
-serve({ fetch: app.fetch, port: PORT }, (info) => {
+const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`[API Server] Listening on http://localhost:${info.port}`);
 });
+
+// Disable default timeouts so large file uploads (1GB+ audiobooks) don't get killed
+server.setTimeout(0);
+(server as any).requestTimeout = 0;
+(server as any).headersTimeout = 0;
 
 export { app };

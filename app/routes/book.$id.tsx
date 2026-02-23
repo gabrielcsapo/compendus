@@ -1,6 +1,6 @@
 import { Link, type LoaderFunctionArgs } from "react-router";
 import { buttonStyles, badgeStyles } from "../lib/styles";
-import { getBook, getLinkedFormats } from "../actions/books";
+import { getBook, getLinkedFormats, getRelatedBooks } from "../actions/books";
 import { getTagsForBook } from "../actions/tags";
 import { getCollectionsForBook } from "../actions/collections";
 import { MetadataRefreshButton } from "../components/MetadataRefreshButton";
@@ -23,17 +23,18 @@ export async function loader({ params }: LoaderFunctionArgs) {
     throw new Response("Book not found", { status: 404 });
   }
 
-  const [tags, collections, linkedFormats] = await Promise.all([
+  const [tags, collections, linkedFormats, relatedBooks] = await Promise.all([
     getTagsForBook(id),
     getCollectionsForBook(id),
     getLinkedFormats(id),
+    getRelatedBooks(book),
   ]);
 
-  return { book, tags, collections, linkedFormats };
+  return { book, tags, collections, linkedFormats, relatedBooks };
 }
 
 export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
-  const { book, tags, collections, linkedFormats } = loaderData;
+  const { book, tags, collections, linkedFormats, relatedBooks } = loaderData;
   // Parse authors with defensive handling for corrupted data
   const rawAuthors = book.authors ? JSON.parse(book.authors) : [];
   const authors = Array.isArray(rawAuthors)
@@ -201,6 +202,20 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
               </p>
             )}
 
+            {book.series && (
+              <p className="text-base text-foreground-muted">
+                {book.seriesNumber && (
+                  <span>Book {book.seriesNumber} in </span>
+                )}
+                <Link
+                  to={`/?series=${encodeURIComponent(book.series)}`}
+                  className="text-primary hover:text-primary-hover font-medium"
+                >
+                  {book.series}
+                </Link>
+              </p>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className={`${badgeStyles.base} ${badgeStyles.primary} uppercase`}>
                 {book.format}
@@ -315,6 +330,60 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
             {/* Metadata refresh */}
             <MetadataRefreshButton bookId={book.id} bookTitle={book.title} bookAuthors={authors} bookFormat={book.format as BookFormat} hasCover={!!book.coverPath} coverUrl={book.coverPath ? `/covers/${book.id}.jpg?v=${book.updatedAt?.getTime() || ""}` : undefined} />
           </section>
+
+          {/* Related Books */}
+          {relatedBooks.length > 0 && (
+            <section className="bg-surface border border-border rounded-xl p-6 shadow-paper">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-foreground-muted mb-4">
+                Related Books
+              </h2>
+              <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+                {relatedBooks.map((related) => {
+                  const relatedAuthors = (() => {
+                    try {
+                      const parsed = related.authors ? JSON.parse(related.authors) : [];
+                      return Array.isArray(parsed) ? parsed.filter((a: unknown): a is string => typeof a === "string") : [];
+                    } catch {
+                      return [];
+                    }
+                  })();
+                  const coverUrl = related.coverPath
+                    ? `/covers/${related.id}.jpg?v=${related.updatedAt?.getTime() || ""}`
+                    : null;
+
+                  return (
+                    <Link
+                      key={related.id}
+                      to={`/book/${related.id}`}
+                      className="flex-shrink-0 w-[100px] group"
+                    >
+                      {coverUrl ? (
+                        <img
+                          src={coverUrl}
+                          alt={related.title}
+                          className="w-[100px] aspect-[2/3] object-cover rounded-lg shadow-md group-hover:shadow-lg transition-shadow"
+                        />
+                      ) : (
+                        <div className="w-[100px] aspect-[2/3] rounded-lg shadow-md bg-surface-elevated border border-border flex items-center justify-center">
+                          <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                        </div>
+                      )}
+                      <p className="mt-2 text-sm font-medium text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                        {related.title}
+                      </p>
+                      {relatedAuthors.length > 0 && (
+                        <p className="mt-0.5 text-xs text-foreground-muted line-clamp-1">
+                          {relatedAuthors.join(", ")}
+                        </p>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </main>

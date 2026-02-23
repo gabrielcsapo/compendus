@@ -11,15 +11,16 @@ import SwiftData
 struct ContentView: View {
     @Environment(ServerConfig.self) private var serverConfig
     @Environment(ReaderSettings.self) private var readerSettings
+    @Environment(AppNavigation.self) private var appNavigation
     @Environment(\.modelContext) private var modelContext
     @Environment(\.deepLinkBookId) private var deepLinkBookId
-    @State private var selectedTab = 1
     @State private var deepLinkedBook: DownloadedBook?
 
     var body: some View {
         Group {
             if serverConfig.isConfigured {
-                TabView(selection: $selectedTab) {
+                @Bindable var nav = appNavigation
+                TabView(selection: $nav.selectedTab) {
                     LibraryView()
                         .tabItem {
                             Label("Library", systemImage: "books.vertical")
@@ -72,7 +73,7 @@ struct ContentView: View {
         if let book = try? modelContext.fetch(descriptor).first {
             deepLinkedBook = book
             // Switch to downloads tab
-            selectedTab = 1
+            appNavigation.selectedTab = 1
         }
 
         // Clear the deep link
@@ -181,6 +182,7 @@ struct ServerSetupView: View {
 #Preview {
     ContentView()
         .environment(ServerConfig())
+        .environment(AppNavigation())
         .environment(StorageManager())
         .modelContainer(for: DownloadedBook.self, inMemory: true)
 }

@@ -10,8 +10,11 @@ import SwiftData
 
 struct DownloadedBookDetailView: View {
     let book: DownloadedBook
+    var onSeriesTap: ((String) -> Void)?
 
     @Environment(APIService.self) private var apiService
+    @Environment(ServerConfig.self) private var serverConfig
+    @Environment(AppNavigation.self) private var appNavigation
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(StorageManager.self) private var storageManager
     @Environment(ReaderSettings.self) private var readerSettings
@@ -21,6 +24,8 @@ struct DownloadedBookDetailView: View {
     @State private var bookToRead: DownloadedBook?
     @State private var showingDeleteConfirmation = false
     @State private var isDescriptionExpanded = false
+    @State private var relatedBooks: [Book] = []
+    @State private var selectedRelatedBook: Book?
 
     var body: some View {
         ScrollView {
@@ -47,6 +52,10 @@ struct DownloadedBookDetailView: View {
                     .padding(.top, 24)
                     .padding(.horizontal, 20)
 
+                relatedBooksContent
+                    .padding(.top, 24)
+                    .padding(.horizontal, 20)
+
                 downloadInfoSection
                     .padding(.top, 24)
                     .padding(.horizontal, 20)
@@ -56,6 +65,9 @@ struct DownloadedBookDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .task {
+            await loadRelatedBooks()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
@@ -83,6 +95,9 @@ struct DownloadedBookDetailView: View {
                 .environment(storageManager)
                 .environment(readerSettings)
                 .modelContext(modelContext)
+        }
+        .sheet(item: $selectedRelatedBook) { relatedBook in
+            BookDetailView(book: relatedBook)
         }
     }
 
@@ -386,8 +401,63 @@ struct DownloadedBookDetailView: View {
                 DetailRow(label: "Published", value: publishedDate)
             }
             if let series = book.series {
-                let value = book.seriesNumber != nil ? "\(series) #\(Int(book.seriesNumber!))" : series
-                DetailRow(label: "Series", value: value)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Series")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        navigateToSeries(series)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(book.seriesNumber != nil ? "\(series) #\(Int(book.seriesNumber!))" : series)
+                                .font(.subheadline)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.accent)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Related Books
+
+    @ViewBuilder
+    private var relatedBooksContent: some View {
+        if !relatedBooks.isEmpty {
+            RelatedBooksSection(
+                title: "Related Books",
+                books: relatedBooks,
+                currentBookId: book.id
+            ) { tappedBook in
+                selectedRelatedBook = tappedBook
+            }
+        }
+    }
+
+    private func loadRelatedBooks() async {
+        do {
+            let response = try await apiService.fetchBook(id: book.id)
+            relatedBooks = response.relatedBooks ?? []
+        } catch {
+            // Silently fail — related books are supplementary
+        }
+    }
+
+    private func navigateToSeries(_ series: String) {
+        Task {
+            let isConnected = await serverConfig.testConnection()
+            await MainActor.run {
+                if isConnected {
+                    // Navigate to Library tab filtered by this series
+                    appNavigation.pendingSeriesFilter = series
+                    appNavigation.selectedTab = 0
+                } else {
+                    // Stay in Downloads, filter by series
+                    onSeriesTap?(series)
+                    dismiss()
+                }
             }
         }
     }
@@ -421,6 +491,8 @@ struct DownloadedBookDetailView: View {
     NavigationStack {
         DownloadedBookDetailView(book: book)
     }
+    .environment(ServerConfig())
+    .environment(AppNavigation())
     .environment(APIService(config: ServerConfig()))
     .environment(DownloadManager(config: ServerConfig(), apiService: APIService(config: ServerConfig())))
     .environment(StorageManager())

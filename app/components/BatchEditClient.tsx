@@ -150,6 +150,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
     return () => cancelAnimationFrame(timer);
   }, []);
 
+  // Prevent body scroll while batch edit is mounted
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   // Close tag dropdown when clicking outside
   useEffect(() => {
     if (!openTagDropdown) return;
@@ -623,8 +629,8 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen overflow-hidden">
-        <header className="sticky top-0 z-20 bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
+      <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden">
+        <header className="bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-3">
             <Link to="/" className="text-primary hover:text-primary-hover transition-colors text-sm">&larr; Library</Link>
             <h1 className="text-xl font-bold text-foreground">Batch Edit</h1>
@@ -641,7 +647,7 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden">
       {/* Shared datalists for autocomplete — rendered once instead of per-row */}
       <datalist id="shared-authors-datalist">
         {authorNames.map((a) => (
@@ -654,8 +660,8 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         ))}
       </datalist>
 
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-20 bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
+      {/* Header */}
+      <header className="bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <Link to="/" className="text-primary hover:text-primary-hover transition-colors text-sm">&larr; Library</Link>
           <h1 className="text-xl font-bold text-foreground">Batch Edit</h1>
