@@ -1,6 +1,6 @@
 /**
- * Build script for the parser worker
- * Bundles the worker and its dependencies into a single JS file
+ * Build script for worker threads
+ * Bundles the parser worker and processing worker into standalone JS files
  */
 import { build } from "esbuild";
 import { copyFile, mkdir } from "fs/promises";
@@ -10,48 +10,60 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
-async function buildWorker() {
-  console.log("[Worker Build] Building parser worker...");
+const SHARED_EXTERNALS = [
+  // Node.js built-ins
+  "fs",
+  "fs/promises",
+  "path",
+  "url",
+  "worker_threads",
+  "crypto",
+  "stream",
+  "buffer",
+  "util",
+  "events",
+  "os",
+  "zlib",
+  "child_process",
+  // Native modules that can't be bundled
+  "better-sqlite3",
+  "canvas",
+  "sharp",
+  // CBR/RAR parsing - has dynamic requires that don't work when bundled
+  "node-unrar-js",
+];
 
+const SHARED_OPTIONS = {
+  bundle: true as const,
+  platform: "node" as const,
+  target: "node20",
+  format: "esm" as const,
+  external: SHARED_EXTERNALS,
+  resolveExtensions: [".ts", ".js", ".mjs"],
+  keepNames: true,
+  sourcemap: true,
+  logLevel: "info" as const,
+};
+
+async function buildWorkers() {
   const startTime = performance.now();
 
-  await build({
-    entryPoints: [join(rootDir, "app/lib/reader/parser-worker.ts")],
-    bundle: true,
-    platform: "node",
-    target: "node20",
-    format: "esm",
-    outfile: join(rootDir, "dist/worker/parser-worker.mjs"),
-    external: [
-      // Node.js built-ins
-      "fs",
-      "fs/promises",
-      "path",
-      "url",
-      "worker_threads",
-      "crypto",
-      "stream",
-      "buffer",
-      "util",
-      "events",
-      "os",
-      "zlib",
-      // Native modules that can't be bundled
-      "better-sqlite3",
-      "canvas",
-      "sharp",
-      // CBR/RAR parsing - has dynamic requires that don't work when bundled
-      "node-unrar-js",
-    ],
-    // Ensure we can resolve all internal modules
-    resolveExtensions: [".ts", ".js", ".mjs"],
-    // Keep names for debugging
-    keepNames: true,
-    // Source maps for debugging
-    sourcemap: true,
-    // Log level
-    logLevel: "info",
-  });
+  // Build both workers in parallel
+  await Promise.all([
+    // Parser worker (for reader content parsing)
+    build({
+      ...SHARED_OPTIONS,
+      entryPoints: [join(rootDir, "app/lib/reader/parser-worker.ts")],
+      outfile: join(rootDir, "dist/worker/parser-worker.mjs"),
+    }).then(() => console.log("[Worker Build] Built parser-worker.mjs")),
+
+    // Processing worker (for upload metadata/cover extraction, CBR conversion)
+    build({
+      ...SHARED_OPTIONS,
+      entryPoints: [join(rootDir, "app/lib/processing/processing-worker.ts")],
+      outfile: join(rootDir, "dist/worker/processing-worker.mjs"),
+    }).then(() => console.log("[Worker Build] Built processing-worker.mjs")),
+  ]);
 
   // Copy pdf.worker.mjs to dist/worker directory
   // pdfjs-dist requires this worker file to exist alongside the bundled parser-worker
@@ -69,7 +81,7 @@ async function buildWorker() {
   console.log(`[Worker Build] Done in ${duration}s`);
 }
 
-buildWorker().catch((error) => {
+buildWorkers().catch((error) => {
   console.error("[Worker Build] Failed:", error);
   process.exit(1);
 });

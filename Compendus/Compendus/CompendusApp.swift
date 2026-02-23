@@ -10,10 +10,13 @@ import SwiftData
 
 @main
 struct CompendusApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             DownloadedBook.self,
             BookHighlight.self,
+            PendingDownload.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -61,6 +64,11 @@ struct CompendusApp: App {
                 .environment(\.deepLinkBookId, $deepLinkBookId)
                 .onOpenURL { url in
                     handleDeepLink(url)
+                }
+                .onAppear {
+                    downloadManager.appDelegate = appDelegate
+                    downloadManager.modelContainer = sharedModelContainer
+                    downloadManager.reconnectBackgroundSession()
                 }
         }
         .modelContainer(sharedModelContainer)

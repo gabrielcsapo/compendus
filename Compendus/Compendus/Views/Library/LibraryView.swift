@@ -121,80 +121,97 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            mainContent
-                .navigationTitle(navigationTitle)
-                .toolbar { libraryToolbar }
-                .searchable(text: $searchText, prompt: viewMode == .series && selectedSeriesName == nil ? "Search series..." : "Search books...")
-                .onChange(of: searchText) { _, newValue in
-                    Task {
-                        if viewMode == .series && selectedSeriesName == nil {
-                            // Search is handled locally for series
-                        } else if newValue.isEmpty {
-                            await loadBooks()
-                        } else {
-                            await searchBooks(query: newValue)
-                        }
-                    }
-                }
-                .onChange(of: selectedFilter) { _, _ in
-                    if viewMode == .books || selectedSeriesName != nil {
-                        Task { await loadBooks() }
-                    }
-                }
-                .onChange(of: selectedSort) { _, _ in
-                    if viewMode == .books || selectedSeriesName != nil {
-                        Task { await loadBooks() }
-                    }
-                }
-                .onChange(of: viewMode) { _, newValue in
-                    Task {
-                        if newValue == .series && selectedSeriesName == nil {
-                            await loadSeries()
-                        } else if newValue == .books && selectedSeriesName == nil {
-                            await loadBooks()
-                        }
-                    }
-                }
-                .onChange(of: appNavigation.pendingSeriesFilter) { _, newValue in
-                    applyPendingSeriesFilter()
-                }
-                .onAppear {
-                    applyPendingSeriesFilter()
-                }
-                .refreshable {
-                    if viewMode == .series && selectedSeriesName == nil {
-                        await loadSeries()
-                    } else {
-                        await loadBooks()
-                    }
-                }
-                .task {
-                    if books.isEmpty && viewMode == .books {
-                        await loadBooks()
-                    }
-                    await downloadManager.syncDownloadedBooksMetadata(modelContext: modelContext)
-                }
-                .sheet(item: $selectedBook) { book in
-                    BookDetailView(
-                        book: book,
-                        onRead: { downloaded in
-                            bookToRead = downloaded
-                        },
-                        onSeriesTap: { seriesName in
-                            selectedSeriesName = seriesName
-                            viewMode = .books
-                            Task { await loadBooks() }
-                        },
-                        onBookTap: { tappedBook in
-                            selectedBook = tappedBook
-                        }
-                    )
-                }
-                .fullScreenCover(item: $bookToRead) { book in
-                    ReaderContainerView(book: book)
-                        .environment(readerSettings)
-                }
+            libraryContent
         }
+    }
+
+    private var libraryContent: some View {
+        libraryBase
+            .onChange(of: downloadManager.activeDownloads.count) {
+                cleanupFinishedDownloads()
+            }
+            .sheet(item: $selectedBook) { book in
+                BookDetailView(
+                    book: book,
+                    onRead: { downloaded in
+                        bookToRead = downloaded
+                    },
+                    onSeriesTap: { seriesName in
+                        selectedSeriesName = seriesName
+                        viewMode = .books
+                        Task { await loadBooks() }
+                    },
+                    onBookTap: { tappedBook in
+                        selectedBook = tappedBook
+                    }
+                )
+            }
+            .fullScreenCover(item: $bookToRead) { book in
+                ReaderContainerView(book: book)
+                    .environment(readerSettings)
+            }
+    }
+
+    private var libraryBase: some View {
+        librarySearchable
+            .onChange(of: viewMode) { _, newValue in
+                Task {
+                    if newValue == .series && selectedSeriesName == nil {
+                        await loadSeries()
+                    } else if newValue == .books && selectedSeriesName == nil {
+                        await loadBooks()
+                    }
+                }
+            }
+            .onChange(of: appNavigation.pendingSeriesFilter) { _, _ in
+                applyPendingSeriesFilter()
+            }
+            .onAppear { applyPendingSeriesFilter() }
+            .refreshable {
+                if viewMode == .series && selectedSeriesName == nil {
+                    await loadSeries()
+                } else {
+                    await loadBooks()
+                }
+            }
+            .task {
+                if books.isEmpty && viewMode == .books {
+                    await loadBooks()
+                }
+                await downloadManager.syncDownloadedBooksMetadata(modelContext: modelContext)
+            }
+    }
+
+    private var librarySearchable: some View {
+        mainContent
+            .navigationTitle(navigationTitle)
+            .toolbar { libraryToolbar }
+            .searchable(text: $searchText, prompt: searchPrompt)
+            .onChange(of: searchText) { _, newValue in
+                Task {
+                    if viewMode == .series && selectedSeriesName == nil {
+                        // Search is handled locally for series
+                    } else if newValue.isEmpty {
+                        await loadBooks()
+                    } else {
+                        await searchBooks(query: newValue)
+                    }
+                }
+            }
+            .onChange(of: selectedFilter) { _, _ in
+                if viewMode == .books || selectedSeriesName != nil {
+                    Task { await loadBooks() }
+                }
+            }
+            .onChange(of: selectedSort) { _, _ in
+                if viewMode == .books || selectedSeriesName != nil {
+                    Task { await loadBooks() }
+                }
+            }
+    }
+
+    private var searchPrompt: String {
+        viewMode == .series && selectedSeriesName == nil ? "Search series..." : "Search books..."
     }
 
     // MARK: - Main Content
@@ -520,14 +537,28 @@ struct LibraryView: View {
 
         Task {
             do {
-                _ = try await downloadManager.downloadBook(book, modelContext: modelContext)
+                let result = try await downloadManager.downloadBook(book, modelContext: modelContext)
                 await MainActor.run {
-                    downloadingBooks.remove(book.id)
+                    if result != nil {
+                        // Already downloaded, done immediately
+                        downloadingBooks.remove(book.id)
+                    }
+                    // If nil, download started in background — will be removed
+                    // when activeDownloads state changes to completed
                 }
             } catch {
                 await MainActor.run {
                     downloadingBooks.remove(book.id)
                 }
+            }
+        }
+    }
+
+    private func cleanupFinishedDownloads() {
+        for bookId in downloadingBooks {
+            let download = downloadManager.activeDownloads[bookId]
+            if download == nil || download?.state.isCompleted == true {
+                downloadingBooks.remove(bookId)
             }
         }
     }

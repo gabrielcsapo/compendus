@@ -2,7 +2,8 @@
 //  DownloadManager.swift
 //  Compendus
 //
-//  Handles downloading books for offline reading
+//  Handles downloading books for offline reading with background session support.
+//  Downloads continue when the app is backgrounded or terminated.
 //
 
 import Foundation
@@ -20,6 +21,11 @@ struct DownloadProgress: Identifiable {
         case downloading
         case completed
         case failed(Error)
+
+        var isCompleted: Bool {
+            if case .completed = self { return true }
+            return false
+        }
     }
 
     var progressDisplay: String {
@@ -37,20 +43,24 @@ class DownloadManager: NSObject {
     let apiService: APIService
 
     private(set) var activeDownloads: [String: DownloadProgress] = [:]
-    @ObservationIgnored private var downloadTasks: [String: URLSessionDownloadTask] = [:]
-    @ObservationIgnored private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
     @ObservationIgnored private var _session: URLSession?
+
+    /// Set by CompendusApp on appear for background session handling
+    weak var appDelegate: AppDelegate?
+    /// Set by CompendusApp on appear for creating ModelContexts in delegate callbacks
+    var modelContainer: ModelContainer?
+
+    private static let backgroundSessionIdentifier = "com.compendus.background-download"
 
     private var session: URLSession {
         if let existing = _session {
             return existing
         }
-        let config = URLSessionConfiguration.default
+        let config = URLSessionConfiguration.background(withIdentifier: Self.backgroundSessionIdentifier)
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
-        // Increase timeouts for large file downloads (audiobooks can be 1GB+)
-        config.timeoutIntervalForRequest = 60  // 60 seconds per request
         config.timeoutIntervalForResource = 3600  // 1 hour max for entire download
+        config.allowsCellularAccess = true
         let newSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         _session = newSession
         return newSession
@@ -62,32 +72,46 @@ class DownloadManager: NSObject {
         super.init()
     }
 
-    /// Download a book for offline reading
+    // MARK: - Public API
+
+    /// Download a book for offline reading.
+    /// The download runs in the background and completes even if the app is suspended.
+    /// Returns the existing DownloadedBook if already downloaded, or nil if download was started.
     @MainActor
-    func downloadBook(_ book: Book, modelContext: ModelContext) async throws -> DownloadedBook {
+    func downloadBook(_ book: Book, modelContext: ModelContext) async throws -> DownloadedBook? {
         // Check if already downloaded
+        let bookId = book.id
         let descriptor = FetchDescriptor<DownloadedBook>(
-            predicate: #Predicate { $0.id == book.id }
+            predicate: #Predicate { $0.id == bookId }
         )
         if let existing = try? modelContext.fetch(descriptor).first {
             return existing
         }
 
+        // Check if already pending/downloading
+        let pendingDescriptor = FetchDescriptor<PendingDownload>(
+            predicate: #Predicate { $0.id == bookId }
+        )
+        if let existing = try? modelContext.fetch(pendingDescriptor).first {
+            if existing.status == "downloading" || existing.status == "pending" {
+                print("[DownloadManager] Download already in progress for \(bookId)")
+                return nil
+            }
+            // Remove stale failed/completed pending download
+            modelContext.delete(existing)
+        }
+
         // Determine download URL and final format
-        // For CBR files, download as CBZ for offline reading support
-        // For MOBI/AZW/AZW3 files, download as EPUB (server auto-converts)
         let isCbr = book.format.lowercased() == "cbr"
         let isMobi = ["mobi", "azw", "azw3"].contains(book.format.lowercased())
         let downloadURL: URL?
         let localFormat: String
 
         if isCbr {
-            // Download CBR as CBZ for offline iOS support
             downloadURL = config.bookAsCbzURL(for: book.id)
             localFormat = "cbz"
             print("[DownloadManager] Converting CBR to CBZ for offline reading: \(book.id)")
         } else if isMobi {
-            // Download MOBI/AZW/AZW3 as EPUB (server converts on the fly)
             downloadURL = config.bookAsEpubURL(for: book.id)
             localFormat = "epub"
             print("[DownloadManager] Converting MOBI to EPUB for download: \(book.id)")
@@ -100,68 +124,35 @@ class DownloadManager: NSObject {
             throw APIError.invalidURL
         }
 
+        // Pre-fetch cover before starting download
+        var coverData: Data? = nil
+        if book.coverUrl != nil {
+            coverData = try? await apiService.fetchCover(bookId: book.id)
+        }
+
+        // Persist download intent in SwiftData
+        let pending = PendingDownload.from(book: book, downloadURL: downloadURL, localFormat: localFormat)
+        pending.status = "downloading"
+        pending.coverData = coverData
+        modelContext.insert(pending)
+        try modelContext.save()
+
         // Initialize progress tracking
         let progress = DownloadProgress(
             id: book.id,
             progress: 0,
             bytesReceived: 0,
             totalBytes: Int64(book.fileSize ?? 0),
-            state: .waiting
+            state: .downloading
         )
         activeDownloads[book.id] = progress
 
-        // Download file
-        let localURL = try await downloadFile(from: downloadURL, bookId: book.id)
+        // Start background download task
+        let task = session.downloadTask(with: downloadURL)
+        task.taskDescription = book.id  // Persists across app termination
+        task.resume()
 
-        // Move to permanent location
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let booksDir = documentsURL.appendingPathComponent("books", isDirectory: true)
-        try FileManager.default.createDirectory(at: booksDir, withIntermediateDirectories: true)
-
-        let fileName = "\(book.id).\(localFormat)"
-        let destinationURL = booksDir.appendingPathComponent(fileName)
-
-        // Remove existing file if present
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
-        }
-
-        try FileManager.default.moveItem(at: localURL, to: destinationURL)
-
-        // Get actual file size from downloaded file
-        let actualFileSize: Int
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: destinationURL.path),
-           let size = attrs[.size] as? Int {
-            actualFileSize = size
-        } else {
-            actualFileSize = book.fileSize ?? 0
-        }
-
-        // Download cover
-        var coverData: Data? = nil
-        if book.coverUrl != nil {
-            coverData = try? await apiService.fetchCover(bookId: book.id)
-        }
-
-        // Create database entry with actual file size
-        // Use local format (cbz) instead of original format (cbr) for offline reading
-        let downloadedBook = DownloadedBook.from(
-            book: book,
-            localPath: "books/\(fileName)",
-            coverData: coverData
-        )
-        // Override format if we converted CBR to CBZ or MOBI to EPUB
-        if isCbr || isMobi {
-            downloadedBook.format = localFormat
-        }
-        downloadedBook.fileSize = actualFileSize
-        modelContext.insert(downloadedBook)
-        try modelContext.save()
-
-        // Clean up progress tracking
-        activeDownloads.removeValue(forKey: book.id)
-
-        return downloadedBook
+        return nil
     }
 
     /// Download the converted EPUB version for a PDF book
@@ -184,11 +175,13 @@ class DownloadManager: NSObject {
             progress: 0,
             bytesReceived: 0,
             totalBytes: 0,
-            state: .waiting
+            state: .downloading
         )
         activeDownloads[progressId] = progress
 
-        let localURL = try await downloadFile(from: downloadURL, bookId: progressId)
+        // EPUB version downloads use a simple foreground data task since they're
+        // typically small and the user is actively waiting in the reader
+        let (data, _) = try await URLSession.shared.data(from: downloadURL)
 
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let booksDir = documentsURL.appendingPathComponent("books", isDirectory: true)
@@ -201,7 +194,7 @@ class DownloadManager: NSObject {
             try FileManager.default.removeItem(at: destinationURL)
         }
 
-        try FileManager.default.moveItem(at: localURL, to: destinationURL)
+        try data.write(to: destinationURL)
 
         downloadedBook.epubLocalPath = "books/\(fileName)"
         try modelContext.save()
@@ -210,22 +203,35 @@ class DownloadManager: NSObject {
     }
 
     /// Cancel a download in progress
-    func cancelDownload(bookId: String) {
-        downloadTasks[bookId]?.cancel()
-        downloadTasks.removeValue(forKey: bookId)
+    @MainActor
+    func cancelDownload(bookId: String, modelContext: ModelContext? = nil) {
+        session.getAllTasks { tasks in
+            for task in tasks {
+                if task.taskDescription == bookId {
+                    task.cancel()
+                }
+            }
+        }
+
         activeDownloads.removeValue(forKey: bookId)
-        completionHandlers.removeValue(forKey: bookId)
+
+        if let modelContext = modelContext {
+            let descriptor = FetchDescriptor<PendingDownload>(
+                predicate: #Predicate { $0.id == bookId }
+            )
+            if let pending = try? modelContext.fetch(descriptor).first {
+                modelContext.delete(pending)
+                try? modelContext.save()
+            }
+        }
     }
 
     /// Delete a downloaded book
     @MainActor
     func deleteBook(_ book: DownloadedBook, modelContext: ModelContext) throws {
-        // Delete file
         if let fileURL = book.fileURL {
             try? FileManager.default.removeItem(at: fileURL)
         }
-
-        // Delete from database
         modelContext.delete(book)
         try modelContext.save()
     }
@@ -264,17 +270,43 @@ class DownloadManager: NSObject {
         return try? modelContext.fetch(descriptor).first
     }
 
+    // MARK: - Background Session Reconnection
+
+    /// Reconnect to any in-progress background downloads after app launch.
+    func reconnectBackgroundSession() {
+        session.getAllTasks { [weak self] tasks in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                for task in tasks {
+                    guard let bookId = task.taskDescription else { continue }
+
+                    let progress = DownloadProgress(
+                        id: bookId,
+                        progress: task.countOfBytesExpectedToReceive > 0
+                            ? Double(task.countOfBytesReceived) / Double(task.countOfBytesExpectedToReceive)
+                            : 0,
+                        bytesReceived: task.countOfBytesReceived,
+                        totalBytes: task.countOfBytesExpectedToReceive,
+                        state: .downloading
+                    )
+                    self.activeDownloads[bookId] = progress
+                }
+
+                if !tasks.isEmpty {
+                    print("[DownloadManager] Reconnected to \(tasks.count) in-progress download(s)")
+                }
+            }
+        }
+    }
+
     // MARK: - Metadata Sync
 
-    /// Minimum interval between metadata syncs (1 hour)
     private static let syncInterval: TimeInterval = 3600
     private static let lastSyncKey = "lastMetadataSyncTimestamp"
 
-    /// Sync metadata for all downloaded books from the server.
-    /// Throttled to run at most once per hour.
     @MainActor
     func syncDownloadedBooksMetadata(modelContext: ModelContext) async {
-        // Throttle: skip if synced recently
         let lastSync = UserDefaults.standard.double(forKey: Self.lastSyncKey)
         if lastSync > 0 && Date.now.timeIntervalSince1970 - lastSync < Self.syncInterval {
             return
@@ -293,7 +325,6 @@ class DownloadManager: NSObject {
                 group.addTask {
                     do {
                         let book = try await self.apiService.fetchBook(id: bookId).book
-                        // Re-fetch cover if server has one
                         var coverData: Data? = nil
                         if book.coverUrl != nil {
                             coverData = try? await self.apiService.fetchCover(bookId: bookId)
@@ -321,60 +352,90 @@ class DownloadManager: NSObject {
             print("[DownloadManager] Failed to save synced metadata: \(error.localizedDescription)")
         }
     }
-
-    // MARK: - Private Helpers
-
-    private func downloadFile(from url: URL, bookId: String) async throws -> URL {
-        return try await withCheckedThrowingContinuation { continuation in
-            let task = session.downloadTask(with: url)
-            downloadTasks[bookId] = task
-            completionHandlers[bookId] = { result in
-                continuation.resume(with: result)
-            }
-
-            DispatchQueue.main.async {
-                self.activeDownloads[bookId]?.state = .downloading
-            }
-
-            task.resume()
-        }
-    }
 }
 
 // MARK: - URLSessionDownloadDelegate
 
 extension DownloadManager: URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        guard let bookId = downloadTasks.first(where: { $0.value == downloadTask })?.key else { return }
+        guard let bookId = downloadTask.taskDescription else { return }
 
-        // Copy to a temporary location we control (the system will delete the original)
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        guard let container = modelContainer else {
+            print("[DownloadManager] No model container available for background completion")
+            return
+        }
+
+        // Create a fresh ModelContext for this background thread
+        let context = ModelContext(container)
+
+        let descriptor = FetchDescriptor<PendingDownload>(
+            predicate: #Predicate { $0.id == bookId }
+        )
+        guard let pending = try? context.fetch(descriptor).first else {
+            print("[DownloadManager] No PendingDownload found for \(bookId)")
+            return
+        }
+
         do {
-            try FileManager.default.copyItem(at: location, to: tempURL)
+            let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let booksDir = documentsURL.appendingPathComponent("books", isDirectory: true)
+            try FileManager.default.createDirectory(at: booksDir, withIntermediateDirectories: true)
+
+            let fileName = "\(bookId).\(pending.format)"
+            let destinationURL = booksDir.appendingPathComponent(fileName)
+
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+
+            try FileManager.default.moveItem(at: location, to: destinationURL)
+
+            let actualFileSize: Int
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: destinationURL.path),
+               let size = attrs[.size] as? Int {
+                actualFileSize = size
+            } else {
+                actualFileSize = pending.fileSize
+            }
+
+            let downloadedBook = pending.toDownloadedBook(
+                localPath: "books/\(fileName)",
+                fileSize: actualFileSize,
+                coverData: pending.coverData
+            )
+
+            context.insert(downloadedBook)
+            context.delete(pending)
+            try context.save()
 
             DispatchQueue.main.async {
                 self.activeDownloads[bookId]?.state = .completed
                 self.activeDownloads[bookId]?.progress = 1.0
-                // Trigger success haptic feedback
                 HapticFeedback.success()
+
+                // Clean up progress tracking after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    self.activeDownloads.removeValue(forKey: bookId)
+                }
             }
 
-            completionHandlers[bookId]?(.success(tempURL))
+            print("[DownloadManager] Download completed for \(bookId)")
         } catch {
+            print("[DownloadManager] Failed to process completed download for \(bookId): \(error)")
+
+            pending.status = "failed"
+            pending.errorMessage = error.localizedDescription
+            try? context.save()
+
             DispatchQueue.main.async {
                 self.activeDownloads[bookId]?.state = .failed(error)
-                // Trigger error haptic feedback
                 HapticFeedback.error()
             }
-            completionHandlers[bookId]?(.failure(error))
         }
-
-        downloadTasks.removeValue(forKey: bookId)
-        completionHandlers.removeValue(forKey: bookId)
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard let bookId = downloadTasks.first(where: { $0.value == downloadTask })?.key else { return }
+        guard let bookId = downloadTask.taskDescription else { return }
 
         let progress = totalBytesExpectedToWrite > 0
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
@@ -388,27 +449,44 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let downloadTask = task as? URLSessionDownloadTask,
-              let bookId = downloadTasks.first(where: { $0.value == downloadTask })?.key,
-              let error = error else { return }
+        guard let bookId = task.taskDescription, let error = error else { return }
 
-        // Log detailed error for debugging
+        // Ignore cancellation errors
+        if (error as NSError).code == NSURLErrorCancelled { return }
+
         print("[DownloadManager] Download failed for book \(bookId)")
         print("[DownloadManager] Error: \(error.localizedDescription)")
         if let urlError = error as? URLError {
             print("[DownloadManager] URLError code: \(urlError.code.rawValue)")
-            print("[DownloadManager] URLError description: \(urlError.localizedDescription)")
         }
-        if let response = downloadTask.response as? HTTPURLResponse {
+        if let response = task.response as? HTTPURLResponse {
             print("[DownloadManager] HTTP Status: \(response.statusCode)")
+        }
+
+        // Update PendingDownload status
+        if let container = modelContainer {
+            let context = ModelContext(container)
+            let descriptor = FetchDescriptor<PendingDownload>(
+                predicate: #Predicate { $0.id == bookId }
+            )
+            if let pending = try? context.fetch(descriptor).first {
+                pending.status = "failed"
+                pending.errorMessage = error.localizedDescription
+                try? context.save()
+            }
         }
 
         DispatchQueue.main.async {
             self.activeDownloads[bookId]?.state = .failed(error)
+            HapticFeedback.error()
         }
+    }
 
-        completionHandlers[bookId]?(.failure(error))
-        downloadTasks.removeValue(forKey: bookId)
-        completionHandlers.removeValue(forKey: bookId)
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            self.appDelegate?.backgroundSessionCompletionHandler?()
+            self.appDelegate?.backgroundSessionCompletionHandler = nil
+            print("[DownloadManager] Background session events processed")
+        }
     }
 }

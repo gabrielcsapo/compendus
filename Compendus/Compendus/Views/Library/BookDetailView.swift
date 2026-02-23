@@ -101,6 +101,12 @@ struct BookDetailView: View {
                 checkIfDownloaded()
                 await loadRelatedBooks()
             }
+            .onChange(of: downloadManager.activeDownloads[book.id]?.state.isCompleted) { _, completed in
+                if completed == true {
+                    checkIfDownloaded()
+                    isDownloading = false
+                }
+            }
             .alert("Download Failed", isPresented: $showingError) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -663,9 +669,14 @@ struct BookDetailView: View {
             do {
                 let downloaded = try await downloadManager.downloadBook(book, modelContext: modelContext)
                 await MainActor.run {
-                    isDownloading = false
-                    isDownloaded = true
-                    downloadedBook = downloaded
+                    if let downloaded = downloaded {
+                        // Already existed, available immediately
+                        isDownloading = false
+                        isDownloaded = true
+                        downloadedBook = downloaded
+                    }
+                    // If nil, download started in background — UI tracks via activeDownloads
+                    // The download completion will be detected by checkIfDownloaded()
                 }
             } catch {
                 await MainActor.run {

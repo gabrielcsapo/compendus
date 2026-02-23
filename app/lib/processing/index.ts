@@ -18,11 +18,13 @@ import {
   type AudioFileInput,
 } from "./audio";
 import { extractCover } from "./cover";
-import { suppressConsole, yieldToEventLoop, scheduleBackground } from "./utils";
+import { convertCbrToCbz } from "./comic";
+import { suppressConsole, yieldToEventLoop, scheduleBackground, runInWorker } from "./utils";
 import { createJob, updateJobProgress } from "../jobs";
 import type {
   BookFormat,
   BookMetadata,
+  CoverResult,
   ProcessingResult,
   ImportOptions,
 } from "../types";
@@ -56,19 +58,41 @@ export async function processBook(
   }
 
   // Step 3: Detect format (fast)
-  const format = detectFormat(fileName, buffer);
-  if (!format) {
+  const detectedFormat = detectFormat(fileName, buffer);
+  if (!detectedFormat) {
     return { success: false, error: "unsupported_format" };
+  }
+
+  // Step 3.5: Convert CBR → CBZ at upload time so iOS can read offline
+  let format: BookFormat = detectedFormat;
+  let processedBuffer = buffer;
+  let processedFileName = fileName;
+  if (detectedFormat === "cbr") {
+    try {
+      console.log(`[processBook] Converting CBR → CBZ at upload time: ${fileName}`);
+      const result = await runInWorker<Uint8Array>(
+        "convertCbrToCbz",
+        buffer,
+        "cbr",
+        async () => convertCbrToCbz(buffer),
+      );
+      processedBuffer = Buffer.from(result);
+      format = "cbz";
+      processedFileName = fileName.replace(/\.cbr$/i, ".cbz");
+    } catch (error) {
+      console.error("[processBook] CBR → CBZ conversion failed, storing as CBR:", error);
+      // Fall back to storing original CBR
+    }
   }
 
   // Step 4: Generate book ID and store file immediately
   const bookId = uuid();
-  const storedPath = storeBookFile(buffer, bookId, format);
-  const mimeType = lookup(fileName) || "application/octet-stream";
-  const titleFromFilename = basename(fileName, extname(fileName));
+  const storedPath = storeBookFile(processedBuffer, bookId, format);
+  const mimeType = lookup(processedFileName) || "application/octet-stream";
+  const titleFromFilename = basename(processedFileName, extname(processedFileName));
 
   // For large files, save immediately with basic info and process in background
-  if (buffer.length > BACKGROUND_PROCESSING_THRESHOLD) {
+  if (processedBuffer.length > BACKGROUND_PROCESSING_THRESHOLD) {
     // Insert basic entry immediately with any provided metadata overrides
     // Use try-catch to handle race condition where another concurrent upload
     // of the same file inserted between our duplicate check and this insert
@@ -77,8 +101,8 @@ export async function processBook(
       await db.insert(books).values({
         id: bookId,
         filePath: storedPath,
-        fileName: fileName,
-        fileSize: buffer.length,
+        fileName: processedFileName,
+        fileSize: processedBuffer.length,
         fileHash,
         mimeType,
         title: meta?.title || titleFromFilename,
@@ -112,7 +136,7 @@ export async function processBook(
     }
 
     // Queue heavy processing in background
-    queueBackgroundProcessing(bookId, buffer, format, options);
+    queueBackgroundProcessing(bookId, processedBuffer, format, options);
 
     return {
       success: true,
@@ -124,7 +148,12 @@ export async function processBook(
   // For smaller files, do full processing synchronously (original behavior)
   let metadata: BookMetadata | AudioMetadata;
   try {
-    metadata = await suppressConsole(() => extractMetadata(buffer, format));
+    metadata = await runInWorker<BookMetadata>(
+      "extractMetadata",
+      processedBuffer,
+      format,
+      () => suppressConsole(() => extractMetadata(processedBuffer, format)),
+    );
   } catch {
     metadata = {
       title: titleFromFilename,
@@ -135,7 +164,16 @@ export async function processBook(
   // Extract audio-specific fields if present
   const audioMetadata = metadata as AudioMetadata;
 
-  const coverResult = await suppressConsole(() => extractCover(buffer, format));
+  const coverResultRaw = await runInWorker<CoverResult | null>(
+    "extractCover",
+    processedBuffer,
+    format,
+    () => suppressConsole(() => extractCover(processedBuffer, format)),
+  );
+  // Worker returns Uint8Array for buffer, convert back to Buffer
+  const coverResult = coverResultRaw
+    ? { ...coverResultRaw, buffer: Buffer.from(coverResultRaw.buffer) }
+    : null;
   const coverPath = coverResult ? storeCoverImage(coverResult.buffer, bookId) : null;
 
   // Merge extracted metadata with overrides (overrides take precedence)
@@ -147,8 +185,8 @@ export async function processBook(
     await db.insert(books).values({
       id: bookId,
       filePath: storedPath,
-      fileName: fileName,
-      fileSize: buffer.length,
+      fileName: processedFileName,
+      fileSize: processedBuffer.length,
       fileHash,
       mimeType,
       title: meta?.title || metadata.title || titleFromFilename,
@@ -292,10 +330,15 @@ function queueBackgroundProcessing(
   options: ImportOptions,
 ) {
   scheduleBackground(async () => {
-    // Extract metadata with console suppression (EPUB parser is verbose)
+    // Extract metadata in worker thread (falls back to main thread)
     let metadata: BookMetadata | AudioMetadata;
     try {
-      metadata = await suppressConsole(() => extractMetadata(buffer, format));
+      metadata = await runInWorker<BookMetadata>(
+        "extractMetadata",
+        buffer,
+        format,
+        () => suppressConsole(() => extractMetadata(buffer, format)),
+      );
     } catch {
       metadata = { title: null, authors: [] };
     }
@@ -304,8 +347,16 @@ function queueBackgroundProcessing(
     // Yield to event loop between heavy operations
     await yieldToEventLoop();
 
-    // Extract cover
-    const coverResult = await suppressConsole(() => extractCover(buffer, format));
+    // Extract cover in worker thread
+    const coverResultRaw = await runInWorker<CoverResult | null>(
+      "extractCover",
+      buffer,
+      format,
+      () => suppressConsole(() => extractCover(buffer, format)),
+    );
+    const coverResult = coverResultRaw
+      ? { ...coverResultRaw, buffer: Buffer.from(coverResultRaw.buffer) }
+      : null;
     const coverPath = coverResult ? storeCoverImage(coverResult.buffer, bookId) : null;
 
     // Yield again before database operations

@@ -1,6 +1,9 @@
 /**
  * Utility functions for processing operations
  */
+import { isWorkerAvailable, getWorkerPool } from "./worker-pool";
+import type { WorkerTaskType } from "./processing-worker";
+import type { BookFormat } from "../types";
 
 /**
  * Suppress console output during the execution of a function.
@@ -49,4 +52,27 @@ export function scheduleBackground(fn: () => Promise<void>): void {
       // Background processing failed silently
     }
   }, 10); // Small delay to ensure main thread can respond
+}
+
+/**
+ * Run a CPU-intensive task in a worker thread.
+ * Falls back to main-thread execution if the worker isn't built.
+ */
+export async function runInWorker<T>(
+  type: WorkerTaskType,
+  buffer: Buffer,
+  format: BookFormat,
+  fallback: () => Promise<T>,
+): Promise<T> {
+  if (!isWorkerAvailable()) {
+    return fallback();
+  }
+
+  try {
+    const pool = getWorkerPool();
+    return (await pool.runTask(type, buffer, format)) as T;
+  } catch (error) {
+    console.warn(`[runInWorker] Worker failed for ${type}, falling back to main thread:`, error);
+    return fallback();
+  }
 }

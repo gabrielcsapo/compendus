@@ -260,11 +260,11 @@ export async function convertCbrToCbz(cbrBuffer: Buffer): Promise<Buffer> {
 
   console.log(`[CBR→CBZ] Extracted ${extractedCount} images, creating CBZ...`);
 
-  // Generate CBZ with good compression
+  // Use STORE mode (no compression) since comic images are already JPEG/PNG compressed.
+  // Re-compressing them with DEFLATE wastes CPU for negligible size savings.
   const cbzBuffer = await zip.generateAsync({
     type: "nodebuffer",
-    compression: "DEFLATE",
-    compressionOptions: { level: 6 },
+    compression: "STORE",
   });
 
   console.log(`[CBR→CBZ] Conversion complete, output size: ${(cbzBuffer.length / 1024 / 1024).toFixed(1)}MB`);
