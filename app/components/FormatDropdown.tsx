@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import type { TypeFilter } from "./TypeTabs";
+import { isNativeFormat, isConvertibleFormat } from "../lib/book-types";
 
 interface FormatDropdownProps {
   formatCounts: { format: string; count: number }[];
@@ -100,26 +101,59 @@ export function FormatDropdown({
 
       {open && (
         <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-surface border border-border rounded-xl shadow-lg p-2">
-          {sorted.map(({ format, count }) => {
-            const checked = selectedFormats.includes(format);
-            return (
-              <label
-                key={format}
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-surface-elevated transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggle(format)}
-                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary"
-                />
-                <span className="text-sm font-medium text-foreground uppercase flex-1">
-                  {format}
-                </span>
-                <span className="text-xs text-foreground-muted tabular-nums">{count}</span>
-              </label>
-            );
-          })}
+          {sorted.filter(({ format }) => isNativeFormat(format)).length > 0 && (
+            <>
+              <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                Native
+              </p>
+              {sorted
+                .filter(({ format }) => isNativeFormat(format))
+                .map(({ format, count }) => (
+                  <label
+                    key={format}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-surface-elevated transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFormats.includes(format)}
+                      onChange={() => toggle(format)}
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground uppercase flex-1">
+                      {format}
+                    </span>
+                    <span className="text-xs text-foreground-muted tabular-nums">{count}</span>
+                  </label>
+                ))}
+            </>
+          )}
+          {sorted.filter(({ format }) => isConvertibleFormat(format)).length > 0 && (
+            <>
+              <div className="border-t border-border my-1" />
+              <p className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+                Convertible
+              </p>
+              {sorted
+                .filter(({ format }) => isConvertibleFormat(format))
+                .map(({ format, count }) => (
+                  <label
+                    key={format}
+                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-surface-elevated transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFormats.includes(format)}
+                      onChange={() => toggle(format)}
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground uppercase flex-1">
+                      {format}
+                    </span>
+                    <span className="text-xs text-foreground-muted tabular-nums">{count}</span>
+                  </label>
+                ))}
+            </>
+          )}
           {activeCount > 0 && (
             <>
               <div className="border-t border-border my-1" />

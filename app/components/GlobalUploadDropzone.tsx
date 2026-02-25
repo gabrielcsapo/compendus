@@ -574,7 +574,8 @@ export function GlobalUploadDropzone() {
                 </svg>
               </div>
               <p className="text-xl font-semibold text-foreground">Drop files to upload</p>
-              <p className="text-foreground-muted mt-1">PDF, EPUB, MOBI, CBR, CBZ, M4B, MP3</p>
+              <p className="text-foreground-muted mt-1">PDF, EPUB, CBZ, M4B, MP3</p>
+              <p className="text-foreground-muted/60 text-sm mt-0.5">Also accepts MOBI, AZW, CBR (auto-converted)</p>
             </div>
           </div>
         </div>

@@ -77,6 +77,18 @@ struct Book: Codable, Identifiable, Hashable {
         ["epub", "pdf", "mobi", "azw", "azw3"].contains(format.lowercased())
     }
 
+    var isConvertibleFormat: Bool {
+        ["mobi", "azw", "azw3", "cbr"].contains(format.lowercased())
+    }
+
+    var conversionTarget: String? {
+        switch format.lowercased() {
+        case "mobi", "azw", "azw3": return "EPUB"
+        case "cbr": return "CBZ"
+        default: return nil
+        }
+    }
+
     var seriesNumberDouble: Double? {
         guard let num = seriesNumber else { return nil }
         return Double(num)

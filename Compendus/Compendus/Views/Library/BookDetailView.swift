@@ -58,8 +58,8 @@ struct BookDetailView: View {
                         .padding(.top, 20)
                         .padding(.horizontal, 20)
 
-                    // PDF → EPUB conversion (MOBI/AZW/AZW3 auto-convert on download)
-                    if book.format.lowercased() == "pdf" {
+                    // EPUB conversion for PDF, MOBI, AZW, AZW3
+                    if ["pdf", "mobi", "azw", "azw3"].contains(book.format.lowercased()) {
                         convertToEpubSection
                             .padding(.top, 12)
                             .padding(.horizontal, 20)
@@ -370,31 +370,12 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var formatBadge: some View {
-        Text(book.formatDisplay)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(formatColor.opacity(0.2))
-            .foregroundStyle(formatColor)
-            .clipShape(Capsule())
-    }
-
-    private var formatColor: Color {
-        switch book.format.lowercased() {
-        case "epub":
-            return .blue
-        case "pdf":
-            return .red
-        case "mobi", "azw", "azw3":
-            return .orange
-        case "cbr", "cbz":
-            return .purple
-        case "m4b", "mp3", "m4a":
-            return .green
-        default:
-            return .gray
-        }
+        let info = FormatInfo.from(format: book.format)
+        FormatBadgeView(
+            format: book.format,
+            size: .detail,
+            showConversionHint: info.isConvertible && !book.hasEpubVersion
+        )
     }
 
     @ViewBuilder

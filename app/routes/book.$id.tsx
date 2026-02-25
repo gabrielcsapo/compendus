@@ -117,8 +117,8 @@ export default function BookDetail({ loaderData }: { loaderData: LoaderData }) {
             </a>
           </div>
 
-          {/* Convert PDF to EPUB */}
-          {book.format === "pdf" && (
+          {/* Convert to EPUB (PDF, MOBI, AZW3) */}
+          {["pdf", "mobi", "azw3"].includes(book.format) && (
             <ConvertToEpubButton bookId={book.id} hasEpub={!!book.convertedEpubPath} />
           )}
 

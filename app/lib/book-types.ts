@@ -4,6 +4,29 @@ const AUDIOBOOK_FORMATS = ["m4b", "mp3", "m4a"];
 const COMIC_FORMATS = ["cbr", "cbz"];
 const EBOOK_FORMATS = ["pdf", "epub", "mobi", "azw3"];
 
+/** Formats that can be read directly without conversion */
+const NATIVE_FORMATS = ["pdf", "epub", "cbz", "m4b", "mp3", "m4a"];
+
+/** Formats that need conversion before reading, mapped to their target format */
+const CONVERTIBLE_FORMAT_MAP: Record<string, string> = {
+  mobi: "epub",
+  azw: "epub",
+  azw3: "epub",
+  cbr: "cbz",
+};
+
+export function isNativeFormat(format: string): boolean {
+  return NATIVE_FORMATS.includes(format.toLowerCase());
+}
+
+export function isConvertibleFormat(format: string): boolean {
+  return format.toLowerCase() in CONVERTIBLE_FORMAT_MAP;
+}
+
+export function getConversionTarget(format: string): string | null {
+  return CONVERTIBLE_FORMAT_MAP[format.toLowerCase()] ?? null;
+}
+
 export function getFormatsByType(type: BookType): string[] {
   switch (type) {
     case "audiobook":

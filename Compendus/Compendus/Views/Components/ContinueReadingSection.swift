@@ -132,52 +132,7 @@ struct ContinueReadingCard: View {
 
     @ViewBuilder
     private var formatBadge: some View {
-        HStack(spacing: 2) {
-            Image(systemName: formatIcon)
-                .font(.system(size: 8))
-            Text(book.formatDisplay)
-                .font(.system(size: 9))
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 2)
-        .background(formatColor.opacity(0.2))
-        .foregroundStyle(formatColor)
-        .clipShape(Capsule())
-    }
-
-    private var formatIcon: String {
-        switch book.format.lowercased() {
-        case "epub":
-            return "book.closed.fill"
-        case "pdf":
-            return "doc.fill"
-        case "mobi", "azw", "azw3":
-            return "book.fill"
-        case "cbr", "cbz":
-            return "book.pages.fill"
-        case "m4b", "mp3", "m4a":
-            return "headphones"
-        default:
-            return "doc.fill"
-        }
-    }
-
-    private var formatColor: Color {
-        switch book.format.lowercased() {
-        case "epub":
-            return .blue
-        case "pdf":
-            return .red
-        case "mobi", "azw", "azw3":
-            return .orange
-        case "cbr", "cbz":
-            return .purple
-        case "m4b", "mp3", "m4a":
-            return .green
-        default:
-            return .gray
-        }
+        FormatBadgeView(format: book.format, size: .compact)
     }
 }
 
