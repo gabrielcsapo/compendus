@@ -78,6 +78,10 @@ enum BookSort: String, CaseIterable {
     }
 }
 
+private struct SeriesSheet: Identifiable {
+    let id: String  // series name
+}
+
 struct LibraryView: View {
     @Environment(APIService.self) private var apiService
     @Environment(ServerConfig.self) private var serverConfig
@@ -104,7 +108,7 @@ struct LibraryView: View {
     @State private var downloadingBooks: Set<String> = []
     @State private var viewMode: LibraryViewMode = .books
     @State private var seriesItems: [SeriesItem] = []
-    @State private var selectedSeriesName: String? = nil
+    @State private var seriesSheet: SeriesSheet? = nil
     @State private var isLoadingSeries = false
 
     private let limit = 50
@@ -138,14 +142,17 @@ struct LibraryView: View {
                         }
                     },
                     onSeriesTap: { seriesName in
-                        selectedSeriesName = seriesName
-                        viewMode = .books
-                        Task { await loadBooks() }
+                        seriesSheet = SeriesSheet(id: seriesName)
                     },
                     onBookTap: { tappedBook in
                         selectedBook = tappedBook
                     }
                 )
+            }
+            .sheet(item: $seriesSheet) { sheet in
+                SeriesDetailView(seriesName: sheet.id)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
             .fullScreenCover(item: $bookToRead) { book in
                 ReaderContainerView(book: book)
@@ -157,9 +164,9 @@ struct LibraryView: View {
         librarySearchable
             .onChange(of: viewMode) { _, newValue in
                 Task {
-                    if newValue == .series && selectedSeriesName == nil {
+                    if newValue == .series {
                         await loadSeries()
-                    } else if newValue == .books && selectedSeriesName == nil {
+                    } else if newValue == .books {
                         await loadBooks()
                     }
                 }
@@ -169,7 +176,7 @@ struct LibraryView: View {
             }
             .onAppear { applyPendingSeriesFilter() }
             .refreshable {
-                if viewMode == .series && selectedSeriesName == nil {
+                if viewMode == .series {
                     await loadSeries()
                 } else {
                     await loadBooks()
@@ -190,7 +197,7 @@ struct LibraryView: View {
             .searchable(text: $searchText, prompt: searchPrompt)
             .onChange(of: searchText) { _, newValue in
                 Task {
-                    if viewMode == .series && selectedSeriesName == nil {
+                    if viewMode == .series {
                         // Search is handled locally for series
                     } else if newValue.isEmpty {
                         await loadBooks()
@@ -200,26 +207,26 @@ struct LibraryView: View {
                 }
             }
             .onChange(of: selectedFilter) { _, _ in
-                if viewMode == .books || selectedSeriesName != nil {
+                if viewMode == .books {
                     Task { await loadBooks() }
                 }
             }
             .onChange(of: selectedSort) { _, _ in
-                if viewMode == .books || selectedSeriesName != nil {
+                if viewMode == .books {
                     Task { await loadBooks() }
                 }
             }
     }
 
     private var searchPrompt: String {
-        viewMode == .series && selectedSeriesName == nil ? "Search series..." : "Search books..."
+        viewMode == .series ? "Search series..." : "Search books..."
     }
 
     // MARK: - Main Content
 
     @ViewBuilder
     private var mainContent: some View {
-        if viewMode == .series && selectedSeriesName == nil {
+        if viewMode == .series {
             seriesGridContent
         } else if books.isEmpty && isLoading {
             SkeletonBookGrid(count: 8)
@@ -241,23 +248,6 @@ struct LibraryView: View {
 
     private var booksScrollContent: some View {
         ScrollView {
-            if selectedSeriesName != nil {
-                Button {
-                    selectedSeriesName = nil
-                    viewMode = .series
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.caption)
-                        Text("All Series")
-                            .font(.subheadline)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(Array(books.enumerated()), id: \.element.id) { index, book in
                     bookGridCell(book: book, index: index)
@@ -275,9 +265,7 @@ struct LibraryView: View {
 
     private func bookGridCell(book: Book, index: Int) -> some View {
         BookGridItem(book: book, isDownloaded: downloadedBook(for: book.id) != nil, onSeriesTap: { seriesName in
-                selectedSeriesName = seriesName
-                viewMode = .books
-                Task { await loadBooks() }
+                seriesSheet = SeriesSheet(id: seriesName)
             })
             .onTapGesture {
                 selectedBook = book
@@ -338,7 +326,7 @@ struct LibraryView: View {
             .pickerStyle(.segmented)
             .frame(width: 160)
         }
-        if viewMode == .books || selectedSeriesName != nil {
+        if viewMode == .books {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     ForEach(BookFilter.allCases, id: \.self) { filter in
@@ -377,9 +365,6 @@ struct LibraryView: View {
     // MARK: - Navigation Title
 
     private var navigationTitle: String {
-        if let seriesName = selectedSeriesName {
-            return seriesName
-        }
         if viewMode == .series {
             return seriesItems.isEmpty ? "Series" : "Series (\(seriesItems.count))"
         }
@@ -411,9 +396,7 @@ struct LibraryView: View {
                     ForEach(filteredSeriesItems) { series in
                         SeriesGridItem(series: series)
                             .onTapGesture {
-                                selectedSeriesName = series.name
-                                viewMode = .books
-                                Task { await loadBooks() }
+                                seriesSheet = SeriesSheet(id: series.name)
                             }
                     }
                 }
@@ -432,10 +415,8 @@ struct LibraryView: View {
 
     private func applyPendingSeriesFilter() {
         if let seriesName = appNavigation.pendingSeriesFilter {
-            selectedSeriesName = seriesName
-            viewMode = .books
             appNavigation.pendingSeriesFilter = nil
-            Task { await loadBooks() }
+            seriesSheet = SeriesSheet(id: seriesName)
         }
     }
 
@@ -445,7 +426,7 @@ struct LibraryView: View {
         offset = 0
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder, series: selectedSeriesName)
+            let response = try await apiService.fetchBooks(limit: limit, offset: 0, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
             books = response.books
             totalCount = response.totalCount ?? response.books.count
             hasMore = response.books.count >= limit
@@ -471,7 +452,7 @@ struct LibraryView: View {
         isLoading = true
 
         do {
-            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder, series: selectedSeriesName)
+            let response = try await apiService.fetchBooks(limit: limit, offset: offset, type: selectedFilter.apiType, orderBy: selectedSort.apiOrderBy, order: selectedSort.apiOrder)
             let newBooks = response.books
             books.append(contentsOf: newBooks)
             hasMore = newBooks.count >= limit

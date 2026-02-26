@@ -46,6 +46,10 @@ enum DownloadViewMode: String, CaseIterable {
     }
 }
 
+private struct DownloadSeriesSheet: Identifiable {
+    let id: String  // series name
+}
+
 struct DownloadsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(APIService.self) private var apiService
@@ -75,7 +79,7 @@ struct DownloadsView: View {
     @State private var showingStorageBreakdown = false
     @State private var bookToRead: DownloadedBook?
     @State private var viewMode: DownloadViewMode = .books
-    @State private var selectedSeriesName: String? = nil
+    @State private var seriesSheet: DownloadSeriesSheet? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
@@ -83,13 +87,6 @@ struct DownloadsView: View {
 
     private var filteredBooks: [DownloadedBook] {
         var result = books
-
-        // Apply series filter
-        if let seriesName = selectedSeriesName {
-            result = result.filter { $0.series == seriesName }
-            // Sort by series number when viewing a specific series
-            result.sort { ($0.seriesNumber ?? .infinity) < ($1.seriesNumber ?? .infinity) }
-        }
 
         // Apply type filter
         if selectedFilter != .all {
@@ -151,8 +148,7 @@ struct DownloadsView: View {
                 .toolbar { downloadsToolbar }
                 .navigationDestination(for: DownloadedBook.self) { book in
                     DownloadedBookDetailView(book: book) { seriesName in
-                        selectedSeriesName = seriesName
-                        viewMode = .books
+                        seriesSheet = DownloadSeriesSheet(id: seriesName)
                     }
                 }
                 .searchable(text: $searchText, prompt: searchPrompt)
@@ -177,6 +173,11 @@ struct DownloadsView: View {
                 .sheet(isPresented: $showingStorageBreakdown) {
                     StorageBreakdownView()
                 }
+                .sheet(item: $seriesSheet) { sheet in
+                    DownloadedSeriesDetailView(seriesName: sheet.id)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
                 .refreshable {
                     await downloadManager.syncDownloadedBooksMetadata(modelContext: modelContext, force: true)
                 }
@@ -189,9 +190,6 @@ struct DownloadsView: View {
     // MARK: - Navigation Title
 
     private var navigationTitle: String {
-        if let seriesName = selectedSeriesName {
-            return seriesName
-        }
         if viewMode == .series {
             return seriesItems.isEmpty ? "Series" : "Series (\(seriesItems.count))"
         }
@@ -199,7 +197,7 @@ struct DownloadsView: View {
     }
 
     private var searchPrompt: String {
-        if viewMode == .series && selectedSeriesName == nil {
+        if viewMode == .series {
             return "Search series..."
         }
         return "Search downloads..."
@@ -211,7 +209,7 @@ struct DownloadsView: View {
     private var mainContent: some View {
         if books.isEmpty && !hasActiveDownloads && !transcriptionService.isActive {
             DownloadsEmptyStateView()
-        } else if viewMode == .series && selectedSeriesName == nil {
+        } else if viewMode == .series {
             seriesGridContent
         } else if filteredBooks.isEmpty && !hasActiveDownloads && !transcriptionService.isActive {
             filteredEmptyState
@@ -256,8 +254,7 @@ struct DownloadsView: View {
                     ForEach(filteredSeriesItems) { series in
                         DownloadedSeriesGridItem(series: series)
                             .onTapGesture {
-                                selectedSeriesName = series.name
-                                viewMode = .books
+                                seriesSheet = DownloadSeriesSheet(id: series.name)
                             }
                     }
                 }
@@ -271,25 +268,8 @@ struct DownloadsView: View {
 
     private var booksScrollContent: some View {
         ScrollView {
-            if selectedSeriesName != nil {
-                Button {
-                    selectedSeriesName = nil
-                    viewMode = .series
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.caption)
-                        Text("All Series")
-                            .font(.subheadline)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
             // Continue Reading section
-            if !recentlyReadBooks.isEmpty && searchText.isEmpty && selectedFilter == .all && selectedSeriesName == nil {
+            if !recentlyReadBooks.isEmpty && searchText.isEmpty && selectedFilter == .all {
                 ContinueReadingSection(books: recentlyReadBooks) { book in
                     if book.isAudiobook {
                         Task {
@@ -306,17 +286,17 @@ struct DownloadsView: View {
             }
 
             // Active downloads section
-            if hasActiveDownloads && selectedSeriesName == nil {
+            if hasActiveDownloads {
                 activeDownloadsSection
             }
 
             // Active transcription section
-            if transcriptionService.isActive && selectedSeriesName == nil {
+            if transcriptionService.isActive {
                 activeTranscriptionSection
             }
 
-            // Storage summary (only show when not searching, filtering, or in series view)
-            if searchText.isEmpty && selectedFilter == .all && selectedSeriesName == nil {
+            // Storage summary (only show when not searching or filtering)
+            if searchText.isEmpty && selectedFilter == .all {
                 StorageUsageView {
                     showingStorageBreakdown = true
                 }
@@ -328,8 +308,7 @@ struct DownloadsView: View {
                 ForEach(filteredBooks) { book in
                     NavigationLink(value: book) {
                         DownloadedBookGridItem(book: book, onSeriesTap: { seriesName in
-                            selectedSeriesName = seriesName
-                            viewMode = .books
+                            seriesSheet = DownloadSeriesSheet(id: seriesName)
                         })
                     }
                     .buttonStyle(.plain)
@@ -363,7 +342,7 @@ struct DownloadsView: View {
                 .frame(width: 160)
             }
 
-            if viewMode == .books || selectedSeriesName != nil {
+            if viewMode == .books {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(DownloadFilter.allCases, id: \.self) { filter in
