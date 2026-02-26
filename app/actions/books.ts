@@ -1,12 +1,12 @@
 "use server";
 
-import { db, books, booksTags, booksCollections, tags } from "../lib/db";
+import { db, books, booksTags, booksCollections, tags, bookEdits } from "../lib/db";
 import { eq, desc, asc, like, inArray, sql, and } from "drizzle-orm";
 import { deleteBookFile, deleteCoverImage, getBookFilePath, resolveStoragePath } from "../lib/storage";
 import { findBestMetadata, searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { processAndStoreCover } from "../lib/processing/cover";
 import { writeMetadataToFile } from "../lib/processing/metadata-writer";
-import type { Book } from "../lib/db/schema";
+import type { Book, NewBookEdit } from "../lib/db/schema";
 import type { BookFormat } from "../lib/types";
 import { v4 as uuid } from "uuid";
 import { getFormatsByType, type BookType } from "../lib/book-types";
@@ -157,9 +157,44 @@ export async function updateBook(
     lastPosition: string;
     bookTypeOverride: string | null;
   }>,
+  source: "web" | "ios" | "api" | "metadata" = "web",
 ): Promise<Book | null> {
   const book = await getBook(id);
   if (!book) return null;
+
+  // Record audit trail for metadata field changes
+  const auditableFields = [
+    "title", "subtitle", "authors", "publisher", "publishedDate",
+    "description", "isbn", "isbn13", "isbn10", "language",
+    "pageCount", "series", "seriesNumber", "bookTypeOverride",
+  ] as const;
+
+  const editGroupId = uuid();
+  const auditEntries: NewBookEdit[] = [];
+
+  for (const field of auditableFields) {
+    if (field in data) {
+      const oldVal = book[field as keyof Book];
+      const newVal = data[field as keyof typeof data];
+      const oldStr = oldVal != null ? JSON.stringify(oldVal) : null;
+      const newStr = newVal != null ? JSON.stringify(newVal) : null;
+      if (oldStr !== newStr) {
+        auditEntries.push({
+          id: uuid(),
+          bookId: id,
+          editGroupId,
+          field,
+          oldValue: oldStr,
+          newValue: newStr,
+          source,
+        });
+      }
+    }
+  }
+
+  if (auditEntries.length > 0) {
+    await db.insert(bookEdits).values(auditEntries);
+  }
 
   const updateData: Record<string, unknown> = { ...data };
   updateData.updatedAt = sql`(unixepoch())`;

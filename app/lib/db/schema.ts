@@ -303,7 +303,33 @@ export const backgroundJobs = sqliteTable(
   ],
 );
 
+// Book edits audit table (tracks every field-level change for rollback)
+export const bookEdits = sqliteTable(
+  "book_edits",
+  {
+    id: text("id").primaryKey(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    editGroupId: text("edit_group_id").notNull(), // Groups fields changed in same operation
+    field: text("field").notNull(), // Column name that changed
+    oldValue: text("old_value"), // JSON-encoded previous value (null if was empty)
+    newValue: text("new_value"), // JSON-encoded new value (null if cleared)
+    source: text("source").notNull(), // "web" | "ios" | "api" | "metadata"
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    index("idx_book_edits_book_id").on(table.bookId),
+    index("idx_book_edits_group").on(table.editGroupId),
+    index("idx_book_edits_created_at").on(table.createdAt),
+  ],
+);
+
 // Type exports
+export type BookEdit = typeof bookEdits.$inferSelect;
+export type NewBookEdit = typeof bookEdits.$inferInsert;
 export type BackgroundJob = typeof backgroundJobs.$inferSelect;
 export type NewBackgroundJob = typeof backgroundJobs.$inferInsert;
 export type Book = typeof books.$inferSelect;

@@ -18,6 +18,7 @@ struct CompendusApp: App {
             DownloadedBook.self,
             BookHighlight.self,
             PendingDownload.self,
+            PendingBookEdit.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -45,15 +46,18 @@ struct CompendusApp: App {
     // These are created lazily based on serverConfig
     @State private var apiService: APIService
     @State private var downloadManager: DownloadManager
+    @State private var bookEditSyncService: BookEditSyncService
 
     init() {
         let config = ServerConfig()
         let api = APIService(config: config)
         let download = DownloadManager(config: config, apiService: api)
+        let editSync = BookEditSyncService(apiService: api)
 
         _serverConfig = State(initialValue: config)
         _apiService = State(initialValue: api)
         _downloadManager = State(initialValue: download)
+        _bookEditSyncService = State(initialValue: editSync)
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -74,6 +78,7 @@ struct CompendusApp: App {
                 .environment(themeManager)
                 .environment(appSettings)
                 .environment(highlightColorManager)
+                .environment(bookEditSyncService)
                 .environment(\.deepLinkBookId, $deepLinkBookId)
                 .tint(themeManager.accentColor)
                 .preferredColorScheme(appSettings.colorScheme)
@@ -85,8 +90,12 @@ struct CompendusApp: App {
                     downloadManager.modelContainer = sharedModelContainer
                     downloadManager.reconnectBackgroundSession()
                     audiobookPlayer.modelContainer = sharedModelContainer
+                    bookEditSyncService.modelContainer = sharedModelContainer
                     OnDeviceTranscriptionService.registerBackgroundTask(
                         service: onDeviceTranscriptionService
+                    )
+                    BookEditSyncService.registerBackgroundTask(
+                        service: bookEditSyncService
                     )
                 }
         }
@@ -95,8 +104,10 @@ struct CompendusApp: App {
             switch newPhase {
             case .background:
                 onDeviceTranscriptionService.handleAppBackgrounded()
+                bookEditSyncService.scheduleBackgroundTaskIfNeeded()
             case .active:
                 onDeviceTranscriptionService.handleAppForegrounded()
+                bookEditSyncService.handleAppForegrounded()
             default:
                 break
             }

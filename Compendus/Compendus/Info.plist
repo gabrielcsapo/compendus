@@ -18,6 +18,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.compendus.transcription</string>
+		<string>com.compendus.edit-sync</string>
 	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Compendus uses speech recognition to generate transcripts for audiobook lyrics display.</string>

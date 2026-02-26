@@ -622,6 +622,44 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
     }
   }, [edits, tagAdditions, tagRemovals]);
 
+  const handleExportCSV = useCallback(() => {
+    const escapeCSV = (val: string) => {
+      if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const headers = ["Title", "Authors", "Series", "Series #", "Tags", "Category", "Language", "Format", "Publisher", "ISBN", "Description", "File Name"];
+    const rows = filteredBooks.map((book) => {
+      const bookEdits = edits.get(book.id);
+      const tags = (bookTagsState[book.id] || []).map((t) => t.name).join("; ");
+      return [
+        bookEdits?.title ?? book.title ?? "",
+        bookEdits?.authors ?? parseAuthors(book.authors),
+        bookEdits?.series ?? book.series ?? "",
+        bookEdits?.seriesNumber ?? book.seriesNumber ?? "",
+        tags,
+        bookEdits?.bookTypeOverride ?? book.bookTypeOverride ?? "",
+        bookEdits?.language ?? book.language ?? "",
+        book.format ?? "",
+        book.publisher ?? "",
+        book.isbn13 || book.isbn10 || book.isbn || "",
+        book.description ?? "",
+        book.fileName ?? "",
+      ].map(escapeCSV);
+    });
+
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `library-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [filteredBooks, edits, bookTagsState]);
+
   const modifiedCellClass = "bg-amber-50 dark:bg-amber-900/20";
   const cellInputClass = "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
   const cellSelectClass = "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
@@ -727,6 +765,16 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
               {fieldFilters.size}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={handleExportCSV}
+          className={`${buttonStyles.base} ${buttonStyles.ghost} shrink-0`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
         </button>
 
         <button

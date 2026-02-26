@@ -451,6 +451,7 @@ struct BookManagementSheet: View {
     @State private var showingDeleteBookConfirmation = false
     @State private var showingDeleteTranscriptConfirmation = false
     @State private var isDeletingTranscript = false
+    @State private var showingEditSheet = false
 
     /// Whether a transcript exists (saved or in-progress partial)
     private var hasAnyTranscript: Bool {
@@ -465,6 +466,17 @@ struct BookManagementSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                // Metadata editing
+                Section {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Label("Edit Details", systemImage: "pencil")
+                    }
+                } header: {
+                    Text("Metadata")
+                }
+
                 // Transcription section (audiobooks only)
                 if book.isAudiobook {
                     Section {
@@ -573,6 +585,9 @@ struct BookManagementSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showingEditSheet) {
+            EditBookView(downloadedBook: book)
+        }
     }
 
     private func deleteTranscript() {

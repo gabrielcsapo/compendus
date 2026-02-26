@@ -38,9 +38,16 @@ struct BookDetailView: View {
     @State private var pollingTimer: Timer?
     @State private var readAsEpub = false
     @State private var relatedBooks: [Book] = []
+    @State private var showingEditSheet = false
+    @State private var editedBook: Book?
 
     enum ConversionState {
         case idle, starting, converting, completed, downloading, error(String)
+    }
+
+    /// Use edited version of the book if available
+    private var displayBook: Book {
+        editedBook ?? book
     }
 
     var body: some View {
@@ -66,7 +73,7 @@ struct BookDetailView: View {
                             .padding(.horizontal, 20)
                     }
 
-                    if let description = book.description, !description.isEmpty {
+                    if let description = displayBook.description, !description.isEmpty {
                         descriptionSection(description)
                             .padding(.top, 24)
                             .padding(.horizontal, 20)
@@ -76,7 +83,7 @@ struct BookDetailView: View {
                         .padding(.top, 24)
                         .padding(.horizontal, 20)
 
-                    if book.isAudiobook, let chapters = book.chapters, !chapters.isEmpty {
+                    if displayBook.isAudiobook, let chapters = displayBook.chapters, !chapters.isEmpty {
                         chaptersSection(chapters)
                             .padding(.top, 24)
                             .padding(.horizontal, 20)
@@ -92,10 +99,22 @@ struct BookDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingEditSheet = true
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                }
+            }
+            .sheet(isPresented: $showingEditSheet) {
+                EditBookView(book: displayBook) { updatedBook in
+                    editedBook = updatedBook
                 }
             }
             .task {
@@ -183,19 +202,19 @@ struct BookDetailView: View {
     @ViewBuilder
     private var titleBlock: some View {
         VStack(spacing: 4) {
-            Text(book.title)
+            Text(displayBook.title)
                 .font(.title2)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
 
-            if let subtitle = book.subtitle {
+            if let subtitle = displayBook.subtitle {
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
-            Text(book.authorsDisplay)
+            Text(displayBook.authorsDisplay)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -209,18 +228,18 @@ struct BookDetailView: View {
         HStack(spacing: 12) {
             formatBadge
 
-            if book.isAudiobook {
-                if let duration = book.durationDisplay {
+            if displayBook.isAudiobook {
+                if let duration = displayBook.durationDisplay {
                     metadataLabel(icon: "clock", text: duration)
                 }
-                if let narrator = book.narrator {
+                if let narrator = displayBook.narrator {
                     metadataLabel(icon: "person.wave.2", text: narrator)
                 }
-            } else if let pageCount = book.pageCount {
+            } else if let pageCount = displayBook.pageCount {
                 metadataLabel(icon: "doc.text", text: "\(pageCount) pages")
             }
 
-            metadataLabel(icon: nil, text: book.fileSizeDisplay)
+            metadataLabel(icon: nil, text: displayBook.fileSizeDisplay)
         }
         .padding(.horizontal, 20)
     }
@@ -390,19 +409,19 @@ struct BookDetailView: View {
     @ViewBuilder
     private var detailsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
-            if let publisher = book.publisher {
+            if let publisher = displayBook.publisher {
                 DetailRow(label: "Publisher", value: publisher)
             }
-            if let publishedDate = book.publishedDate {
+            if let publishedDate = displayBook.publishedDate {
                 DetailRow(label: "Published", value: publishedDate)
             }
-            if let isbn = book.isbn13 ?? book.isbn10 ?? book.isbn {
+            if let isbn = displayBook.isbn13 ?? displayBook.isbn10 ?? displayBook.isbn {
                 DetailRow(label: "ISBN", value: isbn)
             }
-            if let language = book.language {
+            if let language = displayBook.language {
                 DetailRow(label: "Language", value: language.uppercased())
             }
-            if let series = book.series {
+            if let series = displayBook.series {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Series")
                         .font(.caption)
@@ -412,7 +431,7 @@ struct BookDetailView: View {
                         dismiss()
                     } label: {
                         HStack(spacing: 4) {
-                            Text(book.seriesNumber != nil ? "\(series) #\(book.seriesNumber!)" : series)
+                            Text(displayBook.seriesNumber != nil ? "\(series) #\(displayBook.seriesNumber!)" : series)
                                 .font(.subheadline)
                             Image(systemName: "chevron.right")
                                 .font(.caption2)

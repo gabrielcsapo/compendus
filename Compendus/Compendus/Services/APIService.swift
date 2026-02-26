@@ -269,6 +269,90 @@ class APIService {
         }
     }
 
+    // MARK: - Book Editing
+
+    /// Update a book's metadata on the server
+    func updateBook(id: String, updates: UpdateBookRequest) async throws -> BookResponse {
+        guard config.isConfigured else { throw APIError.serverNotConfigured }
+        guard let url = config.apiURL("/api/books/\(id)") else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(updates)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let message = String(data: data, encoding: .utf8)
+                throw APIError.serverError(httpResponse.statusCode, message)
+            }
+            return try JSONDecoder().decode(BookResponse.self, from: data)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    // MARK: - Tags
+
+    /// Fetch tags for a book
+    func fetchBookTags(bookId: String) async throws -> BookTagsResponse {
+        guard config.isConfigured else { throw APIError.serverNotConfigured }
+        guard let url = config.apiURL("/api/books/\(bookId)/tags") else { throw APIError.invalidURL }
+        return try await fetch(url)
+    }
+
+    /// Add a tag to a book by name
+    func addTag(bookId: String, name: String) async throws -> AddTagResponse {
+        guard config.isConfigured else { throw APIError.serverNotConfigured }
+        guard let url = config.apiURL("/api/books/\(bookId)/tags") else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["name": name])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let message = String(data: data, encoding: .utf8)
+                throw APIError.serverError(httpResponse.statusCode, message)
+            }
+            return try JSONDecoder().decode(AddTagResponse.self, from: data)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decodingError(error)
+        } catch {
+            throw APIError.networkError(error)
+        }
+    }
+
+    /// Remove a tag from a book
+    func removeTag(bookId: String, tagId: String) async throws {
+        guard config.isConfigured else { throw APIError.serverNotConfigured }
+        guard let url = config.apiURL("/api/books/\(bookId)/tags/\(tagId)") else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
+    }
+
     // MARK: - Downloads
 
     /// Get URL for downloading a book file
@@ -329,4 +413,62 @@ struct JobProgressResponse: Codable {
     let status: String?
     let progress: Int?
     let message: String?
+}
+
+// MARK: - Book Editing Types
+
+/// Request body for updating book metadata (only encodes non-nil fields)
+struct UpdateBookRequest: Codable {
+    var title: String?
+    var subtitle: String?
+    var authors: [String]?
+    var publisher: String?
+    var publishedDate: String?
+    var description: String?
+    var isbn: String?
+    var language: String?
+    var pageCount: Int?
+    var series: String?
+    var seriesNumber: String?
+    var source: String = "ios"
+
+    enum CodingKeys: String, CodingKey {
+        case title, subtitle, authors, publisher, publishedDate
+        case description, isbn, language, pageCount, series, seriesNumber, source
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(subtitle, forKey: .subtitle)
+        try container.encodeIfPresent(authors, forKey: .authors)
+        try container.encodeIfPresent(publisher, forKey: .publisher)
+        try container.encodeIfPresent(publishedDate, forKey: .publishedDate)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(isbn, forKey: .isbn)
+        try container.encodeIfPresent(language, forKey: .language)
+        try container.encodeIfPresent(pageCount, forKey: .pageCount)
+        try container.encodeIfPresent(series, forKey: .series)
+        try container.encodeIfPresent(seriesNumber, forKey: .seriesNumber)
+        try container.encode(source, forKey: .source)
+    }
+}
+
+// MARK: - Tag Types
+
+struct BookTag: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let color: String?
+    let createdAt: Int?
+}
+
+struct BookTagsResponse: Codable {
+    let success: Bool
+    let tags: [BookTag]
+}
+
+struct AddTagResponse: Codable {
+    let success: Bool
+    let tag: BookTag
 }
