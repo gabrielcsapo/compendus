@@ -12,6 +12,106 @@ import {
   calculateToolbarPosition,
 } from "./utils/highlightUtils";
 import { AudioLyrics } from "./AudioLyrics";
+import { resolveInternalLink, getFootnoteContent } from "@/actions/reader";
+
+/**
+ * Scope EPUB CSS rules under a container selector to prevent leaking into app UI.
+ * Skips @-rules (media, font-face, keyframes) and remaps body/html selectors.
+ */
+function scopeEpubCss(css: string, scope: string): string {
+  // Remove @import rules (we serve resources via API)
+  let result = css.replace(/@import\s+[^;]+;/gi, "");
+
+  // Process CSS rule by rule using a simple state machine
+  const output: string[] = [];
+  let i = 0;
+
+  while (i < result.length) {
+    // Skip whitespace
+    while (i < result.length && /\s/.test(result[i])) {
+      output.push(result[i]);
+      i++;
+    }
+    if (i >= result.length) break;
+
+    // Check for @-rules
+    if (result[i] === "@") {
+      const atStart = i;
+      // Find the @-rule name
+      const atMatch = result.slice(i).match(/^@[\w-]+/);
+      if (atMatch) {
+        const atName = atMatch[0].toLowerCase();
+        if (atName === "@media" || atName === "@supports") {
+          // Find the opening brace and pass through the @-rule wrapper,
+          // but scope the inner selectors
+          const braceIdx = result.indexOf("{", i);
+          if (braceIdx === -1) break;
+          output.push(result.slice(atStart, braceIdx + 1));
+          i = braceIdx + 1;
+          // Find matching closing brace
+          let depth = 1;
+          let innerStart = i;
+          while (i < result.length && depth > 0) {
+            if (result[i] === "{") depth++;
+            else if (result[i] === "}") depth--;
+            if (depth > 0) i++;
+          }
+          // Scope the inner CSS
+          const inner = result.slice(innerStart, i);
+          output.push(scopeEpubCss(inner, scope));
+          output.push("}");
+          i++; // skip closing brace
+          continue;
+        }
+        // For @font-face, @keyframes, etc. — pass through unmodified
+        const braceIdx = result.indexOf("{", i);
+        if (braceIdx === -1) break;
+        let depth = 1;
+        let j = braceIdx + 1;
+        while (j < result.length && depth > 0) {
+          if (result[j] === "{") depth++;
+          else if (result[j] === "}") depth--;
+          j++;
+        }
+        output.push(result.slice(atStart, j));
+        i = j;
+        continue;
+      }
+    }
+
+    // Regular rule: find selector(s) before {
+    const braceIdx = result.indexOf("{", i);
+    if (braceIdx === -1) break;
+
+    const selectorText = result.slice(i, braceIdx).trim();
+    // Find the matching closing brace
+    let depth = 1;
+    let j = braceIdx + 1;
+    while (j < result.length && depth > 0) {
+      if (result[j] === "{") depth++;
+      else if (result[j] === "}") depth--;
+      j++;
+    }
+    const ruleBody = result.slice(braceIdx, j);
+
+    // Scope each selector
+    if (selectorText) {
+      const scopedSelectors = selectorText.split(",").map((sel) => {
+        const s = sel.trim();
+        if (!s) return s;
+        // Remap body/html selectors to the scope container
+        if (/^(html|body)$/i.test(s)) return scope;
+        if (/^(html|body)\s/i.test(s)) return s.replace(/^(html|body)\s/i, `${scope} `);
+        return `${scope} ${s}`;
+      }).join(", ");
+      output.push(scopedSelectors + " " + ruleBody);
+    }
+
+    i = j;
+  }
+
+  return output.join("");
+}
 
 interface ReaderContentProps {
   content: PageContent | null;
@@ -25,6 +125,7 @@ interface ReaderContentProps {
   // Book identification
   bookId?: string;
   hasTranscript?: boolean;
+  formatOverride?: string;
   // Audio-specific props
   audioChapters?: AudioChapter[];
   audioDuration?: number;
@@ -40,6 +141,8 @@ interface ReaderContentProps {
   onRemoveHighlight?: (highlightId: string) => void;
   onUpdateHighlightColor?: (highlightId: string, color: string) => void;
   onUpdateHighlightNote?: (highlightId: string, note: string | null) => void;
+  // Navigation
+  onNavigateToPosition?: (position: number) => void;
   // Ref for TTS access to text DOM
   textContentRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -58,6 +161,7 @@ export function ReaderContent({
   onCenterTap,
   bookId,
   hasTranscript,
+  formatOverride,
   audioChapters,
   audioDuration,
   highlights,
@@ -65,6 +169,7 @@ export function ReaderContent({
   onRemoveHighlight,
   onUpdateHighlightColor,
   onUpdateHighlightNote,
+  onNavigateToPosition,
   textContentRef,
 }: ReaderContentProps) {
   if (!content) {
@@ -89,11 +194,14 @@ export function ReaderContent({
           onPrevPage={onPrevPage}
           onNextPage={onNextPage}
           onCenterTap={onCenterTap}
+          bookId={bookId}
+          formatOverride={formatOverride}
           highlights={highlights}
           onAddHighlight={onAddHighlight}
           onRemoveHighlight={onRemoveHighlight}
           onUpdateHighlightColor={onUpdateHighlightColor}
           onUpdateHighlightNote={onUpdateHighlightNote}
+          onNavigateToPosition={onNavigateToPosition}
           theme={theme}
           textContentRef={textContentRef}
         />
@@ -140,11 +248,14 @@ function TextContent({
   onPrevPage,
   onNextPage,
   onCenterTap,
+  bookId,
+  formatOverride,
   highlights,
   onAddHighlight,
   onRemoveHighlight,
   onUpdateHighlightColor,
   onUpdateHighlightNote,
+  onNavigateToPosition,
   theme,
   textContentRef,
 }: {
@@ -156,6 +267,8 @@ function TextContent({
   onPrevPage?: () => void;
   onNextPage?: () => void;
   onCenterTap?: () => void;
+  bookId?: string;
+  formatOverride?: string;
   highlights?: ReaderHighlight[];
   onAddHighlight?: (
     startPosition: number,
@@ -167,6 +280,7 @@ function TextContent({
   onRemoveHighlight?: (highlightId: string) => void;
   onUpdateHighlightColor?: (highlightId: string, color: string) => void;
   onUpdateHighlightNote?: (highlightId: string, note: string | null) => void;
+  onNavigateToPosition?: (position: number) => void;
   theme: { background: string; foreground: string; muted: string; accent: string; selection: string };
   textContentRef?: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -201,8 +315,17 @@ function TextContent({
     color: string;
   } | null>(null);
 
+  // Footnote popover state
+  const [footnotePopover, setFootnotePopover] = useState<{
+    content: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
   // Tap feedback state
   const [tapFeedback, setTapFeedback] = useState<"left" | "right" | null>(null);
+
+  // EPUB publisher CSS injection
+  const [epubCss, setEpubCss] = useState<string>("");
 
   // Page transition state
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -210,6 +333,34 @@ function TextContent({
   const [displayContent, setDisplayContent] = useState(content);
   const [displayRightContent, setDisplayRightContent] = useState(rightContent);
   const prevPositionRef = useRef(content.position);
+
+  // Fetch and scope EPUB publisher CSS when cssUrls change
+  useEffect(() => {
+    if (!settings.usePublisherStyles || !displayContent.cssUrls?.length) {
+      setEpubCss("");
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all(
+      displayContent.cssUrls.map((url) =>
+        fetch(url)
+          .then((r) => r.text())
+          .catch(() => ""),
+      ),
+    ).then((sheets) => {
+      if (!cancelled) {
+        const scoped = sheets
+          .map((css) => scopeEpubCss(css, ".epub-content"))
+          .join("\n");
+        setEpubCss(scoped);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayContent.cssUrls, settings.usePublisherStyles]);
 
   // Page transition effect
   useEffect(() => {
@@ -347,6 +498,71 @@ function TextContent({
     }
   }, [highlights]);
 
+  // Intercept EPUB link clicks: footnotes and internal navigation
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el || !bookId) return;
+
+    const handleLinkClick = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest("a") as HTMLAnchorElement | null;
+      if (!link) return;
+
+      // Handle footnote references
+      if (link.hasAttribute("data-footnote-ref")) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const href = link.getAttribute("href");
+        if (href) {
+          const text = await getFootnoteContent(bookId, href, formatOverride);
+          if (text) {
+            const rect = link.getBoundingClientRect();
+            const containerRect = containerRef.current?.getBoundingClientRect();
+            if (containerRect) {
+              setFootnotePopover({
+                content: text,
+                position: {
+                  x: Math.min(rect.left - containerRect.left, containerRect.width - 320),
+                  y: rect.bottom - containerRect.top + 8,
+                },
+              });
+            }
+            return;
+          }
+        }
+      }
+
+      // Handle internal EPUB links (not external, not mailto, not anchors-only)
+      const href = link.getAttribute("href");
+      if (
+        href &&
+        !href.startsWith("http://") &&
+        !href.startsWith("https://") &&
+        !href.startsWith("mailto:")
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Extract the EPUB path from the resource API URL if present
+        let epubPath = href;
+        if (href.includes("/api/reader/") && href.includes("/resource/")) {
+          epubPath = decodeURIComponent(href.split("/resource/")[1] || "");
+        }
+
+        if (epubPath && onNavigateToPosition) {
+          const result = await resolveInternalLink(bookId, epubPath, formatOverride);
+          if (result) {
+            onNavigateToPosition(result.position);
+          }
+        }
+      }
+    };
+
+    el.addEventListener("click", handleLinkClick);
+    return () => el.removeEventListener("click", handleLinkClick);
+  }, [bookId, formatOverride, onNavigateToPosition]);
+
   // Apply saved highlights to DOM after content renders
   useEffect(() => {
     if (!highlights?.length) return;
@@ -426,6 +642,7 @@ function TextContent({
   );
 
   const showSpread = isSpreadMode && displayRightContent?.html;
+  const isFxl = displayContent.isFixedLayout;
 
   const textStyles = {
     maxWidth: `${settings.maxWidth}px`,
@@ -473,7 +690,25 @@ function TextContent({
             : "translateX(0)",
         }}
       >
-        {showSpread ? (
+        {isFxl ? (
+          // Fixed layout EPUB: render as full-page viewport content
+          <div className="h-full flex items-center justify-center">
+            <div
+              ref={contentRef}
+              className="epub-content fxl-page"
+              style={{
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
+              dangerouslySetInnerHTML={{ __html: displayContent.html || "" }}
+            />
+          </div>
+        ) : showSpread ? (
           // Two-column spread layout
           <div
             className="mx-auto flex gap-8"
@@ -481,7 +716,7 @@ function TextContent({
           >
             <div
               ref={contentRef}
-              className="flex-1 prose max-w-none"
+              className="flex-1 prose max-w-none epub-content"
               style={textStyles}
               // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
               dangerouslySetInnerHTML={{ __html: displayContent.html || "" }}
@@ -492,7 +727,7 @@ function TextContent({
             />
             <div
               ref={rightContentRef}
-              className="flex-1 prose max-w-none"
+              className="flex-1 prose max-w-none epub-content"
               style={textStyles}
               // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
               dangerouslySetInnerHTML={{ __html: displayRightContent?.html || "" }}
@@ -502,11 +737,31 @@ function TextContent({
           // Single column layout
           <div
             ref={contentRef}
-            className="mx-auto prose max-w-none"
+            className="mx-auto prose max-w-none epub-content"
             style={textStyles}
             // biome-ignore lint/security/noDangerouslySetInnerHtml: Content is sanitized server-side
             dangerouslySetInnerHTML={{ __html: displayContent.html || "" }}
           />
+        )}
+        {/* Injected EPUB publisher CSS (scoped under .epub-content) */}
+        {epubCss && (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: CSS is scoped and sanitized
+          <style dangerouslySetInnerHTML={{ __html: epubCss }} />
+        )}
+        {/* FXL page scaling */}
+        {isFxl && (
+          <style>{`
+            .fxl-page > * {
+              max-width: 100%;
+              max-height: 100%;
+              margin: 0 auto;
+            }
+            .fxl-page img, .fxl-page svg {
+              max-width: 100%;
+              max-height: 100vh;
+              object-fit: contain;
+            }
+          `}</style>
         )}
       </div>
 
@@ -588,6 +843,30 @@ function TextContent({
           }}
           theme={theme}
         />
+      )}
+
+      {/* Footnote popover */}
+      {footnotePopover && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setFootnotePopover(null)}
+          />
+          <div
+            className="absolute z-50 max-w-xs p-4 rounded-lg shadow-xl border"
+            style={{
+              left: Math.max(8, footnotePopover.position.x),
+              top: footnotePopover.position.y,
+              backgroundColor: theme.background,
+              borderColor: `${theme.foreground}20`,
+              color: theme.foreground,
+              maxHeight: "200px",
+              overflowY: "auto",
+            }}
+          >
+            <p className="text-sm leading-relaxed">{footnotePopover.content}</p>
+          </div>
+        </>
       )}
 
       {/* Tap flash animation */}

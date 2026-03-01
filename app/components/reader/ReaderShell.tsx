@@ -8,6 +8,7 @@ import { ReaderToolbar } from "./ReaderToolbar";
 import { ReaderSidebar } from "./ReaderSidebar";
 import { ReaderSettings } from "./ReaderSettings";
 import { ReadAloudBar } from "./ReadAloudBar";
+import { PageJumpSlider } from "./PageJumpSlider";
 import { THEMES } from "@/lib/reader/settings";
 
 interface ReaderShellProps {
@@ -348,6 +349,8 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/", form
             onCenterTap={handleCenterTap}
             bookId={reader.bookInfo?.id}
             hasTranscript={reader.bookInfo?.hasTranscript}
+            formatOverride={formatOverride}
+            onNavigateToPosition={(pos) => reader.goToPosition(pos)}
             audioChapters={reader.bookInfo?.chapters}
             audioDuration={reader.bookInfo?.duration}
             highlights={reader.highlights}
@@ -381,22 +384,34 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/", form
         />
       </div>
 
-      {/* Footer progress bar - always visible, thinner when overlay hidden */}
-      <div
-        className="absolute bottom-0 left-0 right-0 z-30 transition-all duration-300"
-        style={{
-          height: showOverlay ? "4px" : "2px",
-          backgroundColor: `${theme.foreground}10`,
-        }}
-      >
+      {/* Page jump slider (interactive, when overlay visible) */}
+      <PageJumpSlider
+        currentPage={reader.currentPage}
+        totalPages={reader.totalPages}
+        chapterTitle={reader.pageContent?.chapterTitle}
+        onJump={(page) => reader.goToPage(page)}
+        theme={theme}
+        visible={showOverlay}
+      />
+
+      {/* Thin progress bar when overlay is hidden */}
+      {!showOverlay && (
         <div
-          className="h-full transition-all duration-300"
+          className="absolute bottom-0 left-0 right-0 z-30"
           style={{
-            width: `${reader.position * 100}%`,
-            backgroundColor: theme.accent,
+            height: "2px",
+            backgroundColor: `${theme.foreground}10`,
           }}
-        />
-      </div>
+        >
+          <div
+            className="h-full transition-all duration-300"
+            style={{
+              width: `${reader.position * 100}%`,
+              backgroundColor: theme.accent,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
