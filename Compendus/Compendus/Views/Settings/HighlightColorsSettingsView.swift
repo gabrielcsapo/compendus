@@ -26,7 +26,7 @@ struct HighlightColorsSettingsView: View {
                                 .frame(width: 28, height: 28)
                                 .overlay {
                                     Circle()
-                                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                 }
 
                             Text(preset.name)
@@ -126,7 +126,7 @@ private struct AddHighlightColorSheet: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(labelName.isEmpty ? "Preview" : labelName)
                             .foregroundStyle(.secondary)
@@ -186,7 +186,7 @@ private struct EditHighlightColorSheet: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(labelName.isEmpty ? "Preview" : labelName)
                             .foregroundStyle(.secondary)

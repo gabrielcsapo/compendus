@@ -200,67 +200,46 @@ export default function UnmatchedBooks() {
   // All done state
   if (!loading && !currentBook && totalRemaining === 0) {
     return (
-      <main className="container my-8 px-6 mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Link to="/admin" className="text-primary hover:text-primary-hover transition-colors">
-                &larr; Admin
-              </Link>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Unmatched Books</h1>
-          </div>
+      <div className="text-center py-16">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success-light flex items-center justify-center">
+          <svg
+            className="w-8 h-8 text-success"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
         </div>
-
-        <div className="text-center py-16">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success-light flex items-center justify-center">
-            <svg
-              className="w-8 h-8 text-success"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">All caught up!</h2>
-          <p className="text-foreground-muted mb-2">All your books have been matched. Nice work!</p>
-          {processedCount > 0 && (
-            <p className="text-sm text-foreground-muted mb-6">
-              You processed {processedCount} {processedCount === 1 ? "book" : "books"} this session.
-            </p>
-          )}
-          <Link to="/" className={`${buttonStyles.base} ${buttonStyles.primary}`}>
-            Back to Library
-          </Link>
-        </div>
-      </main>
+        <h2 className="text-xl font-semibold text-foreground mb-2">All caught up!</h2>
+        <p className="text-foreground-muted mb-2">All your books have been matched. Nice work!</p>
+        {processedCount > 0 && (
+          <p className="text-sm text-foreground-muted mb-6">
+            You processed {processedCount} {processedCount === 1 ? "book" : "books"} this session.
+          </p>
+        )}
+        <Link to="/" className={`${buttonStyles.base} ${buttonStyles.primary}`}>
+          Back to Library
+        </Link>
+      </div>
     );
   }
 
   const authors = currentBook?.authors ? JSON.parse(currentBook.authors) : [];
 
   return (
-    <main className="container my-8 px-6 mx-auto max-w-4xl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <Link to="/" className="text-primary hover:text-primary-hover transition-colors">
-              &larr; Library
-            </Link>
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Unmatched Books</h1>
-          <p className="text-foreground-muted">
-            {totalRemaining} {totalRemaining === 1 ? "book" : "books"} remaining
-            {processedCount > 0 && ` · ${processedCount} processed`}
-          </p>
-        </div>
+    <div>
+      {/* Status */}
+      <div className="mb-6">
+        <p className="text-foreground-muted">
+          {totalRemaining} {totalRemaining === 1 ? "book" : "books"} remaining
+          {processedCount > 0 && ` · ${processedCount} processed`}
+        </p>
       </div>
 
       {loading ? (
@@ -701,6 +680,6 @@ export default function UnmatchedBooks() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

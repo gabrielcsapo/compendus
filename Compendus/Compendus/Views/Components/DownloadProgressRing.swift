@@ -19,7 +19,7 @@ struct DownloadProgressRing: View {
         ZStack {
             // Background circle
             Circle()
-                .stroke(Color.gray.opacity(0.3), lineWidth: lineWidth)
+                .stroke(Color(.systemGray4), lineWidth: lineWidth)
 
             // Progress arc
             Circle()

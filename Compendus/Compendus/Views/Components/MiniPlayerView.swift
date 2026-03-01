@@ -23,7 +23,7 @@ struct MiniPlayerView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.3))
+                        .fill(Color(.systemGray5))
                         .frame(width: 48, height: 48)
                         .overlay {
                             Image(systemName: "headphones")

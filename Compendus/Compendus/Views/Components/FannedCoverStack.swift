@@ -58,7 +58,7 @@ struct FannedCoverStack<Cover: View>: View {
     @ViewBuilder
     private var defaultPlaceholder: some View {
         RoundedRectangle(cornerRadius: 8)
-            .fill(Color.gray.opacity(0.2))
+            .fill(Color(.systemGray5))
             .overlay {
                 Image(systemName: "books.vertical")
                     .font(.largeTitle)

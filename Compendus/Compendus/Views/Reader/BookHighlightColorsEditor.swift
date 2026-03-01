@@ -38,7 +38,7 @@ struct BookHighlightColorsEditor: View {
                                 .frame(width: 28, height: 28)
                                 .overlay {
                                     Circle()
-                                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                        .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                 }
 
                             Text(preset.name)
@@ -155,7 +155,7 @@ private struct BookAddColorSheet: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(labelName.isEmpty ? "Preview" : labelName)
                             .foregroundStyle(.secondary)
@@ -216,7 +216,7 @@ private struct BookEditColorSheet: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(labelName.isEmpty ? "Preview" : labelName)
                             .foregroundStyle(.secondary)

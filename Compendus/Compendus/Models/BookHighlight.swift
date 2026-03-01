@@ -13,7 +13,7 @@ import SwiftData
 final class BookHighlight {
     @Attribute(.unique) var id: String
     var bookId: String
-    var locatorJSON: String       // Serialized Readium Locator for precise position
+    var locatorJSON: String       // Serialized locator JSON for precise position
     var text: String              // The highlighted text
     var note: String?             // Optional user note
     var color: String             // Hex color (e.g. "#ffff00")

@@ -113,7 +113,7 @@ struct AudiobookPlayerView: View {
                                     .onTapGesture { showBookDetail = true }
                             } else {
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.2))
+                                    .fill(Color(.systemGray5))
                                     .frame(width: 280, height: 280)
                                     .overlay {
                                         Image(systemName: "headphones")
@@ -311,7 +311,7 @@ struct AudiobookPlayerView: View {
                         .font(.subheadline)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.2))
+                        .background(Color(.systemGray5))
                         .clipShape(Capsule())
                 }
 

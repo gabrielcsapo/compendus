@@ -242,6 +242,13 @@ class OnDeviceTranscriptionService {
 
         // If we have saved progress but no active task, resume
         if currentTask == nil, let saved = loadProgressFromDisk() {
+            // Verify the audio file still exists before resuming
+            guard FileManager.default.fileExists(atPath: saved.fileURL.path) else {
+                print("[Whisper] Audio file no longer exists, clearing stale progress")
+                clearResumableState()
+                return
+            }
+
             resumableState = saved
             activeBookId = saved.bookId
             activeBookTitle = saved.title
@@ -265,6 +272,10 @@ class OnDeviceTranscriptionService {
                 currentTask = Task {
                     await performTranscription()
                 }
+            } else {
+                // Progress file says complete but wasn't cleaned up — clear it
+                clearResumableState()
+                clearActiveBook()
             }
         }
     }
@@ -333,11 +344,15 @@ class OnDeviceTranscriptionService {
             try await ensureWhisperContext()
         } catch {
             state = .error("Failed to load whisper model: \(error.localizedDescription)")
+            clearResumableState()
+            clearActiveBook()
             return
         }
 
         guard let ctx = whisperContext else {
             state = .error("Whisper context unavailable")
+            clearResumableState()
+            clearActiveBook()
             return
         }
 
@@ -403,6 +418,8 @@ class OnDeviceTranscriptionService {
                     return
                 }
                 state = .error("Transcription failed on chunk \(chunkIndex + 1): \(error.localizedDescription)")
+                clearResumableState()
+                clearActiveBook()
                 return
             }
         }

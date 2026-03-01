@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@import "../../app/styles/theme.css";
+@source "../../app/components/docs/";
+@plugin "@tailwindcss/typography";
+
+/* Base Styles */
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    transition:
+      background-color var(--transition-base),
+      color var(--transition-base);
+  }
+
+  * {
+    @apply outline-primary;
+  }
+}
+
+/* Prose/Typography Overrides */
+@layer utilities {
+  .prose {
+    :where(a):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+      @apply text-primary no-underline hover:underline;
+    }
+
+    :where(strong):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+      @apply text-foreground;
+    }
+  }
+}
+
+/* Fallback color for unhighlighted code blocks */
+pre code:not(.shiki code) {
+  color: #e5e7eb;
+}

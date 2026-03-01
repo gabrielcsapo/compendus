@@ -31,7 +31,7 @@ struct ReaderShell<Content: View>: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .frame(width: 32, height: 32)
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
@@ -88,7 +88,7 @@ struct ReaderContainerView: View {
             }
         case "cbr", "cbz":
             ReaderShell(book: book, showsDismissButton: false) {
-                ComicReaderView(book: book)
+                UnifiedReaderView(book: book)
             }
         case "m4b", "mp3", "m4a":
             ReaderShell(book: book, showsDismissButton: true) {

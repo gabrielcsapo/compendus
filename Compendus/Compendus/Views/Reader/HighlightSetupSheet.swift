@@ -52,7 +52,7 @@ struct HighlightSetupSheet: View {
                                     .frame(width: 36, height: 36)
                                     .overlay {
                                         Circle()
-                                            .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                     }
                                 Text(preset.name)
                                     .font(.caption2)

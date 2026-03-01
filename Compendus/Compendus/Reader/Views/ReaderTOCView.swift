@@ -60,17 +60,17 @@ struct ReaderTOCView: View {
 
                 Spacer(minLength: 4)
 
+                if isCurrent {
+                    Image(systemName: "bookmark.fill")
+                        .font(.caption)
+                        .foregroundStyle(themeManager.accentColor)
+                }
+
                 if let pageIndex = item.location.pageIndex {
                     Text("\(pageIndex + 1)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
-                }
-
-                if isCurrent {
-                    Image(systemName: "bookmark.fill")
-                        .font(.caption)
-                        .foregroundStyle(themeManager.accentColor)
                 }
             }
             .padding(.leading, CGFloat(item.level) * 20)

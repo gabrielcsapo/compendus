@@ -104,6 +104,7 @@ class NativeEPUBEngine: ReaderEngine {
 
     // Viewport
     private var viewportSize: CGSize = .zero
+    private var safeAreaInsets: UIEdgeInsets = .zero
 
     // Deferred initial load (waits for view to have proper size)
     private var pendingInitialLoad: (spineIndex: Int, progression: Double?)?
@@ -121,6 +122,14 @@ class NativeEPUBEngine: ReaderEngine {
             return (viewportSize.width - spreadGutterWidth) / 2
         }
         return viewportSize.width
+    }
+
+    /// Pagination insets that incorporate device safe area (notch, home indicator).
+    private func paginationInsets(for pageWidth: CGFloat, isTwoPage: Bool) -> UIEdgeInsets {
+        var insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+        insets.top += safeAreaInsets.top
+        insets.bottom += safeAreaInsets.bottom
+        return insets
     }
 
     /// Align a page index to spread boundaries (even index in two-page mode).
@@ -313,14 +322,20 @@ class NativeEPUBEngine: ReaderEngine {
                 guard let self = self else { return }
                 logger.info("View ready with size \(size.width)x\(size.height)")
                 self.viewportSize = size
+                self.safeAreaInsets = pageVC.view.window?.safeAreaInsets ?? pageVC.view.safeAreaInsets
                 if let pending = self.pendingInitialLoad {
                     self.pendingInitialLoad = nil
                     logger.info("Executing deferred load: spine \(pending.spineIndex), progression \(pending.progression ?? -1)")
-                    // Pre-paginate all chapters before displaying the first one
-                    // so global page counts are accurate from the start
-                    Task {
-                        await self.paginateAllChapters()
+                    // Display the requested chapter immediately so the user can
+                    // start reading, then paginate all remaining chapters in the
+                    // background for accurate global page counts.
+                    self.fullPaginationTask = Task {
                         self.loadChapter(at: pending.spineIndex, progression: pending.progression)
+                        // Wait for the initial chapter to finish loading before
+                        // paginating the rest, so it won't be processed twice.
+                        await self.chapterLoadTask?.value
+                        guard !Task.isCancelled else { return }
+                        await self.paginateAllChapters()
                     }
                 }
             }
@@ -329,6 +344,7 @@ class NativeEPUBEngine: ReaderEngine {
                 guard let self = self, self.isReady else { return }
                 let oldWidth = self.viewportSize.width
                 self.viewportSize = newSize
+                self.safeAreaInsets = pageVC.view.window?.safeAreaInsets ?? pageVC.view.safeAreaInsets
                 logger.info("View resized to \(newSize.width)x\(newSize.height)")
 
                 // Re-paginate if the width changed (layout mode may have changed)
@@ -575,6 +591,7 @@ class NativeEPUBEngine: ReaderEngine {
         let stylesheet = bookStylesheet
         let gutterWidth = spreadGutterWidth
         let resolvedLayout = settings.resolvedLayout(for: viewport.width)
+        let capturedSafeArea = safeAreaInsets
 
         // If the chapter is already fully built (nodes + pages), display immediately
         if cachedNodes != nil, let cachedPages = chapterPages[spineIndex],
@@ -620,7 +637,9 @@ class NativeEPUBEngine: ReaderEngine {
                 // Compute layout (resolvedLayout captured before entering detached task)
                 let isTwoPage = resolvedLayout == .twoPage
                 let pageWidth = isTwoPage ? (viewport.width - gutterWidth) / 2 : viewport.width
-                let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+                var insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+                insets.top += capturedSafeArea.top
+                insets.bottom += capturedSafeArea.bottom
                 let contentWidth = pageWidth - insets.left - insets.right
                 let contentHeight = viewport.height - insets.top - insets.bottom
                 let pageViewportSize = CGSize(width: pageWidth, height: viewport.height)
@@ -900,7 +919,7 @@ class NativeEPUBEngine: ReaderEngine {
         // Build TOC attributed string (requires main actor for parser access)
         let isTwoPage = resolvedLayout == .twoPage
         let pageWidth = isTwoPage ? (viewport.width - gutterWidth) / 2 : viewport.width
-        let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+        let insets = paginationInsets(for: pageWidth, isTwoPage: isTwoPage)
         let contentWidth = pageWidth - insets.left - insets.right
         let contentHeight = viewport.height - insets.top - insets.bottom
         let pageViewportSize = CGSize(width: pageWidth, height: viewport.height)
@@ -1181,12 +1200,16 @@ class NativeEPUBEngine: ReaderEngine {
         // Configure layout mode on the page view controller
         pageViewController?.configureLayout(twoPage: isTwoPage)
 
+        // Compute safe-area-aware insets for text container
+        let displayPageWidth = isTwoPage ? (viewportSize.width - spreadGutterWidth) / 2 : viewportSize.width
+        let displayInsets = paginationInsets(for: displayPageWidth, isTwoPage: isTwoPage)
+
         // Suppress "This page is blank" in spread mode or when rendition:spread is set
         let hasSpread = parser.package.metadata.renditionSpread != nil
             && parser.package.metadata.renditionSpread != .none
         pageViewController?.suppressBlankPagePlaceholder = isTwoPage || hasSpread
 
-        // Display
+        // Display — pass insets explicitly so loadContent always has safe-area-aware values
         let manifestItem = parser.manifestItem(forSpineIndex: spineIndex)
         pageViewController?.loadContent(
             attributedString: attrString,
@@ -1194,12 +1217,13 @@ class NativeEPUBEngine: ReaderEngine {
             chapterHref: manifestItem?.href,
             startAtPage: startPage,
             mediaAttachments: currentMediaAttachments,
-            floatingElements: currentFloatingElements
+            floatingElements: currentFloatingElements,
+            textContainerInsets: displayInsets
         )
 
         // Apply theme
         if let settings = currentSettings {
-            pageViewController?.applyTheme(backgroundColor: settings.theme.backgroundColor)
+            pageViewController?.applyTheme(backgroundColor: settings.theme.backgroundColor, theme: settings.theme)
         }
 
         // Apply highlights
@@ -1235,7 +1259,7 @@ class NativeEPUBEngine: ReaderEngine {
 
         let isTwoPage = resolvedLayout == .twoPage
         let pageWidth = isTwoPage ? (viewport.width - gutterWidth) / 2 : viewport.width
-        let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+        let insets = paginationInsets(for: pageWidth, isTwoPage: isTwoPage)
         let contentWidth = pageWidth - insets.left - insets.right
         let contentHeight = viewport.height - insets.top - insets.bottom
         let pageViewportSize = CGSize(width: pageWidth, height: viewport.height)
@@ -1431,6 +1455,7 @@ class NativeEPUBEngine: ReaderEngine {
         let viewport = viewportSize
         let gutterWidth = spreadGutterWidth
         let resolvedLayout = settings.resolvedLayout(for: viewport.width)
+        let capturedSafeArea = safeAreaInsets
 
         for index in indices {
             guard index >= 0, index < parser.package.spine.count,
@@ -1440,7 +1465,7 @@ class NativeEPUBEngine: ReaderEngine {
             if isNavDocument(at: index) {
                 let isTwoPage = resolvedLayout == .twoPage
                 let pageWidth = isTwoPage ? (viewport.width - gutterWidth) / 2 : viewport.width
-                let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+                let insets = paginationInsets(for: pageWidth, isTwoPage: isTwoPage)
                 let contentWidth = pageWidth - insets.left - insets.right
                 let contentHeight = viewport.height - insets.top - insets.bottom
                 let pageViewportSize = CGSize(width: pageWidth, height: viewport.height)
@@ -1495,7 +1520,9 @@ class NativeEPUBEngine: ReaderEngine {
                 // Build attributed string and paginate (resolvedLayout captured before detached task)
                 let isTwoPage = resolvedLayout == .twoPage
                 let pageWidth = isTwoPage ? (viewport.width - gutterWidth) / 2 : viewport.width
-                let insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+                var insets = NativePaginationEngine.insets(for: pageWidth, isTwoPageMode: isTwoPage)
+                insets.top += capturedSafeArea.top
+                insets.bottom += capturedSafeArea.bottom
                 let contentWidth = pageWidth - insets.left - insets.right
                 let contentHeight = viewport.height - insets.top - insets.bottom
                 let pageViewportSize = CGSize(width: pageWidth, height: viewport.height)
@@ -1556,17 +1583,14 @@ class NativeEPUBEngine: ReaderEngine {
         let savedProgression = currentLocation?.progression ?? 0
         let savedSpine = currentSpineIndex
 
-        // Re-paginate all chapters with new settings, then display current position
-        isLoadingChapter = true
-        pageViewController?.showLoadingIndicator(true)
-
+        // Display the current chapter immediately, then re-paginate remaining
+        // chapters in the background for accurate global page counts.
         fullPaginationTask = Task { [weak self] in
             guard let self else { return }
-            await self.paginateAllChapters()
-            guard !Task.isCancelled else { return }
-            self.isLoadingChapter = false
-            self.pageViewController?.showLoadingIndicator(false)
             self.loadChapter(at: savedSpine, progression: savedProgression)
+            await self.chapterLoadTask?.value
+            guard !Task.isCancelled else { return }
+            await self.paginateAllChapters()
         }
     }
 
@@ -1628,6 +1652,56 @@ class NativeEPUBEngine: ReaderEngine {
             accumulated += count
         }
         return nil
+    }
+
+    // MARK: - Page Snapshot
+
+    /// Convert a global (book-wide) page index to (spineIndex, localPageIndex).
+    private func spineAndLocalPage(forGlobal globalIndex: Int) -> (spineIndex: Int, localPage: Int)? {
+        var accumulated = 0
+        for (index, count) in spinePageCounts.enumerated() {
+            if accumulated + count > globalIndex {
+                return (spineIndex: index, localPage: globalIndex - accumulated)
+            }
+            accumulated += count
+        }
+        return nil
+    }
+
+    func snapshotPage(at offset: Int) -> UIImage? {
+        let targetGlobal = globalPageIndex + offset
+        guard targetGlobal >= 0, targetGlobal < totalPositions else { return nil }
+        guard let (spineIndex, localPage) = spineAndLocalPage(forGlobal: targetGlobal) else { return nil }
+        guard let attrString = chapterStrings[spineIndex],
+              let pages = chapterPages[spineIndex],
+              localPage < pages.count else { return nil }
+
+        let pageInfo = pages[localPage]
+        let safeRange = NSIntersectionRange(pageInfo.range, NSRange(location: 0, length: attrString.length))
+        let pageContent = attrString.attributedSubstring(from: safeRange)
+
+        // Render at the actual viewport size so font sizes, line spacing, and
+        // text reflow match the real reader exactly. SwiftUI scales the image
+        // down for the carousel card display.
+        let renderSize = viewportSize
+        let isTwoPage = pagesPerSpread == 2
+        let pageWidth = isTwoPage ? (renderSize.width - spreadGutterWidth) / 2 : renderSize.width
+        let insets = paginationInsets(for: pageWidth, isTwoPage: isTwoPage)
+
+        // Render into a temporary UITextView
+        let tv = UITextView(frame: CGRect(origin: .zero, size: renderSize))
+        tv.isEditable = false
+        tv.isScrollEnabled = false
+        tv.textContainerInset = insets
+        tv.textContainer.lineFragmentPadding = 0
+        tv.backgroundColor = pageViewController?.textView.backgroundColor ?? currentSettings?.theme.backgroundColor ?? .systemBackground
+        tv.attributedText = pageContent
+
+        tv.layoutIfNeeded()
+        let renderer = UIGraphicsImageRenderer(size: renderSize)
+        return renderer.image { ctx in
+            tv.layer.render(in: ctx.cgContext)
+        }
     }
 
     // MARK: - ReaderEngine Protocol
@@ -1743,12 +1817,14 @@ class NativeEPUBEngine: ReaderEngine {
 
     private func convertTOCEntries(_ entries: [EPUBTOCEntry], level: Int) -> [TOCItem] {
         entries.map { entry in
-            TOCItem(
+            let hrefBase = entry.href.components(separatedBy: "#").first ?? entry.href
+            let globalPage = globalStartPage(forHref: hrefBase)
+            return TOCItem(
                 id: entry.href,
                 title: entry.title,
                 location: ReaderLocation(
-                    href: entry.href.components(separatedBy: "#").first ?? entry.href,
-                    pageIndex: nil,
+                    href: hrefBase,
+                    pageIndex: globalPage,
                     progression: 0,
                     totalProgression: 0,
                     title: entry.title
@@ -1759,10 +1835,28 @@ class NativeEPUBEngine: ReaderEngine {
         }
     }
 
+    /// Returns the global (book-wide) zero-based starting page index for a chapter href,
+    /// by matching it to a spine index and summing page counts of preceding chapters.
+    private func globalStartPage(forHref href: String) -> Int? {
+        guard let parser = parser else { return nil }
+        for (index, spineItem) in parser.package.spine.enumerated() {
+            guard let manifest = parser.package.manifest[spineItem.idref] else { continue }
+            let manifestBase = manifest.href.components(separatedBy: "#").first ?? manifest.href
+            if manifest.href == href || manifestBase == href
+                || href.hasSuffix(manifestBase) || manifestBase.hasSuffix(href) {
+                return (0..<index).reduce(0) { sum, i in
+                    sum + (i < spinePageCounts.count ? spinePageCounts[i] : 1)
+                }
+            }
+        }
+        return nil
+    }
+
     /// Scan spine XHTML files for heading elements (h1–h3) to build a fallback TOC.
     private func buildTOCFromHeadings(parser: EPUBParser) async -> [TOCItem] {
         let spine = parser.package.spine
         let manifest = parser.package.manifest
+        let pageCounts = spinePageCounts
 
         return await Task.detached {
             var items: [TOCItem] = []
@@ -1773,6 +1867,10 @@ class NativeEPUBEngine: ReaderEngine {
                       let data = try? Data(contentsOf: chapterURL),
                       let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
                     continue
+                }
+
+                let globalPage = (0..<index).reduce(0) { sum, i in
+                    sum + (i < pageCounts.count ? pageCounts[i] : 1)
                 }
 
                 do {
@@ -1798,7 +1896,7 @@ class NativeEPUBEngine: ReaderEngine {
                             title: text,
                             location: ReaderLocation(
                                 href: href,
-                                pageIndex: nil,
+                                pageIndex: globalPage,
                                 progression: 0,
                                 totalProgression: 0,
                                 title: text
@@ -1819,7 +1917,7 @@ class NativeEPUBEngine: ReaderEngine {
                             title: capitalized,
                             location: ReaderLocation(
                                 href: manifestItem.href,
-                                pageIndex: nil,
+                                pageIndex: globalPage,
                                 progression: 0,
                                 totalProgression: 0,
                                 title: capitalized
@@ -1925,7 +2023,7 @@ class NativeEPUBEngine: ReaderEngine {
         guard settingsChanged, isReady else { return }
 
         // Apply theme immediately
-        pageViewController?.applyTheme(backgroundColor: settings.theme.backgroundColor)
+        pageViewController?.applyTheme(backgroundColor: settings.theme.backgroundColor, theme: settings.theme)
 
         // Invalidate caches and rebuild
         invalidateAndReload()
@@ -1950,82 +2048,116 @@ class NativeEPUBEngine: ReaderEngine {
     func search(query: String) async -> [ReaderSearchResult] {
         guard let parser = parser, !query.isEmpty else { return [] }
 
-        var results: [ReaderSearchResult] = []
-        let contextChars = 40
+        // Capture values on main actor for background work
+        let spine = parser.package.spine
+        let manifestMap = parser.package.manifest
+        let cachedChapters = parsedChapters
+        let stylesheet = bookStylesheet
+        let pageCounts = spinePageCounts
+        let totalPages = totalPositions
 
-        for (spineIndex, spineItem) in parser.package.spine.enumerated() {
-            // Get or parse chapter content
-            let nodes: [ContentNode]
-            if let cached = parsedChapters[spineIndex] {
-                nodes = cached
-            } else {
-                guard let chapterURL = parser.resolveSpineItemURL(at: spineIndex),
-                      let data = try? Data(contentsOf: chapterURL) else { continue }
-                let baseURL = chapterURL.deletingLastPathComponent()
-                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: bookStylesheet)
-                let parsed = contentParser.parse()
-                parsedChapters[spineIndex] = parsed
-                nodes = parsed
-            }
-
-            // Extract plain text
-            let plainText = Self.extractPlainText(from: nodes)
-            guard !plainText.isEmpty else { continue }
-
-            let manifest = parser.package.manifest[spineItem.idref]
+        // Pre-resolve chapter URLs and titles on main actor
+        struct ChapterInfo: Sendable {
+            let index: Int
+            let href: String?
+            let title: String?
+            let url: URL?
+        }
+        var chapterInfos: [ChapterInfo] = []
+        for (spineIndex, spineItem) in spine.enumerated() {
+            let manifest = manifestMap[spineItem.idref]
             let href = manifest?.href
-            let chapterTitle = findChapterTitle(for: href)
-
-            // Find all matches (case-insensitive)
-            var searchStart = plainText.startIndex
-
-            while searchStart < plainText.endIndex {
-                guard let matchRange = plainText.range(of: query, options: .caseInsensitive, range: searchStart..<plainText.endIndex) else {
-                    break
-                }
-
-                // Build snippet with context
-                let snippetStart = plainText.index(matchRange.lowerBound, offsetBy: -contextChars, limitedBy: plainText.startIndex) ?? plainText.startIndex
-                let snippetEnd = plainText.index(matchRange.upperBound, offsetBy: contextChars, limitedBy: plainText.endIndex) ?? plainText.endIndex
-                let snippet = String(plainText[snippetStart..<snippetEnd])
-
-                // Calculate match range within snippet
-                let matchOffsetInSnippet = plainText.distance(from: snippetStart, to: matchRange.lowerBound)
-                let matchStartInSnippet = snippet.index(snippet.startIndex, offsetBy: matchOffsetInSnippet)
-                let matchEndInSnippet = snippet.index(matchStartInSnippet, offsetBy: plainText.distance(from: matchRange.lowerBound, to: matchRange.upperBound))
-
-                // Calculate progression within chapter
-                let charOffset = plainText.distance(from: plainText.startIndex, to: matchRange.lowerBound)
-                let chapterProgression = Double(charOffset) / Double(max(1, plainText.count))
-
-                let location = ReaderLocation(
-                    href: href,
-                    pageIndex: nil,
-                    progression: chapterProgression,
-                    totalProgression: 0,
-                    title: chapterTitle
-                )
-
-                let prefix = snippetStart > plainText.startIndex ? "..." : ""
-                let suffix = snippetEnd < plainText.endIndex ? "..." : ""
-                let displaySnippet = prefix + snippet + suffix
-
-                // Adjust match range for prefix
-                let adjustedStart = displaySnippet.index(displaySnippet.startIndex, offsetBy: prefix.count + matchOffsetInSnippet)
-                let adjustedEnd = displaySnippet.index(adjustedStart, offsetBy: plainText.distance(from: matchRange.lowerBound, to: matchRange.upperBound))
-
-                results.append(ReaderSearchResult(
-                    location: location,
-                    snippet: displaySnippet,
-                    matchRange: adjustedStart..<adjustedEnd,
-                    chapterTitle: chapterTitle
-                ))
-
-                searchStart = matchRange.upperBound
-            }
+            let title = findChapterTitle(for: href)
+            let url = parser.resolveSpineItemURL(at: spineIndex)
+            chapterInfos.append(ChapterInfo(index: spineIndex, href: href, title: title, url: url))
         }
 
-        return results
+        // Run heavy search work off main thread
+        return await Task.detached {
+            var results: [ReaderSearchResult] = []
+            let contextChars = 40
+
+            for info in chapterInfos {
+                guard !Task.isCancelled else { break }
+
+                // Get or parse chapter content
+                let nodes: [ContentNode]
+                if let cached = cachedChapters[info.index] {
+                    nodes = cached
+                } else {
+                    guard let url = info.url,
+                          let data = try? Data(contentsOf: url) else { continue }
+                    let baseURL = url.deletingLastPathComponent()
+                    let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: stylesheet)
+                    nodes = contentParser.parse()
+                }
+
+                // Extract plain text
+                let plainText = NativeEPUBEngine.extractPlainText(from: nodes)
+                guard !plainText.isEmpty else { continue }
+
+                // Calculate global start page for this chapter
+                let globalStartPage = (0..<info.index).reduce(0) { sum, i in
+                    sum + (i < pageCounts.count ? pageCounts[i] : 1)
+                }
+                let chapterPageCount = info.index < pageCounts.count ? pageCounts[info.index] : 1
+
+                // Find all matches (case-insensitive)
+                var searchStart = plainText.startIndex
+
+                while searchStart < plainText.endIndex {
+                    guard !Task.isCancelled else { break }
+                    guard let matchRange = plainText.range(of: query, options: .caseInsensitive, range: searchStart..<plainText.endIndex) else {
+                        break
+                    }
+
+                    // Build snippet with context
+                    let snippetStart = plainText.index(matchRange.lowerBound, offsetBy: -contextChars, limitedBy: plainText.startIndex) ?? plainText.startIndex
+                    let snippetEnd = plainText.index(matchRange.upperBound, offsetBy: contextChars, limitedBy: plainText.endIndex) ?? plainText.endIndex
+                    let snippet = String(plainText[snippetStart..<snippetEnd])
+
+                    // Calculate match range within snippet
+                    let matchOffsetInSnippet = plainText.distance(from: snippetStart, to: matchRange.lowerBound)
+                    let matchStartInSnippet = snippet.index(snippet.startIndex, offsetBy: matchOffsetInSnippet)
+                    let matchEndInSnippet = snippet.index(matchStartInSnippet, offsetBy: plainText.distance(from: matchRange.lowerBound, to: matchRange.upperBound))
+
+                    // Calculate progression within chapter and page number
+                    let charOffset = plainText.distance(from: plainText.startIndex, to: matchRange.lowerBound)
+                    let chapterProgression = Double(charOffset) / Double(max(1, plainText.count))
+
+                    let pageInChapter = min(Int(chapterProgression * Double(chapterPageCount)), max(0, chapterPageCount - 1))
+                    let globalPage = globalStartPage + pageInChapter
+                    let totalProg = totalPages > 0 ? Double(globalPage) / Double(totalPages) : 0
+
+                    let location = ReaderLocation(
+                        href: info.href,
+                        pageIndex: globalPage,
+                        progression: chapterProgression,
+                        totalProgression: totalProg,
+                        title: info.title
+                    )
+
+                    let prefix = snippetStart > plainText.startIndex ? "..." : ""
+                    let suffix = snippetEnd < plainText.endIndex ? "..." : ""
+                    let displaySnippet = prefix + snippet + suffix
+
+                    // Adjust match range for prefix
+                    let adjustedStart = displaySnippet.index(displaySnippet.startIndex, offsetBy: prefix.count + matchOffsetInSnippet)
+                    let adjustedEnd = displaySnippet.index(adjustedStart, offsetBy: plainText.distance(from: matchRange.lowerBound, to: matchRange.upperBound))
+
+                    results.append(ReaderSearchResult(
+                        location: location,
+                        snippet: displaySnippet,
+                        matchRange: adjustedStart..<adjustedEnd,
+                        chapterTitle: info.title
+                    ))
+
+                    searchStart = matchRange.upperBound
+                }
+            }
+
+            return results
+        }.value
     }
 
     // MARK: - Plain Text Extraction

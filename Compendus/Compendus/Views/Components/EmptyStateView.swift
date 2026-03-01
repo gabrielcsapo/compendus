@@ -52,10 +52,8 @@ struct EmptyStateView: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(Color.accentColor)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .buttonStyle(.borderedProminent)
                 .padding(.top, 8)
             }
         }

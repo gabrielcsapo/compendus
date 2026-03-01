@@ -63,9 +63,6 @@ struct ContentView: View {
                     ReaderContainerView(book: book)
                         .environment(readerSettings)
                 }
-                .task {
-                    HighlightMigration.migrateIfNeeded(modelContext: modelContext)
-                }
             } else {
                 ServerSetupView()
             }

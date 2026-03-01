@@ -8,20 +8,19 @@
         {
           "fill-specializations" : [
             {
-              "value" : "automatic"
-            },
-            {
               "appearance" : "dark",
-              "value" : "none"
+              "value" : {
+                "solid" : "srgb:0.26052,0.26052,0.26052,1.00000"
+              }
             }
           ],
-          "image-name" : "Compendus-light.svg",
-          "name" : "Compendus-light",
+          "image-name" : "Compendus-light 2.svg",
+          "name" : "Compendus-light 2",
           "position" : {
-            "scale" : 10,
+            "scale" : 30,
             "translation-in-points" : [
-              0,
-              0
+              600,
+              596.2049999999999
             ]
           }
         }

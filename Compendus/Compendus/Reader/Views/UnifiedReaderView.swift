@@ -26,6 +26,8 @@ struct UnifiedReaderView: View {
     @Environment(PocketTTSModelManager.self) private var pocketTTSModelManager
     @Environment(TTSAudioCache.self) private var ttsAudioCache
     @Environment(BackgroundProcessingManager.self) private var backgroundProcessingManager
+    @Environment(StorageManager.self) private var storageManager
+    @Environment(ComicExtractor.self) private var comicExtractor
 
     // Engine
     @State private var engine: (any ReaderEngine)?
@@ -41,8 +43,14 @@ struct UnifiedReaderView: View {
     @State private var showingThumbnails = false
     @State private var showingPageJump = false
     @State private var showingSearch = false
+    @State private var scrubberValue: Double = 0
+    @State private var isScrubbing = false
     @State private var showingHighlightSetup = false
     @State private var showingBookColorEditor = false
+
+    // Carousel state
+    @State private var carouselSnapshots: [UIImage?] = [nil, nil, nil] // [prev, current, next]
+    @State private var carouselDragOffset: CGFloat = 0
 
     // Highlighting
     @State private var highlights: [BookHighlight] = []
@@ -78,6 +86,11 @@ struct UnifiedReaderView: View {
     @State private var pendingLinkURL: URL?
     @State private var pendingLinkIsExternal = false
 
+    // Bookmarks
+    @State private var bookmarks: [BookBookmark] = []
+    @State private var showingBookmarks = false
+    @State private var showingBookmarkEdit = false
+
     // Reading session tracking
     @State private var currentSession: ReadingSession?
 
@@ -93,7 +106,8 @@ struct UnifiedReaderView: View {
             case .loading:
                 VStack(spacing: 16) {
                     ProgressView()
-                        .scaleEffect(1.5)
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: 200)
                     Text("Loading...")
                         .foregroundStyle(.secondary)
                 }
@@ -152,22 +166,44 @@ struct UnifiedReaderView: View {
         .sheet(isPresented: $showingSettings, onDismiss: {
             engine?.applySettings(readerSettings)
         }) {
-            ReaderSettingsView(format: engine?.isPDF == true ? .pdf : .epub, bookId: book.id)
+            ReaderSettingsView(format: engine?.isComic == true ? .comic : (engine?.isPDF == true ? .pdf : .epub), bookId: book.id)
                 .readerThemed(readerSettings)
         }
         // TOC
         .sheet(isPresented: $showingTOC) {
-            ReaderTOCView(
-                items: tocItems,
-                currentLocation: engine?.currentLocation,
-                onSelect: { item in
-                    Task {
-                        await engine?.go(to: item.location)
+            if let comicEngine = engine as? ComicEngine {
+                ComicThumbnailGridView(
+                    engine: comicEngine,
+                    onSelect: { pageIndex in
+                        Task {
+                            await comicEngine.go(to: ReaderLocation(
+                                href: nil, pageIndex: pageIndex,
+                                progression: 0, totalProgression: 0, title: nil
+                            ))
+                        }
+                        showingTOC = false
                     }
-                    showingTOC = false
+                )
+                .readerThemed(readerSettings)
+            } else {
+                ReaderTOCView(
+                    items: tocItems,
+                    currentLocation: engine?.currentLocation,
+                    onSelect: { item in
+                        Task {
+                            await engine?.go(to: item.location)
+                        }
+                        showingTOC = false
+                    }
+                )
+                .readerThemed(readerSettings)
+                .task {
+                    // Refresh TOC items to get latest page numbers after pagination
+                    if let items = await engine?.tableOfContents(), !items.isEmpty {
+                        tocItems = items
+                    }
                 }
-            )
-            .readerThemed(readerSettings)
+            }
         }
         // Highlights list
         .sheet(isPresented: $showingHighlights) {
@@ -186,6 +222,87 @@ struct UnifiedReaderView: View {
                 }
             )
             .readerThemed(readerSettings)
+        }
+        // Bookmarks list
+        .sheet(isPresented: $showingBookmarks) {
+            NavigationStack {
+                List {
+                    if bookmarks.isEmpty {
+                        ContentUnavailableView("No Bookmarks", systemImage: "bookmark", description: Text("Bookmark pages from the menu to save them here."))
+                    } else {
+                        ForEach(bookmarks) { bookmark in
+                            Button {
+                                Task {
+                                    await engine?.go(to: ReaderLocation(
+                                        href: nil, pageIndex: bookmark.pageIndex,
+                                        progression: bookmark.progression,
+                                        totalProgression: bookmark.progression,
+                                        title: bookmark.title
+                                    ))
+                                }
+                                showingBookmarks = false
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(Color(uiColor: bookmark.uiColor))
+                                        .frame(width: 12, height: 12)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(bookmark.title ?? "Page \(bookmark.pageIndex + 1)")
+                                            .font(.subheadline)
+                                        if let note = bookmark.note, !note.isEmpty {
+                                            Text(note)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    Spacer()
+                                    Text("\(Int(bookmark.progression * 100))%")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                        .onDelete { indexSet in
+                            for index in indexSet {
+                                let bookmark = bookmarks[index]
+                                modelContext.delete(bookmark)
+                            }
+                            bookmarks.remove(atOffsets: indexSet)
+                            try? modelContext.save()
+                        }
+                    }
+                }
+                .navigationTitle("Bookmarks")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { showingBookmarks = false }
+                    }
+                }
+            }
+            .readerThemed(readerSettings)
+        }
+        // Bookmark edit (color + note)
+        .sheet(isPresented: $showingBookmarkEdit) {
+            if let bookmark = currentPageBookmark {
+                BookmarkEditSheet(
+                    bookmark: bookmark,
+                    bookId: book.id,
+                    onSave: {
+                        try? modelContext.save()
+                        fetchBookmarks()
+                        showingBookmarkEdit = false
+                    },
+                    onDelete: {
+                        deleteBookmark(bookmark)
+                        showingBookmarkEdit = false
+                    }
+                )
+                .presentationDetents([.medium])
+                .readerThemed(readerSettings)
+            }
         }
         // Note input
         .sheet(isPresented: $showingNoteInput) {
@@ -273,7 +390,7 @@ struct UnifiedReaderView: View {
         // Page jump
         .sheet(isPresented: $showingPageJump) {
             if let engine = engine {
-                if engine.isPDF {
+                if engine.isPDF || engine.isComic {
                     let currentPage = (engine.currentLocation?.pageIndex ?? 0) + 1
                     PageJumpView(
                         totalPages: engine.totalPositions,
@@ -380,43 +497,53 @@ struct UnifiedReaderView: View {
     private func readerContent(engine: any ReaderEngine) -> some View {
         GeometryReader { geometry in
             ZStack {
-                // Main layout: top bar area, reader, bottom bar area
-                VStack(spacing: 0) {
-                    // Top bar — always reserves space, content fades in/out
-                    readerTopBar(engine: engine, visible: showingOverlay)
+                // Layer 0: Full-bleed reader content (hidden when carousel is showing)
+                EngineViewWrapper(engine: engine)
+                    .ignoresSafeArea()
+                    .opacity(showingOverlay ? 0 : 1)
+                    .allowsHitTesting(!showingOverlay)
 
-                    // Engine fills remaining space
-                    EngineViewWrapper(engine: engine)
+                // Layer 1: Page carousel (visible when overlay is showing)
+                if showingOverlay {
+                    pageCarousel(engine: engine, geometry: geometry)
+                        .transition(reduceMotion ? .opacity : .opacity)
+                }
 
-                    // Bottom area — always reserves space
-                    VStack(spacing: 0) {
-                        // PDF-specific controls (only when overlay visible)
-                        if showingOverlay && engine.isPDF {
-                            if showingThumbnails, let pdfEngine = engine as? PDFEngine,
-                               let document = pdfEngine.pdfDocument {
-                                PDFThumbnailScrubber(
-                                    document: document,
-                                    currentPage: Binding(
-                                        get: { pdfEngine.currentPage },
-                                        set: { page in
-                                            Task { await pdfEngine.go(to: ReaderLocation(
-                                                href: nil, pageIndex: page,
-                                                progression: 0, totalProgression: 0, title: nil
-                                            ))}
-                                        }
-                                    )
-                                )
-                            }
-
-                            pdfControlsOverlay(engine: engine)
+                // Layer 1b: Mac Catalyst hover zones (invisible hit areas at edges)
+                #if targetEnvironment(macCatalyst)
+                VStack {
+                    Color.clear
+                        .frame(height: 60)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            if hovering && !showingOverlay { toggleOverlay() }
                         }
+                    Spacer()
+                    Color.clear
+                        .frame(height: 60)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in
+                            if hovering && !showingOverlay { toggleOverlay() }
+                        }
+                }
+                #endif
 
-                        // Progress bar — always present, content fades
-                        progressBar(engine: engine, visible: showingOverlay)
+                // Layer 2: Overlay bars — slide in from edges on tap
+                VStack(spacing: 0) {
+                    if showingOverlay {
+                        readerTopBar(engine: engine)
+                            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                    }
+
+                    Spacer()
+
+                    if showingOverlay {
+                        readerBottomBar(engine: engine)
+                            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     }
                 }
 
-                // Floating highlight toolbar (always overlaid at selection position)
+                // Layer 3: Floating highlight toolbar (always overlaid at selection position)
                 if showingFloatingToolbar, let frame = selectionFrame {
                     FloatingHighlightToolbar(
                         bookId: book.id,
@@ -446,7 +573,7 @@ struct UnifiedReaderView: View {
                     )
                 }
 
-                // Read-along / TTS pill (bottom)
+                // Layer 4: Read-along / TTS pill (bottom)
                 if (showReadAlongPill && !readAlongPillDismissed) || readAlongService.isActive {
                     VStack {
                         Spacer()
@@ -463,12 +590,12 @@ struct UnifiedReaderView: View {
                             onDownloadForLater: { queueTTSPreGeneration() }
                         )
                         .padding(.horizontal, 16)
-                        .padding(.bottom, showingOverlay ? 60 : 16)
+                        .padding(.bottom, showingOverlay ? 140 : 16)
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                // Full-screen loading overlay while engine initializes content
+                // Layer 5: Full-screen loading overlay while engine initializes content
                 if !engine.isReady {
                     ZStack {
                         Color(uiColor: readerSettings.theme.backgroundColor)
@@ -493,112 +620,296 @@ struct UnifiedReaderView: View {
                     .transition(.opacity)
                 }
             }
+            .animation(reduceMotion ? .none : .spring(response: 0.3, dampingFraction: 0.85), value: showingOverlay)
             .animation(.easeInOut(duration: 0.3), value: engine.isReady)
+            .onChange(of: showingOverlay) { _, isShowing in
+                if isShowing {
+                    captureCarouselSnapshots(engine: engine)
+                } else {
+                    carouselSnapshots = [nil, nil, nil]
+                    carouselDragOffset = 0
+                }
+            }
         }
+    }
+
+    // MARK: - Page Carousel
+
+    /// Card dimensions for carousel layout (computed from geometry).
+    private func carouselMetrics(for geometry: GeometryProxy) -> (cardWidth: CGFloat, cardHeight: CGFloat, cardStride: CGFloat, verticalCenter: CGFloat) {
+        let topBarHeight = topSafeAreaInset + 62
+        let bottomBarHeight = max(12, bottomSafeAreaInset + 4) + 90
+        let availableHeight = geometry.size.height - topBarHeight - bottomBarHeight
+        let verticalCenter = topBarHeight + availableHeight / 2
+
+        let cardWidth = geometry.size.width * 0.75
+        let cardAspect = geometry.size.height / max(1, geometry.size.width)
+        let cardHeight = min(cardWidth * cardAspect, availableHeight - 32)
+        let cardSpacing: CGFloat = 16
+        let cardStride = cardWidth + cardSpacing
+
+        return (cardWidth, cardHeight, cardStride, verticalCenter)
+    }
+
+    @ViewBuilder
+    private func pageCarousel(engine: any ReaderEngine, geometry: GeometryProxy) -> some View {
+        let metrics = carouselMetrics(for: geometry)
+
+        ZStack {
+            // Dimmed background — tap to dismiss overlay
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    toggleOverlay()
+                }
+
+            // Three cards: prev (-1), current (0), next (+1)
+            ForEach(-1...1, id: \.self) { offset in
+                let index = offset + 1 // 0=prev, 1=current, 2=next
+                let xOffset = CGFloat(offset) * metrics.cardStride + carouselDragOffset
+
+                carouselCard(image: carouselSnapshots[index], width: metrics.cardWidth, height: metrics.cardHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if offset == 0 {
+                            // Tap on current card dismisses the overlay
+                            toggleOverlay()
+                        } else {
+                            // Tap on prev/next card navigates to that page
+                            let navigateForward = offset == 1
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                                carouselDragOffset = navigateForward ? -metrics.cardStride : metrics.cardStride
+                            }
+                            Task {
+                                try? await Task.sleep(for: .milliseconds(250))
+                                if navigateForward {
+                                    await engine.goForward()
+                                } else {
+                                    await engine.goBackward()
+                                }
+                                carouselDragOffset = 0
+                                captureCarouselSnapshots(engine: engine)
+                                scheduleOverlayHide()
+                            }
+                        }
+                    }
+                    .offset(x: xOffset)
+                    .zIndex(offset == 0 ? 1 : 0)
+            }
+            .position(x: geometry.size.width / 2, y: metrics.verticalCenter)
+        }
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 15)
+                .onChanged { value in
+                    // Cancel auto-hide while user is interacting with carousel
+                    overlayHideTask?.cancel()
+                    overlayHideTask = nil
+                    carouselDragOffset = value.translation.width
+                }
+                .onEnded { value in
+                    let threshold = metrics.cardWidth * 0.25
+                    let predicted = value.predictedEndTranslation.width
+                    if value.translation.width < -threshold || predicted < -threshold * 2 {
+                        // Swiped left → animate card off to the left, then update
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            carouselDragOffset = -metrics.cardStride
+                        }
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(250))
+                            await engine.goForward()
+                            carouselDragOffset = 0
+                            captureCarouselSnapshots(engine: engine)
+                            scheduleOverlayHide()
+                        }
+                    } else if value.translation.width > threshold || predicted > threshold * 2 {
+                        // Swiped right → animate card off to the right, then update
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                            carouselDragOffset = metrics.cardStride
+                        }
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(250))
+                            await engine.goBackward()
+                            carouselDragOffset = 0
+                            captureCarouselSnapshots(engine: engine)
+                            scheduleOverlayHide()
+                        }
+                    } else {
+                        // Snap back — not enough to trigger navigation
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                            carouselDragOffset = 0
+                        }
+                        scheduleOverlayHide()
+                    }
+                }
+        )
+    }
+
+    @ViewBuilder
+    private func carouselCard(image: UIImage?, width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Color(uiColor: readerSettings.theme.backgroundColor)
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 8)
+    }
+
+    private func captureCarouselSnapshots(engine: any ReaderEngine) {
+        // The engine renders snapshots at its own viewport size so text layout
+        // matches exactly. SwiftUI scales the images down for the carousel card.
+        carouselSnapshots = [
+            engine.snapshotPage(at: -1),
+            engine.snapshotPage(at: 0),
+            engine.snapshotPage(at: 1)
+        ]
     }
 
     // MARK: - Top Bar
 
+    private var themeTextColor: Color {
+        Color(uiColor: readerSettings.theme.textColor)
+    }
+
     @ViewBuilder
-    private func readerTopBar(engine: any ReaderEngine, visible: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
+    private func readerTopBar(engine: any ReaderEngine) -> some View {
+        HStack(spacing: 0) {
+            // Left: back button
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(themeTextColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Left-center: TOC
+            Button {
+                showingTOC = true
+            } label: {
+                Image(systemName: "list.bullet")
+                    .foregroundStyle(themeTextColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 8)
+
+            // Center: chapter/book title
+            Group {
+                if let title = engine.currentLocation?.title, !title.isEmpty {
+                    Text(title)
+                } else {
+                    Text(book.title)
                 }
-                .buttonStyle(.plain)
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(themeTextColor)
+            .lineLimit(1)
 
-                Spacer()
+            Spacer(minLength: 8)
 
-                // Chapter/page title
-                Group {
-                    if let title = engine.currentLocation?.title, !title.isEmpty {
-                        Text(title)
-                    } else {
-                        Text(book.title)
-                    }
-                }
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-                .opacity(visible ? 1 : 0)
-
-                Spacer()
-
-                HStack(spacing: 18) {
-                    // Read aloud / Read along
-                    if !engine.isPDF && (matchingAudiobook != nil || pocketTTSModelManager.isModelAvailable || readAlongService.isActive) {
-                        if readAlongService.state == .loading || readAlongService.state == .buffering {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                        } else {
-                            Button {
-                                if readAlongService.isActive {
-                                    readAlongService.deactivate()
-                                } else {
-                                    // Show the pill so users can choose between
-                                    // Read Along (audiobook) and Read Aloud (TTS)
-                                    withAnimation {
-                                        readAlongPillDismissed = false
-                                        showReadAlongPill = true
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: readAlongService.isActive ? "speaker.wave.2.fill" : "speaker.wave.2")
-                                    .foregroundStyle(readAlongService.isActive ? Color.accentColor : .primary)
-                            }
-                        }
-                    }
-
+            // Right-center: search + font settings + bookmark
+            HStack(spacing: 0) {
+                if !engine.isComic {
                     Button {
                         showingSearch = true
                     } label: {
                         Image(systemName: "magnifyingglass")
+                            .foregroundStyle(themeTextColor)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                }
 
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "textformat.size")
-                    }
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "textformat.size")
+                        .foregroundStyle(themeTextColor)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
 
+                // Bookmark button: solid when bookmarked, outline when not
+                Button {
+                    bookmarkCurrentPage()
+                } label: {
+                    Image(systemName: isCurrentPageBookmarked ? "bookmark.fill" : "bookmark")
+                        .foregroundStyle(
+                            isCurrentPageBookmarked
+                                ? Color(uiColor: currentPageBookmark?.uiColor ?? .systemRed)
+                                : themeTextColor
+                        )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+            }
+            .buttonStyle(.plain)
+
+            // Far right: overflow menu
+            Menu {
+                if !engine.isComic {
                     Button {
                         showingHighlights = true
                     } label: {
-                        Image(systemName: "highlighter")
-                    }
-
-                    Button {
-                        showingTOC = true
-                    } label: {
-                        Image(systemName: "list.bullet")
+                        Label("Highlights", systemImage: "highlighter")
                     }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.primary)
-                .opacity(visible ? 1 : 0)
+
+                Button {
+                    showingBookmarks = true
+                } label: {
+                    Label("Bookmarks", systemImage: "bookmark.circle")
+                }
+
+                if !engine.isPDF && !engine.isComic && (matchingAudiobook != nil || pocketTTSModelManager.isModelAvailable || readAlongService.isActive) {
+                    if readAlongService.isActive {
+                        Button {
+                            readAlongService.deactivate()
+                        } label: {
+                            Label("Stop Read Aloud", systemImage: "speaker.slash")
+                        }
+                    } else {
+                        Button {
+                            withAnimation {
+                                readAlongPillDismissed = false
+                                showReadAlongPill = true
+                            }
+                        } label: {
+                            Label("Read Aloud", systemImage: "speaker.wave.2")
+                        }
+                    }
+                }
+
+                Button {
+                    showingPageJump = true
+                } label: {
+                    Label("Go to Page", systemImage: "arrow.right.doc.on.clipboard")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(themeTextColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal)
-            .padding(.bottom, 14)
-            .padding(.top, topSafeAreaInset + 12)
         }
-        .background(visible ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: readerSettings.theme.backgroundColor)))
+        .padding(.horizontal, 4)
+        .padding(.bottom, 10)
+        .padding(.top, topSafeAreaInset + 8)
+        .background(.ultraThinMaterial)
         .environment(\.colorScheme, readerSettings.theme.colorScheme)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !visible { toggleOverlay() }
-        }
-        #if targetEnvironment(macCatalyst)
-        .onHover { hovering in
-            if hovering && !visible {
-                toggleOverlay()
-            }
-        }
-        #endif
-        .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: visible)
     }
 
     private var topSafeAreaInset: CGFloat {
@@ -615,159 +926,191 @@ struct UnifiedReaderView: View {
             .first?.windows.first?.safeAreaInsets ?? .zero
     }
 
-    // MARK: - Progress Bar
+    // MARK: - Bottom Bar
 
     @ViewBuilder
-    private func progressBar(engine: any ReaderEngine, visible: Bool) -> some View {
-        VStack(spacing: 4) {
-            ProgressView(value: engine.currentLocation?.totalProgression ?? 0)
-                .tint(.accentColor)
+    private func readerBottomBar(engine: any ReaderEngine) -> some View {
+        VStack(spacing: 8) {
+            // PDF-specific: brightness control (iOS only)
+            if engine.isPDF {
+                #if !targetEnvironment(macCatalyst)
+                HStack(spacing: 12) {
+                    Image(systemName: "sun.min")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
 
+                    Slider(value: $brightness, in: 0...1)
+                        .onChange(of: brightness) { _, newValue in
+                            UIScreen.main.brightness = CGFloat(newValue)
+                        }
+
+                    Image(systemName: "sun.max")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+                #endif
+            }
+
+            // Page info label
+            pageInfoLabel(engine: engine)
+
+            // Interactive page scrubber
+            pageScrubber(engine: engine)
+
+            // Footer row: page range + optional thumbnail toggle
             HStack {
+                Text("1")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+
+                Spacer()
+
                 if engine.isPDF {
-                    let page = (engine.currentLocation?.pageIndex ?? 0) + 1
                     Button {
-                        showingPageJump = true
+                        withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
+                            showingThumbnails.toggle()
+                        }
                     } label: {
-                        Text("\(page) / \(engine.totalPositions)")
-                            .font(.caption.monospacedDigit())
+                        Image(systemName: showingThumbnails ? "rectangle.grid.1x2.fill" : "rectangle.grid.1x2")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                } else if let nativeEngine = engine as? NativeEPUBEngine,
-                          engine.currentLocation?.pageIndex != nil {
-                    let globalPage = nativeEngine.globalPageIndex + 1
-                    let totalPages = nativeEngine.totalPositions
-                    Button {
-                        showingPageJump = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            if let title = engine.currentLocation?.title {
-                                Text(title)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                Text("·")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            if nativeEngine.isSpreadMode {
-                                let rightPage = min(globalPage + 1, totalPages)
-                                Text("Pages \(globalPage)-\(rightPage) of \(totalPages)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text("Page \(globalPage) of \(totalPages)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    Text("\(Int((engine.currentLocation?.totalProgression ?? 0) * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+
                 Spacer()
+
+                Text("\(engine.totalPositions)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+
+            // PDF thumbnail scrubber (expanded below when toggled)
+            if showingThumbnails, let pdfEngine = engine as? PDFEngine,
+               let document = pdfEngine.pdfDocument {
+                PDFThumbnailScrubber(
+                    document: document,
+                    currentPage: Binding(
+                        get: { pdfEngine.currentPage },
+                        set: { page in
+                            Task { await pdfEngine.go(to: ReaderLocation(
+                                href: nil, pageIndex: page,
+                                progression: 0, totalProgression: 0, title: nil
+                            ))}
+                        }
+                    )
+                )
             }
         }
-        .padding(.horizontal)
-        .padding(.top, 16)
-        .padding(.bottom, max(16, bottomSafeAreaInset + 12))
-        .opacity(visible ? 1 : 0)
-        .background(visible ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color(uiColor: readerSettings.theme.backgroundColor)))
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, max(12, bottomSafeAreaInset + 4))
+        .background(.ultraThinMaterial)
         .environment(\.colorScheme, readerSettings.theme.colorScheme)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !visible { toggleOverlay() }
-        }
-        #if targetEnvironment(macCatalyst)
-        .onHover { hovering in
-            if hovering && !visible {
-                toggleOverlay()
-            }
-        }
-        #endif
-        .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: visible)
     }
 
-    // MARK: - PDF Controls Overlay
+    // MARK: - Page Info Label
 
     @ViewBuilder
-    private func pdfControlsOverlay(engine: any ReaderEngine) -> some View {
-        VStack(spacing: 16) {
-            // Brightness control (iOS only — no screen brightness API on Mac)
-            #if !targetEnvironment(macCatalyst)
-            HStack(spacing: 12) {
-                Image(systemName: "sun.min")
-                    .foregroundStyle(.secondary)
+    private func pageInfoLabel(engine: any ReaderEngine) -> some View {
+        let progression = engine.currentLocation?.totalProgression ?? 0
+        let percentage = Int(progression * 100)
 
-                Slider(value: $brightness, in: 0...1)
-                    .onChange(of: brightness) { _, newValue in
-                        UIScreen.main.brightness = CGFloat(newValue)
-                    }
-
-                Image(systemName: "sun.max")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-            #endif
-
-            // Page slider
-            if engine.totalPositions > 1, let pdfEngine = engine as? PDFEngine {
-                VStack(spacing: 4) {
-                    Slider(
-                        value: Binding(
-                            get: { Double(pdfEngine.currentPage) },
-                            set: { newValue in
-                                Task { await pdfEngine.go(to: ReaderLocation(
-                                    href: nil, pageIndex: Int(newValue),
-                                    progression: 0, totalProgression: 0, title: nil
-                                ))}
-                            }
-                        ),
-                        in: 0...Double(max(0, engine.totalPositions - 1)),
-                        step: 1
-                    )
-
-                    HStack {
-                        Text("1")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(engine.totalPositions)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+        Group {
+            if engine.isPDF {
+                let page = (engine.currentLocation?.pageIndex ?? 0) + 1
+                Text("Page \(page) of \(engine.totalPositions) \u{00B7} \(percentage)%")
+            } else if let comicEngine = engine as? ComicEngine {
+                let page = comicEngine.currentPage + 1
+                if comicEngine.pagesPerSpread == 2 {
+                    let rightPage = min(page + 1, engine.totalPositions)
+                    Text("Pages \(page)-\(rightPage) of \(engine.totalPositions) \u{00B7} \(percentage)%")
+                } else {
+                    Text("Page \(page) of \(engine.totalPositions) \u{00B7} \(percentage)%")
                 }
-                .padding(.horizontal)
-            }
-
-            // Thumbnail toggle
-            Button {
-                withAnimation(reduceMotion ? .none : .spring(response: 0.35, dampingFraction: 0.8)) {
-                    showingThumbnails.toggle()
+            } else if let nativeEngine = engine as? NativeEPUBEngine,
+                      engine.currentLocation?.pageIndex != nil {
+                let globalPage = nativeEngine.globalPageIndex + 1
+                let totalPages = nativeEngine.totalPositions
+                if nativeEngine.isSpreadMode {
+                    let rightPage = min(globalPage + 1, totalPages)
+                    Text("Pages \(globalPage)-\(rightPage) of \(totalPages) \u{00B7} \(percentage)%")
+                } else {
+                    Text("Page \(globalPage) of \(totalPages) \u{00B7} \(percentage)%")
                 }
-            } label: {
-                Label(
-                    showingThumbnails ? "Hide Thumbnails" : "Show Thumbnails",
-                    systemImage: showingThumbnails ? "rectangle.grid.1x2.fill" : "rectangle.grid.1x2"
-                )
-                .font(.subheadline)
+            } else {
+                Text("\(percentage)%")
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+    }
+
+    // MARK: - Page Scrubber
+
+    @ViewBuilder
+    private func pageScrubber(engine: any ReaderEngine) -> some View {
+        if engine.isPDF, let pdfEngine = engine as? PDFEngine, engine.totalPositions > 1 {
+            Slider(
+                value: Binding(
+                    get: { Double(pdfEngine.currentPage) },
+                    set: { newValue in
+                        Task { await pdfEngine.go(to: ReaderLocation(
+                            href: nil, pageIndex: Int(newValue),
+                            progression: 0, totalProgression: 0, title: nil
+                        ))}
+                    }
+                ),
+                in: 0...Double(max(0, engine.totalPositions - 1)),
+                step: 1
+            )
+            .tint(.accentColor)
+        } else if let comicEngine = engine as? ComicEngine, engine.totalPositions > 1 {
+            Slider(
+                value: Binding(
+                    get: { Double(comicEngine.currentPage) },
+                    set: { newValue in
+                        Task { await comicEngine.go(to: ReaderLocation(
+                            href: nil, pageIndex: Int(newValue),
+                            progression: 0, totalProgression: 0, title: nil
+                        ))}
+                    }
+                ),
+                in: 0...Double(max(0, engine.totalPositions - 1)),
+                step: 1
+            )
+            .tint(.accentColor)
+        } else if let nativeEngine = engine as? NativeEPUBEngine,
+                  nativeEngine.totalPositions > 1 {
+            Slider(
+                value: Binding(
+                    get: { isScrubbing ? scrubberValue : Double(nativeEngine.globalPageIndex) },
+                    set: { scrubberValue = $0 }
+                ),
+                in: 0...Double(max(0, nativeEngine.totalPositions - 1)),
+                step: 1,
+                onEditingChanged: { editing in
+                    isScrubbing = editing
+                    if !editing {
+                        // Navigate only when the user lifts their finger
+                        let page = Int(scrubberValue)
+                        let totalPages = max(1, nativeEngine.totalPositions)
+                        let progression = Double(page) / Double(totalPages)
+                        Task { await nativeEngine.go(toProgression: progression) }
+                    }
+                }
+            )
+            .tint(.accentColor)
+        } else {
+            ProgressView(value: engine.currentLocation?.totalProgression ?? 0)
+                .tint(.accentColor)
+        }
     }
 
     // MARK: - Toggle Overlay
 
     private func toggleOverlay() {
-        withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
+        withAnimation(reduceMotion ? .none : .spring(response: 0.3, dampingFraction: 0.85)) {
             showingOverlay.toggle()
         }
         if showingOverlay {
@@ -789,7 +1132,7 @@ struct UnifiedReaderView: View {
         guard showingOverlay else { return }
         overlayHideTask?.cancel()
         overlayHideTask = nil
-        withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
+        withAnimation(reduceMotion ? .none : .spring(response: 0.3, dampingFraction: 0.85)) {
             showingOverlay = false
         }
     }
@@ -799,7 +1142,7 @@ struct UnifiedReaderView: View {
         overlayHideTask = Task {
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
-            withAnimation(reduceMotion ? .none : .easeInOut(duration: 0.25)) {
+            withAnimation(reduceMotion ? .none : .spring(response: 0.3, dampingFraction: 0.85)) {
                 showingOverlay = false
             }
         }
@@ -813,6 +1156,12 @@ struct UnifiedReaderView: View {
         // When preferEpub is true and the book has a downloaded EPUB version, use it
         if preferEpub, let epubURL = book.epubFileURL, book.hasEpubVersion {
             await initializeEPUBEngine(fileURL: epubURL)
+            return
+        }
+
+        // Comics can work without a local file (CBR requires server)
+        if book.isComic {
+            await initializeComicEngine()
             return
         }
 
@@ -853,6 +1202,7 @@ struct UnifiedReaderView: View {
 
         readerState = .ready
         startReadingSession(engine: nativeEngine)
+        fetchBookmarks()
 
         // Load TOC in background — not needed until user opens TOC panel
         Task {
@@ -898,7 +1248,33 @@ struct UnifiedReaderView: View {
 
         readerState = .ready
         startReadingSession(engine: pdfEngine)
+        fetchBookmarks()
         showHighlightSetupIfNeeded()
+    }
+
+    private func initializeComicEngine() async {
+        let comicEngine = ComicEngine(
+            book: book,
+            comicExtractor: comicExtractor,
+            storageManager: storageManager,
+            apiService: apiService
+        )
+        configureEngineCallbacks(comicEngine)
+
+        let initialPage = book.lastPosition.flatMap { Int($0) }
+        await comicEngine.load(initialPage: initialPage)
+
+        if let error = comicEngine.errorMessage {
+            readerState = .error(error)
+            return
+        }
+
+        engine = comicEngine
+        comicEngine.applySettings(readerSettings)
+        fetchBookmarks()
+
+        readerState = .ready
+        startReadingSession(engine: comicEngine)
     }
 
     private func showHighlightSetupIfNeeded() {
@@ -929,6 +1305,13 @@ struct UnifiedReaderView: View {
         if let pdfEngine = engine as? PDFEngine {
             pdfEngine.onCenterTap = { [self] in
                 pauseReadAlongIfActive()
+                toggleOverlay()
+            }
+        }
+
+        // Comic: center tap to toggle overlay (page navigation handled by ComicPageViewController)
+        if let comicEngine = engine as? ComicEngine {
+            comicEngine.onCenterTap = { [self] in
                 toggleOverlay()
             }
         }
@@ -989,6 +1372,8 @@ struct UnifiedReaderView: View {
                 session.endCharacterOffset = nativeEngine.currentPagePlainTextOffset
             } else if let pdfEngine = engine as? PDFEngine {
                 session.endPage = pdfEngine.currentPage
+            } else if let comicEngine = engine as? ComicEngine {
+                session.endPage = comicEngine.currentPage
             }
             // Discard sessions shorter than 10 seconds (accidental opens)
             if session.durationSeconds < 10 {
@@ -1013,13 +1398,21 @@ struct UnifiedReaderView: View {
         } else if let pdfEngine = engine as? PDFEngine {
             page = pdfEngine.currentPage
             charOffset = nil
+        } else if let comicEngine = engine as? ComicEngine {
+            page = comicEngine.currentPage
+            charOffset = nil
         } else {
             return
         }
 
+        let format: String
+        if engine.isComic { format = "comic" }
+        else if engine.isPDF { format = "pdf" }
+        else { format = "epub" }
+
         let session = ReadingSession(
             bookId: book.id,
-            format: engine.isPDF ? "pdf" : "epub",
+            format: format,
             startPage: page,
             endPage: page,
             totalBookPages: engine.totalPositions,
@@ -1047,8 +1440,80 @@ struct UnifiedReaderView: View {
             let page = pdfEngine.currentPage
             session.endPage = page
             session.appendPageTurn(page: page)
+        } else if let comicEngine = engine as? ComicEngine {
+            let page = comicEngine.currentPage
+            session.endPage = page
+            session.appendPageTurn(page: page)
         }
 
+        try? modelContext.save()
+    }
+
+    // MARK: - Bookmarks
+
+    private var currentPageIndex: Int? {
+        guard let engine = engine else { return nil }
+        if let comicEngine = engine as? ComicEngine {
+            return comicEngine.currentPage
+        } else if let pdfEngine = engine as? PDFEngine {
+            return pdfEngine.currentPage
+        } else if let nativeEngine = engine as? NativeEPUBEngine {
+            return nativeEngine.globalPageIndex
+        }
+        return nil
+    }
+
+    private var isCurrentPageBookmarked: Bool {
+        guard let pageIndex = currentPageIndex else { return false }
+        return bookmarks.contains { $0.pageIndex == pageIndex }
+    }
+
+    private var currentPageBookmark: BookBookmark? {
+        guard let pageIndex = currentPageIndex else { return nil }
+        return bookmarks.first { $0.pageIndex == pageIndex }
+    }
+
+    private func fetchBookmarks() {
+        let bookId = book.id
+        let descriptor = FetchDescriptor<BookBookmark>(
+            predicate: #Predicate { $0.bookId == bookId },
+            sortBy: [SortDescriptor(\.pageIndex)]
+        )
+        bookmarks = (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func bookmarkCurrentPage() {
+        guard let engine = engine, let pageIndex = currentPageIndex else { return }
+        // If already bookmarked, just show the editor
+        if currentPageBookmark != nil {
+            showingBookmarkEdit = true
+            return
+        }
+
+        let format: String
+        if engine.isComic { format = "comic" }
+        else if engine.isPDF { format = "pdf" }
+        else { format = "epub" }
+
+        let defaultColor = highlightColorManager.colors.first?.hex ?? "#ff6b6b"
+        let bookmark = BookBookmark(
+            bookId: book.id,
+            pageIndex: pageIndex,
+            color: defaultColor,
+            format: format,
+            title: engine.currentLocation?.title,
+            progression: engine.currentLocation?.totalProgression ?? 0
+        )
+        modelContext.insert(bookmark)
+        bookmarks.append(bookmark)
+        try? modelContext.save()
+
+        showingBookmarkEdit = true
+    }
+
+    private func deleteBookmark(_ bookmark: BookBookmark) {
+        modelContext.delete(bookmark)
+        bookmarks.removeAll { $0.id == bookmark.id }
         try? modelContext.save()
     }
 

@@ -132,7 +132,7 @@ struct ActiveDownloadRow: View {
                 .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
         } else {
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.2))
+                .fill(Color(.systemGray5))
                 .aspectRatio(bookAspectRatio, contentMode: .fit)
                 .overlay {
                     Image(systemName: bookIcon)

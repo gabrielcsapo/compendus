@@ -38,7 +38,7 @@ struct DownloadedBookCoverView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(.systemGray5))
                     .overlay {
                         Image(systemName: iconForFormat)
                             .font(.largeTitle)

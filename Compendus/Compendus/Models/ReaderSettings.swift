@@ -78,6 +78,48 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
         case .light, .sepia: return .light
         }
     }
+
+    /// Semi-transparent overlay background matching the theme
+    var overlayBackgroundColor: UIColor {
+        backgroundColor.withAlphaComponent(0.6)
+    }
+
+    /// Secondary container background (e.g. page indicator pill)
+    var secondaryBackgroundColor: UIColor {
+        switch self {
+        case .light: return UIColor.systemFill
+        case .dark: return UIColor(white: 0.2, alpha: 1.0)
+        case .sepia: return UIColor(red: 0.92, green: 0.89, blue: 0.85, alpha: 1.0)
+        }
+    }
+
+    /// Border color for small controls (e.g. color picker circles)
+    var borderColor: UIColor {
+        switch self {
+        case .light: return UIColor.black.withAlphaComponent(0.15)
+        case .dark: return UIColor.white.withAlphaComponent(0.3)
+        case .sepia: return UIColor.brown.withAlphaComponent(0.25)
+        }
+    }
+
+    /// Placeholder/skeleton fill color
+    var placeholderColor: UIColor {
+        switch self {
+        case .light: return UIColor.systemGray5
+        case .dark: return UIColor(white: 0.18, alpha: 1.0)
+        case .sepia: return UIColor(red: 0.91, green: 0.88, blue: 0.83, alpha: 1.0)
+        }
+    }
+
+    /// Loading indicator track color
+    var loadingTrackColor: UIColor {
+        textColor.withAlphaComponent(0.15)
+    }
+
+    /// Loading indicator bar color
+    var loadingBarColor: UIColor {
+        textColor.withAlphaComponent(0.6)
+    }
 }
 
 // MARK: - Reader Layout

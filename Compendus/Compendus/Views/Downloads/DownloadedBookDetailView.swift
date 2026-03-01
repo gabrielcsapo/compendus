@@ -129,7 +129,7 @@ struct DownloadedBookDetailView: View {
                     .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
             } else {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(.systemGray5))
                     .aspectRatio(2/3, contentMode: .fit)
                     .frame(width: 200)
                     .overlay {

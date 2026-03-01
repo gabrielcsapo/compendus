@@ -26,6 +26,7 @@ class PDFEngine: ReaderEngine {
     private var pdfView: PDFView?
     private let bookURL: URL
     private(set) var currentPage: Int = 0
+    private(set) var currentTheme: ReaderTheme?
 
     init(bookURL: URL) {
         self.bookURL = bookURL
@@ -45,6 +46,16 @@ class PDFEngine: ReaderEngine {
         }
         updateLocation()
         isReady = true
+    }
+
+    // MARK: - Page Snapshot
+
+    func snapshotPage(at offset: Int) -> UIImage? {
+        let targetPage = currentPage + offset
+        guard targetPage >= 0, targetPage < totalPositions,
+              let page = pdfDocument?.page(at: targetPage) else { return nil }
+        let renderSize = pdfView?.bounds.size ?? UIScreen.main.bounds.size
+        return page.thumbnail(of: renderSize, for: .mediaBox)
     }
 
     // MARK: - ReaderEngine Protocol
@@ -108,6 +119,7 @@ class PDFEngine: ReaderEngine {
     }
 
     func applySettings(_ settings: ReaderSettings) {
+        currentTheme = settings.theme
         pdfView?.backgroundColor = settings.theme.backgroundColor
     }
 
@@ -358,7 +370,7 @@ class PDFViewHostController: UIViewController, UIGestureRecognizerDelegate {
         pdfView.displayMode = .singlePage
         pdfView.displayDirection = .horizontal
         pdfView.usePageViewController(true)
-        pdfView.backgroundColor = .systemBackground
+        pdfView.backgroundColor = engine.currentTheme?.backgroundColor ?? .systemBackground
 
         // Set initial page
         if let page = engine.pdfDocument?.page(at: engine.currentPage) {

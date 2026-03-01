@@ -1,0 +1,580 @@
+import { Link } from "react-router";
+import { CodeBlock } from "@app/components/docs";
+import { ShowcaseBookCard } from "../components/ShowcaseBookCard";
+import { mockBooks } from "../data/mockBooks";
+
+const features = [
+  {
+    title: "Multi-Format Support",
+    description:
+      "Read and manage EPUB, PDF, MOBI, and AZW3 ebooks; CBZ and CBR comic archives; and M4B, M4A, and MP3 audiobooks.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: "Automatic Metadata",
+    description:
+      "Fetch book metadata, covers, and descriptions from Google Books and Open Library automatically.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: "Reading Progress",
+    description:
+      "Track reading progress, create highlights with notes, bookmark pages, and log reading sessions.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: "iOS & Web",
+    description:
+      "Native iOS app with custom EPUB/PDF/CBZ comic reader engine plus a full-featured responsive web interface.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: "Full-Text Search",
+    description:
+      "Search across titles, authors, descriptions, and optionally within book content itself.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    title: "Collections & Tags",
+    description:
+      "Organize your library with hierarchical collections, color-coded tags, and series tracking.",
+    icon: (
+      <svg
+        className="w-6 h-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
+      </svg>
+    ),
+  },
+];
+
+const formats = [
+  { ext: "EPUB", type: "ebook" },
+  { ext: "PDF", type: "ebook" },
+  { ext: "MOBI", type: "ebook" },
+  { ext: "AZW3", type: "ebook" },
+  { ext: "CBZ", type: "comic" },
+  { ext: "CBR", type: "comic" },
+  { ext: "M4B", type: "audio" },
+  { ext: "M4A", type: "audio" },
+  { ext: "MP3", type: "audio" },
+];
+
+const typeTabs = ["All", "Ebooks", "Audiobooks", "Comics"];
+
+const fakeNavItems = [
+  "Library",
+  "Collections",
+  "Tags",
+  "Highlights",
+  "Discover",
+];
+
+export default function Landing() {
+  return (
+    <div>
+      {/* Hero */}
+      <section className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-5xl sm:text-6xl font-bold text-foreground tracking-tight mb-6">
+            Your personal
+            <br />
+            <span className="text-primary">digital library</span>
+          </h1>
+          <p className="text-lg sm:text-xl text-foreground-muted max-w-2xl mx-auto mb-10">
+            A self-hosted library manager for ebooks, audiobooks, and comics.
+            Upload, organize, and read across web and iOS with automatic
+            metadata, full-text search, and reading progress tracking.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link
+              to="/docs/getting-started"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors shadow-button"
+            >
+              Get Started
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
+            </Link>
+            <Link
+              to="/docs/architecture"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-surface border border-border text-foreground rounded-lg font-medium hover:bg-surface-elevated transition-colors"
+            >
+              How It Works
+            </Link>
+            <a
+              href="https://github.com/gabrielcsapo/compendus"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-surface border border-border text-foreground rounded-lg font-medium hover:bg-surface-elevated transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              GitHub
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* App Preview — mock app shell */}
+      <section id="preview" className="pb-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
+            Your Library, Your Way
+          </h2>
+          <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
+            Browse and organize your personal library with filtering, sorting,
+            and multiple view modes.
+          </p>
+
+          {/* Mock app window */}
+          <div className="border border-border rounded-xl overflow-hidden shadow-xl bg-surface">
+            {/* Faux app header */}
+            <div className="border-b border-border bg-surface px-4 py-2.5 flex items-center gap-4">
+              {/* Window dots */}
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-danger/60" />
+                <div className="w-3 h-3 rounded-full bg-warning/60" />
+                <div className="w-3 h-3 rounded-full bg-success/60" />
+              </div>
+
+              {/* Faux nav */}
+              <div className="flex items-center gap-1 ml-4">
+                <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
+                  <svg
+                    className="w-3 h-3 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                    />
+                  </svg>
+                </div>
+                <span className="text-sm font-semibold text-foreground ml-1.5 mr-4">
+                  Compendus
+                </span>
+                {fakeNavItems.map((item, i) => (
+                  <span
+                    key={item}
+                    className={`hidden sm:inline px-2.5 py-1 text-xs rounded-md ${
+                      i === 0
+                        ? "bg-primary-light text-primary font-medium"
+                        : "text-foreground-muted"
+                    }`}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex-1" />
+
+              {/* Faux search */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 border border-border rounded-lg text-xs text-foreground-muted">
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                Search...
+              </div>
+            </div>
+
+            {/* Faux content area */}
+            <div className="p-4 sm:p-6 bg-background">
+              {/* Type tabs */}
+              <div className="flex gap-2 mb-5">
+                {typeTabs.map((tab, i) => (
+                  <span
+                    key={tab}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      i === 0
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-surface-elevated text-foreground-muted"
+                    }`}
+                  >
+                    {tab}
+                  </span>
+                ))}
+              </div>
+
+              {/* Book grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {mockBooks.map((book) => (
+                  <ShowcaseBookCard key={book.title} book={book} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section
+        id="features"
+        className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50"
+      >
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
+            Everything you need
+          </h2>
+          <p className="text-foreground-muted text-center mb-10 max-w-xl mx-auto">
+            A complete solution for managing your personal digital library.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="p-6 bg-surface border border-border rounded-xl"
+              >
+                <div className="w-10 h-10 bg-primary-light text-primary rounded-lg flex items-center justify-center mb-4">
+                  {feature.icon}
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-foreground-muted leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Reader Preview */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
+            Beautiful Reading Experience
+          </h2>
+          <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
+            A custom-built reader with themes, highlights, bookmarks, and
+            progress tracking.
+          </p>
+
+          {/* Mock reader window */}
+          <div className="border border-border rounded-xl overflow-hidden shadow-xl">
+            {/* Reader toolbar */}
+            <div className="bg-surface border-b border-border px-4 py-2.5 flex items-center gap-3">
+              <span className="p-1 text-foreground-muted">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </span>
+              <span className="p-1 text-foreground-muted">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </span>
+              <div className="flex-1 text-center">
+                <span className="text-sm font-medium text-foreground">
+                  Chapter 1: The Beginning
+                </span>
+              </div>
+              <span className="text-xs text-foreground-muted">14 / 312</span>
+              <span className="p-1 text-foreground-muted">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                  />
+                </svg>
+              </span>
+              <span className="p-1 text-foreground-muted">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </span>
+            </div>
+
+            {/* Reader content */}
+            <div className="bg-background px-8 sm:px-16 py-12 sm:py-16 min-h-[300px]">
+              <p className="text-foreground leading-[1.8] text-base sm:text-lg font-serif max-w-prose mx-auto">
+                <span className="text-5xl font-bold float-left mr-3 mt-1 leading-none text-primary">
+                  I
+                </span>
+                t was a bright cold day in April, and the clocks were striking
+                thirteen. Winston Smith, his chin nuzzled into his breast in an
+                effort to escape the vile wind, slipped quickly through the
+                glass doors of Victory Mansions, though not quickly enough to
+                prevent a swirl of gritty dust from entering along with him.
+              </p>
+              <p className="text-foreground leading-[1.8] text-base sm:text-lg font-serif max-w-prose mx-auto mt-6">
+                The hallway smelt of boiled cabbage and old rag mats. At one end
+                of it a coloured poster, too large for indoor display, had been
+                tacked to the wall. It depicted simply an enormous face, more
+                than a metre wide: the face of a man of about forty-five, with a
+                heavy black moustache and ruggedly handsome features.
+              </p>
+              {/* Simulated highlight */}
+              <p className="text-foreground leading-[1.8] text-base sm:text-lg font-serif max-w-prose mx-auto mt-6">
+                <span className="bg-yellow-200/40 dark:bg-yellow-500/20 rounded px-0.5">
+                  The telescreen received and transmitted simultaneously. Any
+                  sound that Winston made, above the level of a very low
+                  whisper, would be picked up by it.
+                </span>
+              </p>
+            </div>
+
+            {/* Reader footer */}
+            <div className="bg-surface border-t border-border px-4 py-3 flex items-center gap-3">
+              <span className="text-xs text-foreground-muted shrink-0">
+                Ch 1
+              </span>
+              <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                  style={{ width: "4.5%" }}
+                />
+              </div>
+              <span className="text-xs text-foreground-muted shrink-0">4%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Supported Formats */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl font-semibold text-foreground mb-2">
+            Supported Formats
+          </h2>
+          <p className="text-foreground-muted mb-8">
+            Access anything in your digital collection.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {formats.map((f) => (
+              <span
+                key={f.ext}
+                className={`px-4 py-2 rounded-lg text-sm font-mono font-medium border ${
+                  f.type === "audio"
+                    ? "bg-accent-light text-accent border-accent/20"
+                    : f.type === "comic"
+                      ? "bg-warning-light text-warning border-warning/20"
+                      : "bg-primary-light text-primary border-primary/20"
+                }`}
+              >
+                .{f.ext.toLowerCase()}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Developer Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
+            Easy to Query
+          </h2>
+          <p className="text-foreground-muted text-center mb-8">
+            A clean REST API you can query from anywhere — scripts, automations,
+            or your own tools.
+          </p>
+          <CodeBlock language="bash">{`# List all books in your library
+curl http://localhost:3000/api/books | jq
+
+# Search by title or author
+curl "http://localhost:3000/api/search?q=dune"
+
+# Upload a new book
+curl -X POST http://localhost:3000/api/upload \\
+  -F "file=@./my-book.epub"
+
+# Get book details
+curl http://localhost:3000/api/books/42`}</CodeBlock>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-foreground mb-4">
+            Ready to build your library?
+          </h2>
+          <p className="text-foreground-muted mb-8">
+            Get Compendus running locally in minutes. Self-hosted, open source,
+            and completely free.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link
+              to="/docs/getting-started"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors shadow-button"
+            >
+              Get Started
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
+            </Link>
+            <a
+              href="https://github.com/gabrielcsapo/compendus"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-surface border border-border text-foreground rounded-lg font-medium hover:bg-surface-elevated transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+              </svg>
+              View on GitHub
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -67,6 +67,7 @@ class AttributedStringBuilder {
     private let boldItalicFont: UIFont
     private let monoFont: UIFont
     private let textColor: UIColor
+    private let backgroundColor: UIColor
     private let accentColor: UIColor
     private let fontSize: CGFloat
     private let lineHeight: CGFloat
@@ -87,6 +88,7 @@ class AttributedStringBuilder {
         self.boldItalicFont = settings.nativeBoldItalicFont
         self.monoFont = settings.nativeMonoFont
         self.textColor = settings.theme.textColor
+        self.backgroundColor = settings.theme.backgroundColor
         self.accentColor = accentColor
         self.fontSize = CGFloat(settings.fontSize)
         self.lineHeight = CGFloat(settings.lineHeight)
@@ -101,6 +103,7 @@ class AttributedStringBuilder {
         self.fontSize = CGFloat(fontSize)
         self.lineHeight = CGFloat(lineHeight)
         self.textColor = theme.textColor
+        self.backgroundColor = theme.backgroundColor
         self.accentColor = accentColor
         self.contentWidth = contentWidth
         self.contentHeight = contentHeight
@@ -635,7 +638,7 @@ class AttributedStringBuilder {
             triPath.addLine(to: CGPoint(x: tRight, y: circleRect.midY))
             triPath.addLine(to: CGPoint(x: tLeft, y: tBottom))
             triPath.close()
-            UIColor.white.setFill()
+            backgroundColor.setFill()
             triPath.fill()
 
             // Progress track

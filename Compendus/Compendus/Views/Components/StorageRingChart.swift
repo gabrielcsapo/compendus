@@ -145,7 +145,7 @@ struct StorageBarChart: View {
                         : geometry.size.width
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(Color(.systemGray5))
                         .frame(width: max(4, availableWidth))
                 }
             }

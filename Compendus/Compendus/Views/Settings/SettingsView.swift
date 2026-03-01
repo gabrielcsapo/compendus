@@ -105,7 +105,7 @@ struct SettingsView: View {
                                         .frame(width: 16, height: 16)
                                         .overlay {
                                             Circle()
-                                                .strokeBorder(.white, lineWidth: 1)
+                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                         }
                                 }
                             }

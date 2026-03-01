@@ -1,0 +1,106 @@
+---
+title: Getting Started
+description: Set up Compendus on your local machine or deploy with Docker.
+---
+
+# Getting Started
+
+Set up Compendus on your local machine or deploy with Docker.
+
+## Prerequisites
+
+- **Node.js 20+** — Required runtime
+- **pnpm** — Package manager (`npm install -g pnpm`)
+- **Git LFS** — Required for cloning (large binary tracking)
+
+## Installation
+
+Clone the repository and install dependencies:
+
+```bash
+# Install Git LFS (if not already installed)
+git lfs install
+
+# Clone the repository
+git clone https://github.com/gabrielcsapo/compendus.git
+cd compendus
+
+# Install dependencies
+pnpm install
+```
+
+## Database Setup
+
+Compendus uses SQLite with Drizzle ORM. Initialize the database:
+
+```bash
+# Generate database schema
+pnpm db:generate
+
+# Run migrations
+pnpm db:migrate
+```
+
+The database file is stored at `data/compendus.db`. Book files are stored in `data/books/` and covers in `data/covers/`.
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Google Books API key (for metadata fetching)
+GOOGLE_BOOKS_API_KEY=your_api_key_here
+```
+
+The Google Books API key is optional but recommended for automatic metadata fetching. Without it, metadata must be entered manually.
+
+## Development Server
+
+Start the development server:
+
+```bash
+pnpm dev
+```
+
+The app will be available at `http://localhost:3000`. The dev server includes hot module reloading, API routes, and React Server Components support.
+
+## Production Build
+
+```bash
+# Build the application
+pnpm build
+
+# Start the production server
+pnpm start
+```
+
+The build process compiles worker threads, bundles React Server Components, and copies database migrations.
+
+## Docker Deployment
+
+Compendus includes Docker support for easy deployment:
+
+```bash
+# Build and run with Docker Compose
+docker compose up -d
+
+# Or build the image directly
+docker build -t compendus .
+docker run -p 3000:3000 -v ./data:/app/data compendus
+```
+
+Mount the `data/` directory as a volume to persist your library across container restarts.
+
+## Available Scripts
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | Start development server with HMR |
+| `pnpm build` | Build for production |
+| `pnpm start` | Start production server |
+| `pnpm db:generate` | Generate database schema |
+| `pnpm db:migrate` | Run database migrations |
+| `pnpm db:studio` | Open Drizzle Studio (DB browser) |
+| `pnpm test` | Run test suite |
+| `pnpm test:watch` | Run tests in watch mode |
+| `pnpm lint` | Run linter (oxfmt + oxlint) |

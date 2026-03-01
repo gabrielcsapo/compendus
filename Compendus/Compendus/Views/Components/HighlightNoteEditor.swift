@@ -79,7 +79,7 @@ struct HighlightNoteEditor: View {
                                             }
                                             .overlay {
                                                 Circle()
-                                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                             }
 
                                         Text(item.label)
@@ -200,7 +200,7 @@ struct HighlightEditSheet: View {
                                         }
                                         .overlay {
                                             Circle()
-                                                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                                         }
 
                                     Text(item.label)

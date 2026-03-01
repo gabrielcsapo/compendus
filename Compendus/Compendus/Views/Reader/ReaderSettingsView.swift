@@ -19,6 +19,7 @@ struct ReaderSettingsView: View {
     enum ReaderFormat {
         case epub
         case pdf
+        case comic
     }
 
     var body: some View {
@@ -26,9 +27,13 @@ struct ReaderSettingsView: View {
             Form {
                 themeSection
 
-                if format == .epub {
+                if format == .epub || format == .comic {
                     layoutSection
+                }
+
+                if format == .epub {
                     fontSection
+                    textPreviewSection
                     fontSizeSection
                     lineHeightSection
                 }
@@ -37,7 +42,13 @@ struct ReaderSettingsView: View {
                     pdfInfoSection
                 }
 
-                highlightCategoriesSection
+                if format == .comic {
+                    comicInfoSection
+                }
+
+                if format != .comic {
+                    highlightCategoriesSection
+                }
             }
             .navigationTitle("Reader Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -119,9 +130,40 @@ struct ReaderSettingsView: View {
         }
     }
 
+    // MARK: - Text Preview Section
+
+    @ViewBuilder
+    private var textPreviewSection: some View {
+        Section("Preview") {
+            Text(Self.loremIpsum)
+                .font(.custom(readerSettings.fontFamily.previewFontName, size: readerSettings.fontSize))
+                .lineSpacing((readerSettings.lineHeight - 1.0) * readerSettings.fontSize)
+                .foregroundStyle(Color(uiColor: readerSettings.theme.textColor))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .frame(height: 160, alignment: .top)
+                .clipped()
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(uiColor: readerSettings.theme.backgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(readerSettings.theme.previewBorderColor, lineWidth: 1)
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .animation(.easeInOut(duration: 0.2), value: readerSettings.fontFamily)
+                .animation(.easeInOut(duration: 0.2), value: readerSettings.fontSize)
+                .animation(.easeInOut(duration: 0.2), value: readerSettings.lineHeight)
+                .animation(.easeInOut(duration: 0.2), value: readerSettings.theme)
+        }
+    }
+
     // MARK: - Font Section
 
     private static let previewSentence = "The quick brown fox jumps over the lazy dog."
+    private static let loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
 
     @ViewBuilder
     private var fontSection: some View {
@@ -224,6 +266,17 @@ struct ReaderSettingsView: View {
         }
     }
 
+    // MARK: - Comic Info Section
+
+    @ViewBuilder
+    private var comicInfoSection: some View {
+        Section {
+            // empty section, footer only
+        } footer: {
+            Text("Comics display fixed-layout pages. Font and text settings do not apply.")
+        }
+    }
+
     // MARK: - Highlight Categories Section
 
     @ViewBuilder
@@ -237,7 +290,7 @@ struct ReaderSettingsView: View {
                             .frame(width: 24, height: 24)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(item.label)
                             .font(.subheadline)
@@ -267,7 +320,7 @@ struct ReaderSettingsView: View {
                             .frame(width: 24, height: 24)
                             .overlay {
                                 Circle()
-                                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             }
                         Text(preset.name)
                             .font(.subheadline)

@@ -114,7 +114,7 @@ private struct ThemeGridItem: View {
 
                         Image(systemName: "checkmark")
                             .font(.caption.bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                     }
                 }
 
@@ -147,7 +147,7 @@ private struct ThemePreviewCard: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(theme.accentColor(for: colorScheme))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(colorScheme == .dark ? .black : .white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 // Simulated progress bar
@@ -158,7 +158,7 @@ private struct ThemePreviewCard: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.gray.opacity(0.2))
+                                .fill(Color(.systemGray5))
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(theme.accentColor(for: colorScheme))
                                 .frame(width: geo.size.width * 0.6)

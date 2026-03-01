@@ -46,7 +46,7 @@ struct StorageUsageView: View {
                     ZStack(alignment: .leading) {
                         // Background
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(Color(.systemGray5))
                             .frame(height: 8)
 
                         // Used portion

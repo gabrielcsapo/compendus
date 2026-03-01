@@ -106,7 +106,7 @@ private struct BookHighlightRow: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(.systemGray5))
                     .frame(width: 44, height: 64)
                     .overlay {
                         Image(systemName: "book.closed")

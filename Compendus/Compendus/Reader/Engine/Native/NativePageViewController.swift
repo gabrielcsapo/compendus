@@ -112,7 +112,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             label.translatesAutoresizingMaskIntoConstraints = false
 
             let container = UIView()
-            container.backgroundColor = UIColor.systemFill
+            container.backgroundColor = currentTheme?.secondaryBackgroundColor ?? UIColor.systemFill
             container.layer.cornerRadius = 10
             container.layer.masksToBounds = true
             container.translatesAutoresizingMaskIntoConstraints = false
@@ -150,7 +150,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         if show {
             guard loadingOverlay == nil else { return }
             let overlay = UIView()
-            overlay.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.6)
+            overlay.backgroundColor = currentTheme?.overlayBackgroundColor ?? UIColor.systemBackground.withAlphaComponent(0.6)
             overlay.translatesAutoresizingMaskIntoConstraints = false
 
             // Linear progress bar style matching the EPUB loader
@@ -276,7 +276,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         tv.isSelectable = true
         tv.textContainerInset = NativePaginationEngine.defaultInsets
         tv.textContainer.lineFragmentPadding = 0
-        tv.backgroundColor = .systemBackground
+        tv.backgroundColor = currentTheme?.backgroundColor ?? .systemBackground
         tv.delegate = self
         tv.translatesAutoresizingMaskIntoConstraints = false
 
@@ -286,6 +286,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         tv.linkTextAttributes = [:]
 
         return tv
+    }
+
+    /// Update text container insets on all text views (e.g. to include safe area).
+    func updateTextContainerInsets(_ insets: UIEdgeInsets) {
+        textView.textContainerInset = insets
+        secondTextView?.textContainerInset = insets
     }
 
     private func setupGestures() {
@@ -411,13 +417,15 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     // MARK: - Content Loading
 
     /// Load a chapter's attributed string and pre-computed pages.
+    /// `textContainerInsets` must include safe area insets for correct rendering.
     func loadContent(
         attributedString: NSAttributedString,
         pages: [PageInfo],
         chapterHref: String?,
         startAtPage: Int = 0,
         mediaAttachments: [MediaAttachment] = [],
-        floatingElements: [FloatingElement] = []
+        floatingElements: [FloatingElement] = [],
+        textContainerInsets: UIEdgeInsets? = nil
     ) {
         self.fullAttributedString = attributedString
         self.pages = pages
@@ -426,10 +434,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         self.mediaAttachments = mediaAttachments
         self.floatingElements = floatingElements
 
-        // Use responsive insets
-        let insets = NativePaginationEngine.insets(for: pageWidth(), isTwoPageMode: isTwoPageMode)
-        textView.textContainerInset = insets
-        secondTextView?.textContainerInset = insets
+        // Apply insets if provided; callers should always provide safe-area-aware insets
+        if let insets = textContainerInsets {
+            textView.textContainerInset = insets
+            secondTextView?.textContainerInset = insets
+        }
 
         // Re-apply double-tap suppression after content load (UIKit may
         // recreate internal gesture recognizers when content changes)
@@ -763,11 +772,21 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     // MARK: - Theme
 
-    func applyTheme(backgroundColor: UIColor) {
+    private(set) var currentTheme: ReaderTheme?
+
+    func applyTheme(backgroundColor: UIColor, theme: ReaderTheme? = nil) {
         view.backgroundColor = backgroundColor
         textView.backgroundColor = backgroundColor
         secondTextView?.backgroundColor = backgroundColor
         gutterView?.backgroundColor = backgroundColor
+
+        if let theme = theme {
+            currentTheme = theme
+            // Update page indicator container
+            pageIndicatorView?.backgroundColor = theme.secondaryBackgroundColor
+            // Update loading overlay
+            loadingOverlay?.backgroundColor = theme.overlayBackgroundColor
+        }
     }
 
     // MARK: - UITextViewDelegate
@@ -896,9 +915,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         let (tappedTV, tappedPageIndex) = targetTextView(for: point)
         let textViewPoint = gesture.location(in: tappedTV)
 
-        // Tap zone detection: left 25%, center 50%, right 25%
+        // Tap zone detection: left 25%, center 50%, right 25% horizontally,
+        // but taps in the top/bottom 12% always toggle the overlay (toolbar).
         let width = view.bounds.width
-        let isNavigationZone = point.x < width * 0.25 || point.x > width * 0.75
+        let height = view.bounds.height
+        let isEdgeVertical = point.y < height * 0.12 || point.y > height * 0.88
+        let isNavigationZone = !isEdgeVertical && (point.x < width * 0.25 || point.x > width * 0.75)
 
         // Only check highlights in the center content zone — tapping in
         // the navigation edges should always navigate, not trigger highlights.
@@ -920,8 +942,10 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             return
         }
 
-        // Navigate or toggle overlay based on tap zone
-        if point.x < width * 0.25 {
+        // Taps in the top/bottom edge always toggle overlay (show toolbar)
+        if isEdgeVertical {
+            onTapZone?("center")
+        } else if point.x < width * 0.25 {
             onTapZone?("left")
         } else if point.x > width * 0.75 {
             onTapZone?("right")

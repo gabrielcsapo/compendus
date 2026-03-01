@@ -3,7 +3,6 @@
 //  Compendus
 //
 //  Lightweight EPUB parser that extracts and parses EPUB files.
-//  Replaces Readium's ReadiumShared + ReadiumStreamer packages.
 //
 //  An EPUB file is a ZIP archive containing:
 //  - META-INF/container.xml → points to the OPF file

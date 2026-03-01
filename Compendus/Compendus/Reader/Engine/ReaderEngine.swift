@@ -74,6 +74,9 @@ protocol ReaderEngine: AnyObject, Observable {
     /// Whether this format is PDF (used for conditional PDF-specific UI)
     var isPDF: Bool { get }
 
+    /// Whether this format is a comic (used for conditional comic-specific UI)
+    var isComic: Bool { get }
+
     /// The UIViewController to embed in SwiftUI
     func makeViewController() -> UIViewController
 
@@ -112,11 +115,18 @@ protocol ReaderEngine: AnyObject, Observable {
 
     /// Search for text in the book, returning matching locations with snippets
     func search(query: String) async -> [ReaderSearchResult]
+
+    /// Render a page at the given offset from the current position to a UIImage.
+    /// offset: -1 = previous page, 0 = current, +1 = next, etc.
+    /// The engine renders at its own viewport size for pixel-accurate results.
+    func snapshotPage(at offset: Int) -> UIImage?
 }
 
 // MARK: - Default Implementations
 
 extension ReaderEngine {
     var isPDF: Bool { false }
+    var isComic: Bool { false }
     func search(query: String) async -> [ReaderSearchResult] { [] }
+    func snapshotPage(at offset: Int) -> UIImage? { nil }
 }

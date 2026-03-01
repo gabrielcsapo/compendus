@@ -19,7 +19,7 @@ struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         gradient: Gradient(colors: [
                             .clear,
-                            Color.white.opacity(0.4),
+                            Color.primary.opacity(0.08),
                             .clear
                         ]),
                         startPoint: .leading,
@@ -55,25 +55,25 @@ struct SkeletonBookGridItem: View {
         VStack(alignment: .leading, spacing: 8) {
             // Cover placeholder
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
+                .fill(Color(.systemGray5))
                 .frame(height: 200)
                 .shimmer()
 
             // Title placeholder
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.2))
+                .fill(Color(.systemGray5))
                 .frame(height: 16)
                 .shimmer()
 
             // Author placeholder
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.2))
+                .fill(Color(.systemGray5))
                 .frame(width: 100, height: 12)
                 .shimmer()
 
             // Badge placeholder
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
+                .fill(Color(.systemGray5))
                 .frame(width: 50, height: 18)
                 .shimmer()
         }
@@ -115,7 +115,7 @@ struct ShimmerRectangle: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(Color.gray.opacity(0.2))
+            .fill(Color(.systemGray5))
             .shimmer()
     }
 }

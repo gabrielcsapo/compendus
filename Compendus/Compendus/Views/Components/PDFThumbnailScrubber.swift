@@ -71,7 +71,7 @@ struct PDFThumbnailView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.2))
+                    .fill(Color(.systemGray5))
                     .overlay {
                         Text("\(pageIndex + 1)")
                             .font(.caption2)

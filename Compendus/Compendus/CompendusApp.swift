@@ -17,6 +17,7 @@ struct CompendusApp: App {
         let schema = Schema([
             DownloadedBook.self,
             BookHighlight.self,
+            BookBookmark.self,
             PendingDownload.self,
             PendingBookEdit.self,
             ReadingSession.self,
