@@ -29,7 +29,7 @@ Thumbs.db
 npm-debug.log*
 
 # Runtime data
-data/
+/data/
 images/
 xcuserdata/
 

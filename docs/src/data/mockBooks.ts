@@ -1,0 +1,62 @@
+import type { MockBook } from "../components/ShowcaseBookCard";
+
+const base = import.meta.env.BASE_URL;
+
+export const mockBooks: MockBook[] = [
+  {
+    title: "The Great Gatsby",
+    author: "F. Scott Fitzgerald",
+    format: "epub",
+    bookType: "ebook",
+    progress: 0.73,
+    coverColor: "#1a4731",
+    coverImage: `${base}covers/great-gatsby.jpg`,
+  },
+  {
+    title: "Dune",
+    author: "Frank Herbert",
+    format: "epub",
+    bookType: "ebook",
+    progress: 0.45,
+    coverColor: "#92400e",
+    coverImage: `${base}covers/dune.jpg`,
+    series: "Dune Chronicles",
+    seriesNumber: 1,
+  },
+  {
+    title: "1984",
+    author: "George Orwell",
+    format: "pdf",
+    bookType: "ebook",
+    progress: 0,
+    coverColor: "#7f1d1d",
+    coverImage: `${base}covers/1984.jpg`,
+  },
+  {
+    title: "Project Hail Mary",
+    author: "Andy Weir",
+    format: "m4b",
+    bookType: "audiobook",
+    progress: 0.22,
+    coverColor: "#1e1b4b",
+    coverImage: `${base}covers/project-hail-mary.jpg`,
+  },
+  {
+    title: "Saga Vol. 1",
+    author: "Brian K. Vaughan",
+    format: "cbz",
+    bookType: "comic",
+    progress: 1.0,
+    coverColor: "#701a75",
+    coverImage: `${base}covers/saga-vol-1.jpg`,
+  },
+  {
+    title: "Neuromancer",
+    author: "William Gibson",
+    format: "mobi",
+    bookType: "ebook",
+    progress: 0,
+    coverColor: "#0c4a6e",
+    coverImage: `${base}covers/neuromancer.jpg`,
+  },
+];
