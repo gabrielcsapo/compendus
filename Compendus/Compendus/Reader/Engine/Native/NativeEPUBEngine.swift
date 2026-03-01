@@ -27,6 +27,13 @@ class NativeEPUBEngine: ReaderEngine {
     /// Whether a chapter is currently being loaded/parsed in the background.
     var isLoadingChapter: Bool = false
 
+    /// Progress of full-book pagination (0.0 to 1.0). Observed by the loading overlay.
+    var paginationProgress: Double = 0
+    /// Number of chapters paginated so far (for display).
+    var paginatedChapterCount: Int = 0
+    /// Total chapters to paginate.
+    var totalChapterCount: Int = 0
+
     var onSelectionChanged: ((ReaderSelection?) -> Void)?
     var onHighlightTapped: ((String) -> Void)?
     var onTapZone: ((String) -> Void)?
@@ -183,31 +190,57 @@ class NativeEPUBEngine: ReaderEngine {
         parser?.package.tocItems ?? []
     }
 
+    /// Whether a search is currently in progress.
+    var isSearching: Bool = false
+
     /// Search all spine items for a phrase (case-insensitive).
     /// Returns the spine index where the phrase was found, or nil.
-    func findSpineIndex(containingPhrase phrase: String) -> Int? {
+    /// Performs file I/O and parsing on a background thread to avoid blocking the UI.
+    func findSpineIndex(containingPhrase phrase: String) async -> Int? {
         guard let parser = parser, !phrase.isEmpty else { return nil }
 
-        for (spineIndex, _) in parser.package.spine.enumerated() {
-            let nodes: [ContentNode]
-            if let cached = parsedChapters[spineIndex] {
-                nodes = cached
-            } else {
-                guard let chapterURL = parser.resolveSpineItemURL(at: spineIndex),
-                      let data = try? Data(contentsOf: chapterURL) else { continue }
-                let baseURL = chapterURL.deletingLastPathComponent()
-                let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: bookStylesheet)
-                let parsed = contentParser.parse()
-                parsedChapters[spineIndex] = parsed
-                nodes = parsed
-            }
+        isSearching = true
+        defer { isSearching = false }
 
-            let plainText = Self.extractPlainText(from: nodes)
-            guard plainText.count > 10 else { continue } // skip near-empty chapters
+        let stylesheet = bookStylesheet
+        let cachedChapters = parsedChapters
 
-            if plainText.range(of: phrase, options: .caseInsensitive) != nil {
-                return spineIndex
+        // Run the search off the main thread
+        let result: (spineIndex: Int, parsedUpdates: [(Int, [ContentNode])])? = await Task.detached {
+            var parsedUpdates: [(Int, [ContentNode])] = []
+
+            for (spineIndex, _) in parser.package.spine.enumerated() {
+                guard !Task.isCancelled else { return nil }
+
+                let nodes: [ContentNode]
+                if let cached = cachedChapters[spineIndex] {
+                    nodes = cached
+                } else {
+                    guard let chapterURL = parser.resolveSpineItemURL(at: spineIndex),
+                          let data = try? Data(contentsOf: chapterURL) else { continue }
+                    let baseURL = chapterURL.deletingLastPathComponent()
+                    let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: stylesheet)
+                    let parsed = contentParser.parse()
+                    parsedUpdates.append((spineIndex, parsed))
+                    nodes = parsed
+                }
+
+                let plainText = Self.extractPlainText(from: nodes)
+                guard plainText.count > 10 else { continue }
+
+                if plainText.range(of: phrase, options: .caseInsensitive) != nil {
+                    return (spineIndex, parsedUpdates)
+                }
             }
+            return nil
+        }.value
+
+        // Cache any newly parsed chapters
+        if let result {
+            for (index, nodes) in result.parsedUpdates {
+                parsedChapters[index] = nodes
+            }
+            return result.spineIndex
         }
         return nil
     }
@@ -435,30 +468,34 @@ class NativeEPUBEngine: ReaderEngine {
         }
 
         guard let resolvedURL = targetURL,
-              let data = try? Data(contentsOf: resolvedURL),
               let fragment, !fragment.isEmpty else {
-            // Fall back to regular link navigation
             handleLinkTap(url)
             return
         }
 
-        // Parse the target document and extract the element by fragment ID
-        do {
-            let html = String(data: data, encoding: .utf8) ?? ""
-            let doc = try SwiftSoup.parse(html)
-            if let element = try doc.getElementById(fragment) {
-                let footnoteText = try element.text()
-                if !footnoteText.isEmpty {
-                    onFootnoteTapped?(footnoteText)
-                    return
+        // Parse footnote content off the main thread to avoid UI blocking
+        Task {
+            let footnoteText: String? = await Task.detached {
+                guard let data = try? Data(contentsOf: resolvedURL) else { return nil }
+                let html = String(data: data, encoding: .utf8) ?? ""
+                do {
+                    let doc = try SwiftSoup.parse(html)
+                    if let element = try doc.getElementById(fragment) {
+                        let text = try element.text()
+                        return text.isEmpty ? nil : text
+                    }
+                } catch {
+                    // Fall through to nil
                 }
-            }
-        } catch {
-            logger.warning("Failed to parse footnote content: \(error)")
-        }
+                return nil
+            }.value
 
-        // Fall back to regular link navigation
-        handleLinkTap(url)
+            if let footnoteText {
+                self.onFootnoteTapped?(footnoteText)
+            } else {
+                self.handleLinkTap(url)
+            }
+        }
     }
 
     // Media players are managed inline by NativePageViewController.
@@ -616,7 +653,13 @@ class NativeEPUBEngine: ReaderEngine {
                 )
             }.value
 
-            guard !Task.isCancelled, let self, let result else { return }
+            guard !Task.isCancelled, let self, let result else {
+                await MainActor.run { [weak self] in
+                    self?.isLoadingChapter = false
+                    self?.pageViewController?.showLoadingIndicator(false)
+                }
+                return
+            }
 
             // Back on MainActor — cache and display
             await MainActor.run {
@@ -878,7 +921,13 @@ class NativeEPUBEngine: ReaderEngine {
                 )
             }.value
 
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled, let self else {
+                await MainActor.run { [weak self] in
+                    self?.isLoadingChapter = false
+                    self?.pageViewController?.showLoadingIndicator(false)
+                }
+                return
+            }
 
             await MainActor.run {
                 self.parsedChapters[spineIndex] = []
@@ -1003,7 +1052,13 @@ class NativeEPUBEngine: ReaderEngine {
                 )
             }.value
 
-            guard !Task.isCancelled, let self, let result else { return }
+            guard !Task.isCancelled, let self, let result else {
+                await MainActor.run { [weak self] in
+                    self?.isLoadingChapter = false
+                    self?.pageViewController?.showLoadingIndicator(false)
+                }
+                return
+            }
 
             await MainActor.run {
                 self.parsedChapters[spineIndex] = result.nodes
@@ -1252,23 +1307,28 @@ class NativeEPUBEngine: ReaderEngine {
 
         guard !chapterURLs.isEmpty else {
             totalPositions = spinePageCounts.reduce(0, +)
+            paginationProgress = 1.0
             return
         }
 
-        // Process regular chapters in a single detached task
-        let results: [(index: Int, result: ChapterBuildResult)] = await Task.detached {
-            var output: [(index: Int, result: ChapterBuildResult)] = []
+        // Track pagination progress
+        let totalToProcess = chapterURLs.count
+        totalChapterCount = totalToProcess + navDocIndices.count
+        paginatedChapterCount = navDocIndices.count
+        paginationProgress = totalToProcess > 0 ? Double(paginatedChapterCount) / Double(totalChapterCount) : 0
 
-            for (index, chapterURL) in chapterURLs {
-                guard !Task.isCancelled else { break }
+        // Process chapters individually with progress reporting and yielding
+        for (chapterIndex, (index, chapterURL)) in chapterURLs.enumerated() {
+            guard !Task.isCancelled else { break }
 
-                guard let data = try? Data(contentsOf: chapterURL) else { continue }
+            let result: ChapterBuildResult? = await Task.detached {
+                guard let data = try? Data(contentsOf: chapterURL) else { return nil }
 
                 let baseURL = chapterURL.deletingLastPathComponent()
                 let contentParser = XHTMLContentParser(data: data, baseURL: baseURL, stylesheet: stylesheet)
                 let nodes = contentParser.parse()
 
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled else { return nil }
 
                 let builder = AttributedStringBuilder(
                     settings: settings,
@@ -1277,7 +1337,7 @@ class NativeEPUBEngine: ReaderEngine {
                 )
                 let (attrString, offsetMap, plainTextMap) = builder.build(from: nodes)
 
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled else { return nil }
 
                 let pages = NativePaginationEngine.paginate(
                     attributedString: attrString,
@@ -1285,7 +1345,7 @@ class NativeEPUBEngine: ReaderEngine {
                     contentInsets: insets
                 )
 
-                output.append((index, ChapterBuildResult(
+                return ChapterBuildResult(
                     nodes: nodes,
                     attrString: attrString,
                     offsetMap: offsetMap,
@@ -1293,26 +1353,35 @@ class NativeEPUBEngine: ReaderEngine {
                     pages: pages,
                     mediaAttachments: builder.mediaAttachments,
                     floatingElements: builder.floatingElements
-                )))
+                )
+            }.value
+
+            // Apply result on MainActor
+            if let result {
+                parsedChapters[index] = result.nodes
+                chapterStrings[index] = result.attrString
+                chapterOffsetMaps[index] = result.offsetMap
+                chapterPlainTextMaps[index] = result.plainTextMap
+                chapterPages[index] = result.pages
+                chapterMediaAttachments[index] = result.mediaAttachments
+                chapterFloatingElements[index] = result.floatingElements
+                if index < spinePageCounts.count {
+                    spinePageCounts[index] = result.pages.count
+                }
             }
 
-            return output
-        }.value
+            // Update progress
+            paginatedChapterCount = navDocIndices.count + chapterIndex + 1
+            paginationProgress = Double(paginatedChapterCount) / Double(totalChapterCount)
+            totalPositions = spinePageCounts.reduce(0, +)
 
-        // Apply all results on MainActor
-        for (index, result) in results {
-            parsedChapters[index] = result.nodes
-            chapterStrings[index] = result.attrString
-            chapterOffsetMaps[index] = result.offsetMap
-            chapterPlainTextMaps[index] = result.plainTextMap
-            chapterPages[index] = result.pages
-            chapterMediaAttachments[index] = result.mediaAttachments
-            chapterFloatingElements[index] = result.floatingElements
-            if index < spinePageCounts.count {
-                spinePageCounts[index] = result.pages.count
+            // Yield to let the main thread breathe every few chapters
+            if chapterIndex % 3 == 2 {
+                await Task.yield()
             }
         }
-        totalPositions = spinePageCounts.reduce(0, +)
+
+        paginationProgress = 1.0
         logger.info("Full book pagination complete: \(self.totalPositions) total pages across \(spineCount) chapters")
     }
 
@@ -1961,7 +2030,7 @@ class NativeEPUBEngine: ReaderEngine {
 
     // MARK: - Plain Text Extraction
 
-    static func extractPlainText(from nodes: [ContentNode]) -> String {
+    nonisolated static func extractPlainText(from nodes: [ContentNode]) -> String {
         var text = ""
         for node in nodes {
             appendPlainText(from: node, to: &text)
@@ -1969,7 +2038,7 @@ class NativeEPUBEngine: ReaderEngine {
         return text
     }
 
-    static func appendPlainText(from node: ContentNode, to text: inout String) {
+    nonisolated static func appendPlainText(from node: ContentNode, to text: inout String) {
         switch node {
         case .paragraph(let runs, _), .heading(_, let runs, _):
             for run in runs {

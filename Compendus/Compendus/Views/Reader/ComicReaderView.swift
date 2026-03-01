@@ -58,9 +58,15 @@ struct ComicReaderView: View {
                     }
                     .foregroundStyle(.white)
                 } else if isLoading {
-                    ProgressView("Loading comic...")
-                        .foregroundStyle(.white)
-                        .tint(.white)
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                            .frame(width: 200)
+                            .tint(.white)
+                        Text("Loading comic...")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
                 } else {
                     // Page view with gestures
                     ZStack {
@@ -72,8 +78,15 @@ struct ComicReaderView: View {
                                 .offset(offset)
                                 .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                         } else if isLoadingPage {
-                            ProgressView()
-                                .tint(.white)
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .progressViewStyle(.linear)
+                                    .frame(width: 200)
+                                    .tint(.white)
+                                Text("Loading page...")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
                         } else {
                             Image(systemName: "photo")
                                 .font(.largeTitle)

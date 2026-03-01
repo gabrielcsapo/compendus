@@ -152,19 +152,40 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             let overlay = UIView()
             overlay.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.6)
             overlay.translatesAutoresizingMaskIntoConstraints = false
-            let spinner = UIActivityIndicatorView(style: .large)
-            spinner.translatesAutoresizingMaskIntoConstraints = false
-            spinner.startAnimating()
-            overlay.addSubview(spinner)
+
+            // Linear progress bar style matching the EPUB loader
+            let progressBar = UIProgressView(progressViewStyle: .default)
+            progressBar.translatesAutoresizingMaskIntoConstraints = false
+            progressBar.setProgress(0, animated: false)
+            progressBar.trackTintColor = UIColor.systemGray5
+            // Animate indeterminate progress
+            overlay.addSubview(progressBar)
+
+            let label = UILabel()
+            label.text = "Loading chapter..."
+            label.font = .preferredFont(forTextStyle: .caption1)
+            label.textColor = .secondaryLabel
+            label.translatesAutoresizingMaskIntoConstraints = false
+            overlay.addSubview(label)
+
             view.addSubview(overlay)
             NSLayoutConstraint.activate([
                 overlay.topAnchor.constraint(equalTo: view.topAnchor),
                 overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
                 overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
                 overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-                spinner.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-                spinner.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+                progressBar.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+                progressBar.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+                progressBar.widthAnchor.constraint(equalToConstant: 200),
+                label.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+                label.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 12),
             ])
+
+            // Animate progress to simulate loading
+            UIView.animate(withDuration: 1.5, delay: 0, options: [.repeat, .autoreverse]) {
+                progressBar.setProgress(1.0, animated: true)
+            }
+
             loadingOverlay = overlay
         } else {
             loadingOverlay?.removeFromSuperview()
@@ -468,20 +489,34 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
         suppressSelectionCallbacks = false
 
-        // Apply floating images with exclusion paths (must be before inline players)
-        overlayFloatingImages(for: currentPageIndex, in: textView)
-        if isTwoPageMode, let stv = secondTextView, currentPageIndex + 1 < pages.count {
-            overlayFloatingImages(for: currentPageIndex + 1, in: stv)
-        }
+        // Defer layout and overlay work to the next run loop iteration.
+        // This allows tap events to be processed immediately after content is set,
+        // preventing the "can see content but can't interact" issue.
+        let pageAtSchedule = currentPageIndex
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.currentPageIndex == pageAtSchedule else { return }
 
-        // Overlay inline players for media attachments
-        overlayInlinePlayers(for: currentPageIndex, in: textView)
-        if isTwoPageMode, let stv = secondTextView, currentPageIndex + 1 < pages.count {
-            overlayInlinePlayers(for: currentPageIndex + 1, in: stv)
-        }
+            // Single layout pass before computing glyph positions for overlays.
+            self.textView.layoutIfNeeded()
+            if self.isTwoPageMode {
+                self.secondTextView?.layoutIfNeeded()
+            }
 
-        // Prefetch images for nearby pages in background for smooth paging
-        prefetchImagesForAdjacentPages()
+            // Apply floating images with exclusion paths (must be before inline players)
+            self.overlayFloatingImages(for: pageAtSchedule, in: self.textView)
+            if self.isTwoPageMode, let stv = self.secondTextView, pageAtSchedule + 1 < self.pages.count {
+                self.overlayFloatingImages(for: pageAtSchedule + 1, in: stv)
+            }
+
+            // Overlay inline players for media attachments
+            self.overlayInlinePlayers(for: pageAtSchedule, in: self.textView)
+            if self.isTwoPageMode, let stv = self.secondTextView, pageAtSchedule + 1 < self.pages.count {
+                self.overlayInlinePlayers(for: pageAtSchedule + 1, in: stv)
+            }
+
+            // Prefetch images for nearby pages in background for smooth paging
+            self.prefetchImagesForAdjacentPages()
+        }
     }
 
     /// Render a single page into the given text view.
@@ -489,10 +524,21 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
         let page = pages[pageIndex]
         let safeRange = NSIntersectionRange(page.range, NSRange(location: 0, length: fullString.length))
 
-        // Load actual pixel data for LazyImageAttachments on this page.
-        // During pagination, only dimensions were read (no pixel decode).
-        // The attachments are shared objects, so loading here also populates the substring.
-        loadImagesForRange(safeRange, in: fullString)
+        // Apply only already-cached images synchronously (no disk I/O).
+        // Any uncached images are loaded asynchronously to avoid blocking the main thread.
+        var hasUncached = false
+        fullString.enumerateAttribute(.attachment, in: safeRange, options: []) { value, _, _ in
+            guard let lazy = value as? LazyImageAttachment else { return }
+            if lazy.isLoaded { return }
+            if let cached = EPUBImageCache.shared.image(forPath: lazy.imageURL.path) {
+                lazy.image = cached
+            } else {
+                hasUncached = true
+            }
+        }
+        if hasUncached {
+            loadImagesAsync(for: pageIndex)
+        }
 
         let pageString = fullString.attributedSubstring(from: safeRange)
 
@@ -536,15 +582,42 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     // MARK: - Lazy Image Loading
 
-    /// Load actual UIImage pixel data for all LazyImageAttachments in the given range.
-    /// Called at render time — during pagination only dimensions are read.
-    private func loadImagesForRange(_ range: NSRange, in attrString: NSAttributedString) {
+    /// Collect LazyImageAttachments that need loading in the given range.
+    private func collectLazyAttachments(in range: NSRange, from attrString: NSAttributedString) -> [LazyImageAttachment] {
         let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: attrString.length))
-        guard safeRange.length > 0 else { return }
+        guard safeRange.length > 0 else { return [] }
+        var attachments: [LazyImageAttachment] = []
         attrString.enumerateAttribute(.attachment, in: safeRange, options: []) { value, _, _ in
-            if let lazy = value as? LazyImageAttachment {
-                lazy.loadImageIfNeeded()
+            if let lazy = value as? LazyImageAttachment, !lazy.isLoaded {
+                attachments.append(lazy)
             }
+        }
+        return attachments
+    }
+
+    /// Asynchronously load images for a page, then refresh the text view to show them.
+    func loadImagesAsync(for pageIndex: Int) {
+        guard let fullString = fullAttributedString, pageIndex < pages.count else { return }
+        let page = pages[pageIndex]
+        let safeRange = NSIntersectionRange(page.range, NSRange(location: 0, length: fullString.length))
+        let unloaded = collectLazyAttachments(in: safeRange, from: fullString)
+        guard !unloaded.isEmpty else { return }
+
+        Task { [weak self] in
+            // Load all images off main thread
+            await withTaskGroup(of: Void.self) { group in
+                for attachment in unloaded {
+                    group.addTask { _ = await attachment.loadImageAsync() }
+                }
+            }
+            // Refresh the text view now that images are decoded.
+            // Use setNeedsDisplay + setNeedsLayout to defer layout to the next run loop
+            // instead of forcing an immediate synchronous layout pass.
+            guard let self, self.currentPageIndex == pageIndex else { return }
+            self.textView?.setNeedsDisplay()
+            self.textView?.setNeedsLayout()
+            self.secondTextView?.setNeedsDisplay()
+            self.secondTextView?.setNeedsLayout()
         }
     }
 
@@ -569,10 +642,15 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             for range in pageRanges {
                 let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: stringLength))
                 guard safeRange.length > 0 else { continue }
+                // Collect attachments then load async (avoids setting UIKit properties from background)
+                var attachments: [LazyImageAttachment] = []
                 fullString.enumerateAttribute(.attachment, in: safeRange, options: []) { value, _, _ in
-                    if let lazy = value as? LazyImageAttachment {
-                        lazy.loadImageIfNeeded()
+                    if let lazy = value as? LazyImageAttachment, !lazy.isLoaded {
+                        attachments.append(lazy)
                     }
+                }
+                for attachment in attachments {
+                    _ = await attachment.loadImageAsync()
                 }
             }
         }
@@ -582,10 +660,34 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
     /// Set the highlights to render. Ranges are relative to the full chapter attributed string.
     /// Optionally includes a read-along highlight range for sentence-level sync.
+    /// Applies highlights incrementally without re-rendering the entire page.
     func applyHighlights(_ highlights: [(id: String, range: NSRange, color: UIColor)], readAlongRange: NSRange? = nil) {
         self.highlightRanges = highlights
         self.readAlongHighlightRange = readAlongRange
-        showCurrentPage() // Re-render with highlights
+        refreshHighlightsInPlace()
+    }
+
+    /// Re-apply highlight attributes to the currently displayed text views
+    /// without triggering a full page re-render (no image loading, no overlay rebuild).
+    private func refreshHighlightsInPlace() {
+        guard let fullString = fullAttributedString,
+              currentPageIndex < pages.count else { return }
+
+        // Refresh left (or only) page
+        let leftPage = pages[currentPageIndex]
+        let leftRange = NSIntersectionRange(leftPage.range, NSRange(location: 0, length: fullString.length))
+        let leftPageString = fullString.attributedSubstring(from: leftRange)
+        let highlightedLeft = applyHighlightsToPage(leftPageString, pageRange: leftRange)
+        textView.attributedText = highlightedLeft
+
+        // Refresh right page in two-page mode
+        if isTwoPageMode, let stv = secondTextView, currentPageIndex + 1 < pages.count {
+            let rightPage = pages[currentPageIndex + 1]
+            let rightRange = NSIntersectionRange(rightPage.range, NSRange(location: 0, length: fullString.length))
+            let rightPageString = fullString.attributedSubstring(from: rightRange)
+            let highlightedRight = applyHighlightsToPage(rightPageString, pageRange: rightRange)
+            stv.attributedText = highlightedRight
+        }
     }
 
     /// Apply highlight background colors to a page substring.
@@ -874,14 +976,13 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     // MARK: - Floating Images (CSS float)
 
     /// Position floating images as subviews and set exclusion paths for text wrapping.
+    /// Callers must call layoutIfNeeded() on the text view before invoking this method.
     private func overlayFloatingImages(for pageIndex: Int, in targetTextView: UITextView) {
         guard !floatingElements.isEmpty, pageIndex < pages.count else { return }
 
         let pageRange = pages[pageIndex].range
         let containerWidth = targetTextView.textContainer.size.width
 
-        // First pass: determine which floats are on this page and their Y positions
-        targetTextView.layoutIfNeeded()
         let layoutManager = targetTextView.layoutManager
 
         var exclusionRects: [CGRect] = []
@@ -931,14 +1032,19 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
             exclusionRects.append(exclusionRect)
 
-            // Load the floating image at render time (not during pagination)
+            // Load the floating image — use cache first, fall back to async disk load
             let floatImage: UIImage?
             if let cached = EPUBImageCache.shared.image(forPath: floatEl.imageURL.path) {
                 floatImage = cached
-            } else if let loaded = UIImage(contentsOfFile: floatEl.imageURL.path) {
-                EPUBImageCache.shared.setImage(loaded, forPath: floatEl.imageURL.path)
-                floatImage = loaded
             } else {
+                // Defer disk I/O to background — will be loaded when page is revisited
+                // or by the prefetch system
+                let url = floatEl.imageURL
+                Task.detached(priority: .userInitiated) {
+                    if let loaded = UIImage(contentsOfFile: url.path) {
+                        EPUBImageCache.shared.setImage(loaded, forPath: url.path)
+                    }
+                }
                 floatImage = nil
             }
             guard let resolvedImage = floatImage else { continue }
@@ -978,11 +1084,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
             floatingImageViews.append(imageView)
         }
 
-        // Apply exclusion paths — text will reflow around these rects
+        // Apply exclusion paths — text will reflow around these rects.
+        // Skip layoutIfNeeded here; the text view will lay out naturally on the next run loop.
         if !exclusionRects.isEmpty {
             let paths = exclusionRects.map { UIBezierPath(rect: $0) }
             targetTextView.textContainer.exclusionPaths = paths
-            targetTextView.layoutIfNeeded()
         }
     }
 
@@ -1004,11 +1110,11 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     }
 
     /// Create and position inline player views over media attachments on the given page.
+    /// Callers must call layoutIfNeeded() on the text view before invoking this method.
     private func overlayInlinePlayers(for pageIndex: Int, in targetTextView: UITextView) {
         guard !mediaAttachments.isEmpty, pageIndex < pages.count else { return }
 
         let pageRange = pages[pageIndex].range
-        targetTextView.layoutIfNeeded()
 
         let layoutManager = targetTextView.layoutManager
 

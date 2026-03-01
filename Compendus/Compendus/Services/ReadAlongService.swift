@@ -719,7 +719,7 @@ class ReadAlongService {
 
     /// Search all EPUB chapters for a phrase from the transcript and navigate there.
     private func searchAndNavigateToChapter(phrase: String, engine: NativeEPUBEngine) async {
-        guard let spineIndex = engine.findSpineIndex(containingPhrase: phrase) else {
+        guard let spineIndex = await engine.findSpineIndex(containingPhrase: phrase) else {
             logger.info("Cross-chapter search: no match for '\(phrase.prefix(40))'")
             return
         }

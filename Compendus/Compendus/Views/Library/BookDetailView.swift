@@ -32,6 +32,7 @@ struct BookDetailView: View {
 
     @State private var readAsEpub = false
     @State private var relatedBooks: [Book] = []
+    @State private var isLoadingRelated = true
     @State private var showingEditSheet = false
     @State private var editedBook: Book?
 
@@ -430,7 +431,17 @@ struct BookDetailView: View {
 
     @ViewBuilder
     private var relatedBooksContent: some View {
-        if !relatedBooks.isEmpty {
+        if isLoadingRelated {
+            VStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading related books...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        } else if !relatedBooks.isEmpty {
             RelatedBooksSection(
                 title: "Related Books",
                 books: relatedBooks,
@@ -442,12 +453,14 @@ struct BookDetailView: View {
     }
 
     private func loadRelatedBooks() async {
+        isLoadingRelated = true
         do {
             let response = try await apiService.fetchBook(id: book.id)
             relatedBooks = response.relatedBooks ?? []
         } catch {
             // Silently fail — related books are supplementary
         }
+        isLoadingRelated = false
     }
 
     private func checkIfDownloaded() {

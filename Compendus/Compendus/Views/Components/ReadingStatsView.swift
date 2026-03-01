@@ -21,6 +21,7 @@ struct ReadingStatsView: View {
     @State private var dailyActivity: [(date: Date, seconds: Int)] = []
     @State private var bookBreakdowns: [BookBreakdown] = []
     @State private var selectedSession: ReadingSession? = nil
+    @State private var isLoading = true
 
     struct BookBreakdown: Identifiable {
         let id: String
@@ -35,15 +36,27 @@ struct ReadingStatsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    streakSummarySection
-                    weeklyActivitySection
-                    monthlyCalendarSection
-                    booksBreakdownSection
-                    recentSessionsSection
+            Group {
+                if isLoading {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                        Text("Loading stats...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            streakSummarySection
+                            weeklyActivitySection
+                            monthlyCalendarSection
+                            booksBreakdownSection
+                            recentSessionsSection
+                        }
+                        .padding(.vertical, 16)
+                    }
                 }
-                .padding(.vertical, 16)
             }
             .navigationTitle("Reading Stats")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,7 +65,7 @@ struct ReadingStatsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { loadStats() }
+            .task { await loadStats() }
             .sheet(item: $selectedSession) { session in
                 ReadingSessionDetailView(
                     session: session,
@@ -414,100 +427,125 @@ struct ReadingStatsView: View {
 
     // MARK: - Data Loading
 
-    private func loadStats() {
+    private func loadStats() async {
+        isLoading = true
+        let context = modelContext
+
+        // Fetch data on main thread (SwiftData requirement) but compute off main thread
         let descriptor = FetchDescriptor<ReadingSession>(
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
-        guard let allSessions = try? modelContext.fetch(descriptor) else { return }
+        guard let allSessions = try? context.fetch(descriptor) else {
+            isLoading = false
+            return
+        }
+
+        let bookDescriptor = FetchDescriptor<DownloadedBook>()
+        let downloadedBooks = (try? context.fetch(bookDescriptor)) ?? []
+
+        // Extract value types for background computation
+        struct SessionData {
+            let bookId: String
+            let durationSeconds: Int
+            let startedAt: Date
+            let endedAt: Date
+        }
+        struct BookData {
+            let id: String
+            let title: String
+            let authorsDisplay: String
+            let coverData: Data?
+            let format: String
+        }
+
+        let sessionData = allSessions.map { SessionData(bookId: $0.bookId, durationSeconds: $0.durationSeconds, startedAt: $0.startedAt, endedAt: $0.endedAt) }
+        let bookData = downloadedBooks.map { BookData(id: $0.id, title: $0.title, authorsDisplay: $0.authorsDisplay, coverData: $0.coverData, format: $0.format) }
+
+        // Heavy computation off main thread
+        let computed = await Task.detached {
+            let calendar = Calendar.current
+            let totalTime = sessionData.reduce(0) { $0 + $1.durationSeconds }
+
+            var dailyMap: [Date: Int] = [:]
+            var bookIds: Set<String> = []
+            for session in sessionData {
+                let day = calendar.startOfDay(for: session.startedAt)
+                dailyMap[day, default: 0] += session.durationSeconds
+                bookIds.insert(session.bookId)
+            }
+
+            let activity = dailyMap.map { (date: $0.key, seconds: $0.value) }
+                .sorted { $0.date < $1.date }
+
+            // Streaks
+            let today = calendar.startOfDay(for: Date())
+            let daysWithReading = Set(dailyMap.keys)
+            var streak = 0
+            var checkDate = today
+            if daysWithReading.contains(checkDate) {
+                streak = 1
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+            } else {
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+            }
+            while daysWithReading.contains(checkDate) {
+                streak += 1
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+            }
+
+            let sortedDays = daysWithReading.sorted()
+            var best = 0
+            var current = 0
+            var previousDay: Date? = nil
+            for day in sortedDays {
+                if let prev = previousDay,
+                   let nextDay = calendar.date(byAdding: .day, value: 1, to: prev),
+                   calendar.isDate(day, inSameDayAs: nextDay) {
+                    current += 1
+                } else {
+                    current = 1
+                }
+                best = max(best, current)
+                previousDay = day
+            }
+
+            // Book breakdowns
+            let bookMap = Dictionary(uniqueKeysWithValues: bookData.map { ($0.id, $0) })
+            var breakdownMap: [String: (seconds: Int, count: Int, lastRead: Date)] = [:]
+            for session in sessionData {
+                let existing = breakdownMap[session.bookId]
+                breakdownMap[session.bookId] = (
+                    seconds: (existing?.seconds ?? 0) + session.durationSeconds,
+                    count: (existing?.count ?? 0) + 1,
+                    lastRead: max(existing?.lastRead ?? .distantPast, session.endedAt)
+                )
+            }
+            let breakdowns = breakdownMap.map { bookId, stats in
+                let book = bookMap[bookId]
+                return BookBreakdown(
+                    id: bookId,
+                    title: book?.title ?? "Unknown Book",
+                    authors: book?.authorsDisplay ?? "",
+                    coverData: book?.coverData,
+                    format: book?.format ?? "epub",
+                    totalSeconds: stats.seconds,
+                    sessionCount: stats.count,
+                    lastReadAt: stats.lastRead
+                )
+            }.sorted { $0.totalSeconds > $1.totalSeconds }
+
+            return (totalTime, bookIds.count, activity, streak, best, breakdowns)
+        }.value
+
         sessions = allSessions
         totalSessions = allSessions.count
-        totalReadingTime = allSessions.reduce(0) { $0 + $1.durationSeconds }
-
-        let calendar = Calendar.current
-
-        // Build daily activity
-        var dailyMap: [Date: Int] = [:]
-        var bookIds: Set<String> = []
-
-        for session in allSessions {
-            let day = calendar.startOfDay(for: session.startedAt)
-            dailyMap[day, default: 0] += session.durationSeconds
-            bookIds.insert(session.bookId)
-        }
-
-        booksRead = bookIds.count
-        dailyActivity = dailyMap.map { (date: $0.key, seconds: $0.value) }
-            .sorted { $0.date < $1.date }
-
-        // Calculate streaks
-        let today = calendar.startOfDay(for: Date())
-        var daysWithReading = Set(dailyMap.keys)
-
-        // Current streak
-        var streak = 0
-        var checkDate = today
-        if daysWithReading.contains(checkDate) {
-            streak = 1
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-        } else {
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-            if !daysWithReading.contains(checkDate) {
-                streakDays = 0
-            }
-        }
-        while daysWithReading.contains(checkDate) {
-            streak += 1
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-        }
-        streakDays = streak
-
-        // Best streak
-        let sortedDays = daysWithReading.sorted()
-        var best = 0
-        var current = 0
-        var previousDay: Date? = nil
-        for day in sortedDays {
-            if let prev = previousDay,
-               let nextDay = calendar.date(byAdding: .day, value: 1, to: prev),
-               calendar.isDate(day, inSameDayAs: nextDay) {
-                current += 1
-            } else {
-                current = 1
-            }
-            best = max(best, current)
-            previousDay = day
-        }
-        bestStreak = best
-
-        // Book breakdowns
-        let bookDescriptor = FetchDescriptor<DownloadedBook>()
-        let downloadedBooks = (try? modelContext.fetch(bookDescriptor)) ?? []
-        let bookMap = Dictionary(uniqueKeysWithValues: downloadedBooks.map { ($0.id, $0) })
-
-        var breakdownMap: [String: (seconds: Int, count: Int, lastRead: Date)] = [:]
-        for session in allSessions {
-            let existing = breakdownMap[session.bookId]
-            breakdownMap[session.bookId] = (
-                seconds: (existing?.seconds ?? 0) + session.durationSeconds,
-                count: (existing?.count ?? 0) + 1,
-                lastRead: max(existing?.lastRead ?? .distantPast, session.endedAt)
-            )
-        }
-
-        bookBreakdowns = breakdownMap.map { bookId, stats in
-            let book = bookMap[bookId]
-            return BookBreakdown(
-                id: bookId,
-                title: book?.title ?? "Unknown Book",
-                authors: book?.authorsDisplay ?? "",
-                coverData: book?.coverData,
-                format: book?.format ?? "epub",
-                totalSeconds: stats.seconds,
-                sessionCount: stats.count,
-                lastReadAt: stats.lastRead
-            )
-        }
-        .sorted { $0.totalSeconds > $1.totalSeconds }
+        totalReadingTime = computed.0
+        booksRead = computed.1
+        dailyActivity = computed.2
+        streakDays = computed.3
+        bestStreak = computed.4
+        bookBreakdowns = computed.5
+        isLoading = false
     }
 
     // MARK: - Helpers

@@ -57,6 +57,8 @@ class DownloadManager: NSObject {
     let apiService: APIService
 
     private(set) var activeDownloads: [String: DownloadProgress] = [:]
+    /// Whether a metadata sync is currently in progress.
+    private(set) var isSyncingMetadata: Bool = false
     @ObservationIgnored private var _session: URLSession?
 
     /// Set by CompendusApp on appear for background session handling
@@ -426,6 +428,9 @@ class DownloadManager: NSObject {
 
         let descriptor = FetchDescriptor<DownloadedBook>()
         guard let downloadedBooks = try? modelContext.fetch(descriptor), !downloadedBooks.isEmpty else { return }
+
+        isSyncingMetadata = true
+        defer { isSyncingMetadata = false }
 
         print("[DownloadManager] Syncing metadata for \(downloadedBooks.count) downloaded books")
 

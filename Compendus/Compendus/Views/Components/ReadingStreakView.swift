@@ -13,6 +13,7 @@ struct ReadingStreakView: View {
     @State private var streakDays: Int = 0
     @State private var todayMinutes: Int = 0
     @State private var showingStats = false
+    @State private var isLoading = true
 
     var body: some View {
         Button {
@@ -67,57 +68,63 @@ struct ReadingStreakView: View {
         .sheet(isPresented: $showingStats) {
             ReadingStatsView()
         }
-        .task { calculateStreak() }
+        .task { await calculateStreak() }
+        .redacted(reason: isLoading ? .placeholder : [])
     }
 
-    private func calculateStreak() {
+    private func calculateStreak() async {
+        isLoading = true
         let descriptor = FetchDescriptor<ReadingSession>(
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
         guard let sessions = try? modelContext.fetch(descriptor), !sessions.isEmpty else {
             streakDays = 0
             todayMinutes = 0
+            isLoading = false
             return
         }
 
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        // Extract value types for background computation
+        let sessionData = sessions.map { (startedAt: $0.startedAt, durationSeconds: $0.durationSeconds) }
 
-        // Group sessions by day and sum today's reading time
-        var daysWithReading: Set<Date> = []
-        var todaySeconds: Int = 0
+        let (computedStreak, computedMinutes) = await Task.detached {
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
 
-        for session in sessions {
-            let day = calendar.startOfDay(for: session.startedAt)
-            daysWithReading.insert(day)
-            if day == today {
-                todaySeconds += session.durationSeconds
+            var daysWithReading: Set<Date> = []
+            var todaySeconds: Int = 0
+
+            for session in sessionData {
+                let day = calendar.startOfDay(for: session.startedAt)
+                daysWithReading.insert(day)
+                if day == today {
+                    todaySeconds += session.durationSeconds
+                }
             }
-        }
 
-        todayMinutes = todaySeconds / 60
+            var streak = 0
+            var checkDate = today
 
-        // Count consecutive days backwards from today
-        var streak = 0
-        var checkDate = today
-
-        if daysWithReading.contains(checkDate) {
-            streak = 1
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-        } else {
-            // Check if streak is alive from yesterday
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-            if !daysWithReading.contains(checkDate) {
-                streakDays = 0
-                return
+            if daysWithReading.contains(checkDate) {
+                streak = 1
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+            } else {
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+                if !daysWithReading.contains(checkDate) {
+                    return (0, todaySeconds / 60)
+                }
             }
-        }
 
-        while daysWithReading.contains(checkDate) {
-            streak += 1
-            checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
-        }
+            while daysWithReading.contains(checkDate) {
+                streak += 1
+                checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate)!
+            }
 
-        streakDays = streak
+            return (streak, todaySeconds / 60)
+        }.value
+
+        streakDays = computedStreak
+        todayMinutes = computedMinutes
+        isLoading = false
     }
 }

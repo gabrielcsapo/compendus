@@ -48,4 +48,31 @@ final class LazyImageAttachment: NSTextAttachment {
             image = loaded
         }
     }
+
+    /// Asynchronously load the image off the main thread. Returns true if the image
+    /// was loaded (or was already loaded). Callers on the main thread should use this
+    /// to avoid blocking the UI during disk I/O and image decoding.
+    func loadImageAsync() async -> Bool {
+        // Fast path: already loaded
+        lock.lock()
+        if image != nil { lock.unlock(); return true }
+        lock.unlock()
+
+        let url = imageURL
+        let loaded: UIImage? = await Task.detached(priority: .userInitiated) {
+            if let cached = EPUBImageCache.shared.image(forPath: url.path) {
+                return cached
+            } else if let img = UIImage(contentsOfFile: url.path) {
+                EPUBImageCache.shared.setImage(img, forPath: url.path)
+                return img
+            }
+            return nil
+        }.value
+
+        guard let loaded else { return false }
+        lock.lock()
+        if image == nil { image = loaded }
+        lock.unlock()
+        return true
+    }
 }

@@ -19,16 +19,29 @@ struct BookReadingHistoryView: View {
     @State private var totalContentTime: Int = 0
     @State private var dailyActivity: [(date: Date, seconds: Int)] = []
     @State private var selectedSession: ReadingSession? = nil
+    @State private var isLoading = true
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    summarySection
-                    weeklyActivitySection
-                    sessionsListSection
+            Group {
+                if isLoading {
+                    VStack(spacing: 16) {
+                        ProgressView()
+                        Text("Loading history...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            summarySection
+                            weeklyActivitySection
+                            sessionsListSection
+                        }
+                        .padding(.vertical, 16)
+                    }
                 }
-                .padding(.vertical, 16)
             }
             .navigationTitle("Reading History")
             .navigationBarTitleDisplayMode(.inline)
@@ -37,7 +50,7 @@ struct BookReadingHistoryView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { loadSessions() }
+            .task { await loadSessions() }
             .sheet(item: $selectedSession) { session in
                 ReadingSessionDetailView(session: session, bookTitle: book.title)
             }
@@ -317,26 +330,40 @@ struct BookReadingHistoryView: View {
 
     // MARK: - Data Loading
 
-    private func loadSessions() {
+    private func loadSessions() async {
+        isLoading = true
         let bookId = book.id
         let descriptor = FetchDescriptor<ReadingSession>(
             predicate: #Predicate { $0.bookId == bookId },
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
-        guard let fetchedSessions = try? modelContext.fetch(descriptor) else { return }
-        sessions = fetchedSessions
-        totalReadingTime = fetchedSessions.reduce(0) { $0 + $1.durationSeconds }
-        totalContentTime = fetchedSessions.reduce(0) { $0 + $1.contentDurationSeconds }
-
-        // Build daily activity
-        let calendar = Calendar.current
-        var dailyMap: [Date: Int] = [:]
-        for session in fetchedSessions {
-            let day = calendar.startOfDay(for: session.startedAt)
-            dailyMap[day, default: 0] += session.durationSeconds
+        guard let fetchedSessions = try? modelContext.fetch(descriptor) else {
+            isLoading = false
+            return
         }
-        dailyActivity = dailyMap.map { (date: $0.key, seconds: $0.value) }
-            .sorted { $0.date < $1.date }
+
+        // Extract value types for background computation
+        let sessionData = fetchedSessions.map { (durationSeconds: $0.durationSeconds, contentDurationSeconds: $0.contentDurationSeconds, startedAt: $0.startedAt) }
+
+        let computed = await Task.detached {
+            let readingTime = sessionData.reduce(0) { $0 + $1.durationSeconds }
+            let contentTime = sessionData.reduce(0) { $0 + $1.contentDurationSeconds }
+            let calendar = Calendar.current
+            var dailyMap: [Date: Int] = [:]
+            for session in sessionData {
+                let day = calendar.startOfDay(for: session.startedAt)
+                dailyMap[day, default: 0] += session.durationSeconds
+            }
+            let activity = dailyMap.map { (date: $0.key, seconds: $0.value) }
+                .sorted { $0.date < $1.date }
+            return (readingTime, contentTime, activity)
+        }.value
+
+        sessions = fetchedSessions
+        totalReadingTime = computed.0
+        totalContentTime = computed.1
+        dailyActivity = computed.2
+        isLoading = false
     }
 
     // MARK: - Helpers

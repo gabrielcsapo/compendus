@@ -26,6 +26,7 @@ struct DownloadedBookDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var isDescriptionExpanded = false
     @State private var relatedBooks: [Book] = []
+    @State private var isLoadingRelated = true
     @State private var selectedRelatedBook: Book?
     @State private var showingManagementSheet = false
 
@@ -33,6 +34,7 @@ struct DownloadedBookDetailView: View {
     @State private var totalReadingTime: Int = 0      // Wall-clock seconds
     @State private var totalContentTime: Int = 0      // Speed-adjusted seconds (audiobooks)
     @State private var sessionCount: Int = 0
+    @State private var isLoadingStats = true
     @State private var showingReadingHistory = false
 
     var body: some View {
@@ -50,7 +52,12 @@ struct DownloadedBookDetailView: View {
                     .padding(.top, 16)
                     .padding(.horizontal, 20)
 
-                if totalReadingTime > 0 {
+                if isLoadingStats {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
+                } else if totalReadingTime > 0 {
                     readingStatsSection
                         .padding(.top, 16)
                         .padding(.horizontal, 20)
@@ -76,7 +83,7 @@ struct DownloadedBookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .task {
-            loadReadingStats()
+            await loadReadingStats()
             await loadRelatedBooks()
         }
         .toolbar {
@@ -395,16 +402,24 @@ struct DownloadedBookDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private func loadReadingStats() {
+    private func loadReadingStats() async {
+        isLoadingStats = true
         let bookId = book.id
         let descriptor = FetchDescriptor<ReadingSession>(
             predicate: #Predicate { $0.bookId == bookId }
         )
         if let sessions = try? modelContext.fetch(descriptor) {
-            totalReadingTime = sessions.reduce(0) { $0 + $1.durationSeconds }
-            totalContentTime = sessions.reduce(0) { $0 + $1.contentDurationSeconds }
-            sessionCount = sessions.count
+            let data = sessions.map { (duration: $0.durationSeconds, content: $0.contentDurationSeconds) }
+            let computed = await Task.detached {
+                let readingTime = data.reduce(0) { $0 + $1.duration }
+                let contentTime = data.reduce(0) { $0 + $1.content }
+                return (readingTime, contentTime, data.count)
+            }.value
+            totalReadingTime = computed.0
+            totalContentTime = computed.1
+            sessionCount = computed.2
         }
+        isLoadingStats = false
     }
 
     private func formatReadingTime(_ totalSeconds: Int) -> String {
@@ -483,7 +498,17 @@ struct DownloadedBookDetailView: View {
 
     @ViewBuilder
     private var relatedBooksContent: some View {
-        if !relatedBooks.isEmpty {
+        if isLoadingRelated {
+            VStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading related books...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        } else if !relatedBooks.isEmpty {
             RelatedBooksSection(
                 title: "Related Books",
                 books: relatedBooks,
@@ -495,12 +520,14 @@ struct DownloadedBookDetailView: View {
     }
 
     private func loadRelatedBooks() async {
+        isLoadingRelated = true
         do {
             let response = try await apiService.fetchBook(id: book.id)
             relatedBooks = response.relatedBooks ?? []
         } catch {
             // Silently fail — related books are supplementary
         }
+        isLoadingRelated = false
     }
 
     private func navigateToSeries(_ series: String) {

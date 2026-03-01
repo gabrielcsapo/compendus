@@ -474,10 +474,20 @@ struct UnifiedReaderView: View {
                         Color(uiColor: readerSettings.theme.backgroundColor)
                             .ignoresSafeArea()
                         VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                            Text("Loading...")
-                                .foregroundStyle(.secondary)
+                            if let epub = engine as? NativeEPUBEngine, epub.totalChapterCount > 0 {
+                                ProgressView(value: epub.paginationProgress)
+                                    .progressViewStyle(.linear)
+                                    .frame(width: 200)
+                                Text("Paginating chapter \(epub.paginatedChapterCount) of \(epub.totalChapterCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            } else {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                Text("Loading...")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .transition(.opacity)

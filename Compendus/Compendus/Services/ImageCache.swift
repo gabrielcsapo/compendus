@@ -9,6 +9,7 @@ import Foundation
 import UIKit
 
 @Observable
+@MainActor
 class ImageCache {
     private let memoryCache = NSCache<NSString, UIImage>()
     private let fileManager = FileManager.default
@@ -34,12 +35,15 @@ class ImageCache {
             return cached
         }
 
-        // 2. Disk cache
+        // 2. Disk cache (off main thread to avoid blocking UI during scroll)
         let diskURL = cacheURL.appendingPathComponent("\(bookId).jpg")
-        if let data = try? Data(contentsOf: diskURL),
-           let image = UIImage(data: data) {
-            memoryCache.setObject(image, forKey: key)
-            return image
+        let diskImage: UIImage? = await Task.detached(priority: .userInitiated) {
+            guard let data = try? Data(contentsOf: diskURL) else { return nil }
+            return UIImage(data: data)
+        }.value
+        if let diskImage {
+            memoryCache.setObject(diskImage, forKey: key)
+            return diskImage
         }
 
         // 3. Deduplicate in-flight requests

@@ -148,7 +148,20 @@ struct DownloadsView: View {
         NavigationStack {
             mainContent
                 .navigationTitle(navigationTitle)
-                .toolbar { downloadsToolbar }
+                .toolbar {
+                    downloadsToolbar
+                    if downloadManager.isSyncingMetadata {
+                        ToolbarItem(placement: .principal) {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Syncing...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
                 .navigationDestination(for: DownloadedBook.self) { book in
                     DownloadedBookDetailView(book: book) { seriesName in
                         seriesSheet = DownloadSeriesSheet(id: seriesName)
