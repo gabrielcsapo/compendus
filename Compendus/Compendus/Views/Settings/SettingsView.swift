@@ -326,38 +326,7 @@ struct SettingsView: View {
                 Text("This will clear the server URL. Your downloaded books will be preserved.")
             }
             .sheet(isPresented: $showingStorageChart) {
-                NavigationStack {
-                    StorageRingChart(
-                        segments: [
-                            StorageSegment(
-                                category: "Books",
-                                bytes: storageManager.totalBooksStorageUsed(),
-                                color: .blue
-                            ),
-                            StorageSegment(
-                                category: "Comic Cache",
-                                bytes: storageManager.comicCacheSize(),
-                                color: .purple
-                            ),
-                            StorageSegment(
-                                category: "TTS Cache",
-                                bytes: storageManager.ttsCacheSize(),
-                                color: .orange
-                            )
-                        ],
-                        availableBytes: storageManager.availableDiskSpace()
-                    )
-                    .navigationTitle("Storage")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                showingStorageChart = false
-                            }
-                        }
-                    }
-                }
-                .presentationDetents([.medium])
+                StorageBreakdownView()
             }
         }
     }
