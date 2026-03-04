@@ -60,6 +60,15 @@ class ReadAlongService {
     /// Whether the current session is TTS mode.
     var isTTSMode: Bool { audioSource == .tts }
 
+    /// Transcript for the karaoke lyrics overlay (both TTS and audiobook modes).
+    var currentTranscript: Transcript?
+
+    /// Current playback time for the karaoke lyrics overlay (seconds).
+    var currentPlaybackTime: Double {
+        if isTTSMode { return ttsCurrentTime }
+        return player?.currentTime ?? 0
+    }
+
     // MARK: - TTS Public State
 
     /// Current playback time in TTS mode (seconds).
@@ -216,6 +225,7 @@ class ReadAlongService {
             if let savedTranscript = audiobook.transcript {
                 logger.info("Using saved transcript: \(savedTranscript.segments.count) segments, duration=\(savedTranscript.duration)s")
                 transcriptionService.partialTranscript = savedTranscript
+                currentTranscript = savedTranscript
             } else {
                 // Fall back to live transcription
                 guard let fileURL = audiobook.fileURL else {
@@ -315,7 +325,7 @@ class ReadAlongService {
 
         // Clear highlight
         activeSentenceRange = nil
-        engine?.readAlongHighlightRange = nil
+        currentTranscript = nil
 
         state = .inactive
         audioSource = nil
@@ -444,6 +454,11 @@ class ReadAlongService {
             return
         }
 
+        // Keep karaoke overlay transcript in sync
+        if currentTranscript?.segments.count != transcript.segments.count {
+            currentTranscript = transcript
+        }
+
         let words = transcriptWordsAround(time: currentTime, in: transcript)
         if words.isEmpty {
             if shouldLog {
@@ -485,7 +500,6 @@ class ReadAlongService {
                 if newRange != activeSentenceRange {
                     activeSentenceRange = newRange
                     activeSpineIndex = engine.activeSpineIndex
-                    engine.readAlongHighlightRange = newRange
 
                     // Auto-advance page if needed
                     if !autoAdvanceSuppressed {
@@ -501,7 +515,6 @@ class ReadAlongService {
             // Clear highlight on miss
             if activeSentenceRange != nil {
                 activeSentenceRange = nil
-                engine.readAlongHighlightRange = nil
             }
 
             // After 3+ misses, search across all chapters using transcript words
@@ -1220,6 +1233,8 @@ class ReadAlongService {
         ttsCurrentTime = 0
         ttsCurrentSpineIndex = spineIndex
         resetAudioProcessingState()
+        // Build transcript for karaoke overlay from cached timings
+        rebuildTTSTranscript()
 
         let pageOffset = engine.currentPagePlainTextOffset ?? 0
         let startIndex = sentences.firstIndex {
@@ -1539,6 +1554,8 @@ class ReadAlongService {
                     )
                     self.ttsDuration = cumulativeTime + audioDuration
                     self.ttsTotalSamplesScheduled += sampleCount
+                    // Rebuild transcript for karaoke overlay
+                    self.rebuildTTSTranscript()
                 }
 
                 cumulativeTime += audioDuration
@@ -1721,7 +1738,6 @@ class ReadAlongService {
 
         activeSentenceRange = attrRange
         activeSpineIndex = engine.activeSpineIndex
-        engine.readAlongHighlightRange = attrRange
         logger.info("TTS playing sentence[\(currentIdx)]: \"\(sentence.text.prefix(60))\" attrRange=\(attrRange)")
 
         // Auto-advance page if needed
@@ -1744,11 +1760,31 @@ class ReadAlongService {
 
         activeSentenceRange = attrRange
         activeSpineIndex = engine.activeSpineIndex
-        engine.readAlongHighlightRange = attrRange
         logger.info("TTS first sentence[\(currentIdx)]: \"\(sentence.text.prefix(60))\" attrRange=\(attrRange)")
 
         if !autoAdvanceSuppressed {
             engine.showPage(containingRange: attrRange)
+        }
+    }
+
+    // MARK: - Karaoke Transcript
+
+    /// Rebuild the karaoke transcript from current TTS sentence timings.
+    private func rebuildTTSTranscript() {
+        let completed = ttsSentences[ttsStartSentenceIndex...]
+            .filter { $0.audioEndTime > $0.audioStartTime }
+        currentTranscript = TTSTranscriptBuilder.buildTranscript(from: Array(completed))
+    }
+
+    /// Seek to a specific time (used by karaoke tap-to-seek).
+    func seek(to time: Double) {
+        if isTTSMode {
+            guard let targetIndex = ttsSentences.firstIndex(where: {
+                $0.audioStartTime <= time && $0.audioEndTime > time
+            }) ?? ttsSentences.firstIndex(where: { $0.audioStartTime >= time }) else { return }
+            restartTTSFromSentence(targetIndex)
+        } else {
+            player?.seek(to: time)
         }
     }
 

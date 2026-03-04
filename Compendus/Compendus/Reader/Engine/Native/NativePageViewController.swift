@@ -40,11 +40,12 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     private var currentChapterHref: String?
 
     // Highlight tracking: (highlight ID, range in full attributed string, color)
-    private var highlightRanges: [(id: String, range: NSRange, color: UIColor)] = []
+    private(set) var highlightRanges: [(id: String, range: NSRange, color: UIColor)] = []
 
-    // Read-along highlight: range in full attributed string, rendered with accent color
-    private var readAlongHighlightRange: NSRange?
-    private let readAlongHighlightColor: UIColor = .tintColor
+    /// Read-only access to the current highlights for composing temporary overlays.
+    var currentHighlightRanges: [(id: String, range: NSRange, color: UIColor)] {
+        highlightRanges
+    }
 
     // Track whether we're suppressing selection callbacks during page transitions
     private var suppressSelectionCallbacks = false
@@ -668,11 +669,9 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     // MARK: - Highlight Application
 
     /// Set the highlights to render. Ranges are relative to the full chapter attributed string.
-    /// Optionally includes a read-along highlight range for sentence-level sync.
     /// Applies highlights incrementally without re-rendering the entire page.
-    func applyHighlights(_ highlights: [(id: String, range: NSRange, color: UIColor)], readAlongRange: NSRange? = nil) {
+    func applyHighlights(_ highlights: [(id: String, range: NSRange, color: UIColor)]) {
         self.highlightRanges = highlights
-        self.readAlongHighlightRange = readAlongRange
         refreshHighlightsInPlace()
     }
 
@@ -702,10 +701,7 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
     /// Apply highlight background colors to a page substring.
     private func applyHighlightsToPage(_ pageString: NSAttributedString,
                                         pageRange: NSRange) -> NSAttributedString {
-        let hasHighlights = !highlightRanges.isEmpty
-        let hasReadAlong = readAlongHighlightRange != nil
-
-        guard hasHighlights || hasReadAlong else { return pageString }
+        guard !highlightRanges.isEmpty else { return pageString }
 
         let mutable = NSMutableAttributedString(attributedString: pageString)
 
@@ -724,32 +720,6 @@ class NativePageViewController: UIViewController, UITextViewDelegate {
 
             mutable.addAttribute(.backgroundColor, value: highlight.color.withAlphaComponent(0.35),
                                  range: localRange)
-        }
-
-        // Apply read-along sentence highlight (underline + subtle background)
-        if let readAlongRange = readAlongHighlightRange {
-            let overlap = NSIntersectionRange(readAlongRange, pageRange)
-            if overlap.length > 0 {
-                let localRange = NSRange(
-                    location: overlap.location - pageRange.location,
-                    length: overlap.length
-                )
-
-                if localRange.location >= 0,
-                   localRange.location + localRange.length <= mutable.length {
-                    // Underline the active sentence
-                    mutable.addAttribute(.underlineStyle,
-                                         value: NSUnderlineStyle.thick.rawValue,
-                                         range: localRange)
-                    mutable.addAttribute(.underlineColor,
-                                         value: readAlongHighlightColor.withAlphaComponent(0.85),
-                                         range: localRange)
-                    // Background tint for visibility
-                    mutable.addAttribute(.backgroundColor,
-                                         value: readAlongHighlightColor.withAlphaComponent(0.25),
-                                         range: localRange)
-                }
-            }
         }
 
         return mutable

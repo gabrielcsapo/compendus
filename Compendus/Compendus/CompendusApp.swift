@@ -106,6 +106,7 @@ struct CompendusApp: App {
                     downloadManager.pocketTTSModelManager = pocketTTSModelManager
                     audiobookPlayer.modelContainer = sharedModelContainer
                     bookEditSyncService.modelContainer = sharedModelContainer
+                    onDeviceTranscriptionService.appSettings = appSettings
                     OnDeviceTranscriptionService.registerBackgroundTask(
                         service: onDeviceTranscriptionService
                     )

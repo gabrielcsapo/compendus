@@ -79,6 +79,13 @@ struct UnifiedReaderView: View {
     @State private var showReadAlongPill = false
     @State private var readAlongPillDismissed = false
 
+    // Reader mode (infinite scroll lyrics view without audio)
+    @State private var readerModeActive = false
+    @State private var readerModeSegmentMap: [ReaderModeSegmentMapping] = []
+    @State private var readerModeActiveSegment: Int = -1
+    @State private var readerModeActiveSegmentText: String = ""
+    @State private var readerModeStartSegment: Int = 0
+
     // Footnote popover
     @State private var showingFootnote = false
     @State private var footnoteContent = ""
@@ -154,6 +161,7 @@ struct UnifiedReaderView: View {
         }
         .onDisappear {
             saveProgress()
+            readerModeActive = false
             readAlongService.deactivate()
             if let nativeEPUB = engine as? NativeEPUBEngine {
                 nativeEPUB.cleanup()
@@ -499,14 +507,48 @@ struct UnifiedReaderView: View {
     private func readerContent(engine: any ReaderEngine) -> some View {
         GeometryReader { geometry in
             ZStack {
-                // Layer 0: Full-bleed reader content (hidden when carousel is showing)
+                // Layer 0: Primary reading content
+                // Engine view always in tree for UIKit stability; hidden in reader mode.
                 EngineViewWrapper(engine: engine)
                     .ignoresSafeArea()
-                    .opacity(showingOverlay ? 0 : 1)
-                    .allowsHitTesting(!showingOverlay)
+                    .opacity(showingOverlay || readerModeActive ? 0 : 1)
+                    .allowsHitTesting(!showingOverlay && !readAlongService.isActive && !readerModeActive)
 
-                // Layer 1: Page carousel (visible when overlay is showing)
-                if showingOverlay {
+                // Reader mode replaces the engine view when active
+                if readerModeActive, let segments = readerModeSegments(engine: engine) {
+                    ReaderModeScrollView(
+                        segments: segments,
+                        totalPages: engine.totalPositions,
+                        initialSegment: readerModeStartSegment,
+                        onActiveSegmentChanged: { index in
+                            readerModeActiveSegment = index
+                            if index >= 0 && index < segments.count {
+                                readerModeActiveSegmentText = segments[index].text
+                            }
+                        },
+                        onToggleOverlay: { toggleOverlay() }
+                    )
+                    .transition(.opacity)
+                }
+
+                // Read-along karaoke overlay (audiobook or TTS mode)
+                // Always in the view tree; controlled via opacity.
+                ReadAlongLyricsOverlay(
+                    transcript: readAlongService.isActive ? readAlongService.currentTranscript : nil,
+                    currentTime: readAlongService.currentPlaybackTime,
+                    bookTitle: book.title,
+                    chapterTitle: engine.currentLocation?.title,
+                    isLoading: readAlongService.isActive && readAlongService.currentTranscript == nil,
+                    scrollDriven: false,
+                    onSeek: { time in readAlongService.seek(to: time) },
+                    onTapBackground: { toggleOverlay() }
+                )
+                .opacity(readAlongService.isActive ? 1 : 0)
+                .allowsHitTesting(readAlongService.isActive)
+                .animation(.easeInOut(duration: 0.3), value: readAlongService.isActive)
+
+                // Layer 1: Page carousel (visible when overlay is showing, not in reader mode)
+                if showingOverlay && !readerModeActive {
                     pageCarousel(engine: engine, geometry: geometry)
                         .transition(reduceMotion ? .opacity : .opacity)
                 }
@@ -539,7 +581,8 @@ struct UnifiedReaderView: View {
 
                     Spacer()
 
-                    if showingOverlay {
+                    // Hide bottom bar in reader mode (has its own page info)
+                    if showingOverlay && !readerModeActive {
                         readerBottomBar(engine: engine)
                             .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     }
@@ -891,6 +934,28 @@ struct UnifiedReaderView: View {
                         } label: {
                             Label("Read Aloud", systemImage: "speaker.wave.2")
                         }
+                    }
+                }
+
+                if !engine.isPDF && !engine.isComic {
+                    Button {
+                        // Defer toggle so the context menu fully dismisses first
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            if readerModeActive {
+                                // Exiting reader mode: navigate EPUB to the last viewed passage
+                                restoreEPUBPosition(engine: engine)
+                            } else {
+                                // Pre-compute mapping and start segment before view renders
+                                buildReaderModeMapping(forEngine: engine)
+                                readerModeStartSegment = computeStartSegment(forEngine: engine)
+                            }
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                readerModeActive.toggle()
+                                if readerModeActive { showingOverlay = false }
+                            }
+                        }
+                    } label: {
+                        Label(readerModeActive ? "Exit Reader Mode" : "Reader Mode", systemImage: readerModeActive ? "book" : "scroll")
                     }
                 }
 
@@ -1373,6 +1438,14 @@ struct UnifiedReaderView: View {
     private func saveProgress() {
         guard let engine = engine else { return }
 
+        // If read-along is active, ensure the EPUB page matches the
+        // currently read sentence so the bookmark is accurate.
+        if readAlongService.isActive,
+           let range = readAlongService.activeSentenceRange,
+           let nativeEngine = engine as? NativeEPUBEngine {
+            nativeEngine.showPage(containingRange: range)
+        }
+
         if let serialized = engine.serializeLocation() {
             book.lastPosition = serialized
         }
@@ -1683,6 +1756,149 @@ struct UnifiedReaderView: View {
     private func queueTTSPreGeneration() {
         let voiceId = Int(pocketTTSModelManager.selectedVoiceIndex)
         backgroundProcessingManager.enqueue(.ttsGeneration(bookId: book.id, voiceId: voiceId))
+    }
+
+    // MARK: - Reader Mode
+
+    struct ReaderModeSegmentMapping {
+        let spineIndex: Int
+        let plainTextOffset: Int
+    }
+
+    /// Eagerly build the segment mapping from all parsed chapters.
+    /// Called from the toggle button handler so the mapping is ready before the view renders.
+    private func buildReaderModeMapping(forEngine engine: any ReaderEngine) {
+        guard let nativeEngine = engine as? NativeEPUBEngine else { return }
+        let chapters = nativeEngine.allChaptersPlainText
+        guard !chapters.isEmpty else { return }
+
+        var mapping: [ReaderModeSegmentMapping] = []
+        for chapter in chapters {
+            let sentences = TextProcessingUtils.sentencize(chapter.plainText)
+            for span in sentences {
+                mapping.append(ReaderModeSegmentMapping(
+                    spineIndex: chapter.spineIndex,
+                    plainTextOffset: span.plainTextRange.location
+                ))
+            }
+        }
+        readerModeSegmentMap = mapping
+    }
+
+    /// Build segments from all parsed chapters for reader mode infinite scroll.
+    /// The mapping is built eagerly by `buildReaderModeMapping` in the button handler.
+    private func readerModeSegments(engine: any ReaderEngine) -> [ReaderModeScrollView.Segment]? {
+        guard let nativeEngine = engine as? NativeEPUBEngine else { return nil }
+        let chapters = nativeEngine.allChaptersPlainText
+        guard !chapters.isEmpty else { return nil }
+
+        var segments: [ReaderModeScrollView.Segment] = []
+        var index = 0
+        var lastSpineIndex = -1
+
+        for chapter in chapters {
+            let chapterTitle = nativeEngine.chapterTitle(forSpineIndex: chapter.spineIndex)
+            let sentences = TextProcessingUtils.sentencize(chapter.plainText)
+            for (sentenceIndex, span) in sentences.enumerated() {
+                let isChapterStart = chapter.spineIndex != lastSpineIndex && sentenceIndex == 0
+                let pageNumber = nativeEngine.globalPageIndex(
+                    forPlainTextOffset: span.plainTextRange.location,
+                    inSpine: chapter.spineIndex
+                ) ?? 0
+
+                segments.append(ReaderModeScrollView.Segment(
+                    id: index,
+                    text: span.text,
+                    chapterTitle: isChapterStart ? chapterTitle : nil,
+                    isChapterStart: isChapterStart,
+                    pageNumber: pageNumber
+                ))
+                index += 1
+            }
+            lastSpineIndex = chapter.spineIndex
+        }
+        guard !segments.isEmpty else { return nil }
+
+        return segments
+    }
+
+    /// Find the segment index corresponding to the current EPUB page position.
+    /// Uses a pre-built mapping array (called from `readerModeSegments` during view updates).
+    private func startSegmentForCurrentPage(engine: NativeEPUBEngine, mapping: [ReaderModeSegmentMapping]) -> Int {
+        let currentSpine = engine.activeSpineIndex
+        let pageOffset = engine.currentPagePlainTextOffset ?? 0
+
+        // Find the first segment in the current chapter at or after the page offset
+        for (i, m) in mapping.enumerated() {
+            if m.spineIndex == currentSpine && m.plainTextOffset >= pageOffset {
+                return i
+            }
+        }
+        // Fallback: find the first segment in the current chapter
+        return mapping.firstIndex { $0.spineIndex == currentSpine } ?? 0
+    }
+
+    /// Eagerly compute the start segment for the current page without requiring
+    /// the full mapping array. Called from the toggle button handler so the value
+    /// is ready before `readerModeActive` triggers the first render.
+    private func computeStartSegment(forEngine engine: any ReaderEngine) -> Int {
+        guard let nativeEngine = engine as? NativeEPUBEngine else { return 0 }
+        let currentSpine = nativeEngine.activeSpineIndex
+        let pageOffset = nativeEngine.currentPagePlainTextOffset ?? 0
+        let chapters = nativeEngine.allChaptersPlainText
+        guard !chapters.isEmpty else { return 0 }
+
+        var segmentIndex = 0
+        var firstInChapter: Int?
+
+        for chapter in chapters {
+            let sentences = TextProcessingUtils.sentencize(chapter.plainText)
+            for span in sentences {
+                if chapter.spineIndex == currentSpine {
+                    if firstInChapter == nil { firstInChapter = segmentIndex }
+                    if span.plainTextRange.location >= pageOffset {
+                        return segmentIndex
+                    }
+                }
+                segmentIndex += 1
+            }
+        }
+
+        return firstInChapter ?? 0
+    }
+
+    /// Navigate the EPUB engine to the page containing the active reader mode segment's text,
+    /// then briefly flash-highlight it so the user can see where to pick up reading.
+    private func restoreEPUBPosition(engine: any ReaderEngine) {
+        guard !readerModeActiveSegmentText.isEmpty,
+              readerModeActiveSegment >= 0,
+              readerModeActiveSegment < readerModeSegmentMap.count,
+              let nativeEngine = engine as? NativeEPUBEngine else { return }
+
+        let mapping = readerModeSegmentMap[readerModeActiveSegment]
+        let spineIndex = mapping.spineIndex
+        let fullText = readerModeActiveSegmentText
+
+        // Search for the segment text within the chapter's plain text
+        let chapters = nativeEngine.allChaptersPlainText
+        guard let chapter = chapters.first(where: { $0.spineIndex == spineIndex }) else {
+            nativeEngine.navigateToPlainTextOffset(mapping.plainTextOffset, inSpine: spineIndex)
+            return
+        }
+
+        let searchText = String(fullText.prefix(80))
+        if let range = chapter.plainText.range(of: searchText) {
+            let offset = chapter.plainText.distance(from: chapter.plainText.startIndex, to: range.lowerBound)
+            nativeEngine.navigateToPlainTextOffset(offset, inSpine: spineIndex)
+
+            // Flash-highlight the full sentence after a brief delay so the page has rendered
+            Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                nativeEngine.flashHighlight(plainTextOffset: offset, length: fullText.count, inSpine: spineIndex)
+            }
+        } else {
+            nativeEngine.navigateToPlainTextOffset(mapping.plainTextOffset, inSpine: spineIndex)
+        }
     }
 
     // MARK: - Highlights

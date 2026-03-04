@@ -82,15 +82,6 @@ class NativeEPUBEngine: ReaderEngine {
 
     // MARK: - Read-Along Support
 
-    /// Range in the full chapter attributed string to highlight for read-along.
-    /// Set by ReadAlongService; rendered with a distinct visual style.
-    var readAlongHighlightRange: NSRange? {
-        didSet {
-            guard readAlongHighlightRange != oldValue else { return }
-            applyHighlightsToCurrentPage()
-        }
-    }
-
     /// Callback fired when the spine index changes (for chapter tracking in read-along).
     var onSpineIndexChanged: ((Int) -> Void)?
 
@@ -201,6 +192,51 @@ class NativeEPUBEngine: ReaderEngine {
     /// The TOC entries from the EPUB package.
     var tocEntries: [EPUBTOCEntry] {
         parser?.package.tocItems ?? []
+    }
+
+    /// Chapter title for a given spine index.
+    func chapterTitle(forSpineIndex spineIndex: Int) -> String? {
+        guard let parser = parser else { return nil }
+        let item = parser.manifestItem(forSpineIndex: spineIndex)
+        return findChapterTitle(for: item?.href)
+    }
+
+    /// Global page index for a given plain text offset within a spine item.
+    func globalPageIndex(forPlainTextOffset offset: Int, inSpine spineIndex: Int) -> Int? {
+        guard let map = chapterPlainTextMaps[spineIndex],
+              let pages = chapterPages[spineIndex] else { return nil }
+
+        // Convert plain text offset to attributed string location
+        guard let attrRange = map.attrStringRange(for: NSRange(location: offset, length: 1)) else { return nil }
+        let attrLocation = attrRange.location
+
+        // Find which page contains this attributed string location
+        var localPage = 0
+        for page in pages {
+            if NSLocationInRange(attrLocation, page.range) {
+                localPage = page.pageIndex
+                break
+            }
+        }
+
+        // Compute global page
+        let pagesBeforeCurrent = (0..<spineIndex).reduce(0) { sum, i in
+            sum + (i < spinePageCounts.count ? spinePageCounts[i] : 1)
+        }
+        return pagesBeforeCurrent + localPage
+    }
+
+    /// All parsed chapters as (spineIndex, plainText) for reader mode.
+    var allChaptersPlainText: [(spineIndex: Int, plainText: String)] {
+        let count = spineCount
+        var result: [(spineIndex: Int, plainText: String)] = []
+        for i in 0..<count {
+            guard let nodes = parsedChapters[i] else { continue }
+            let text = Self.extractPlainText(from: nodes)
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            result.append((spineIndex: i, plainText: text))
+        }
+        return result
     }
 
     /// Whether a search is currently in progress.
@@ -586,6 +622,52 @@ class NativeEPUBEngine: ReaderEngine {
     /// Navigate to a specific spine index. Used by ReadAlongService for cross-chapter search.
     func goToSpine(_ spineIndex: Int) {
         loadChapter(at: spineIndex)
+    }
+
+    /// Navigate to the page containing a specific plain text offset within a given spine index.
+    /// Used by reader mode to restore the EPUB position when exiting.
+    func navigateToPlainTextOffset(_ offset: Int, inSpine spineIndex: Int) {
+        if spineIndex != currentSpineIndex {
+            loadChapter(at: spineIndex)
+            // After chapter loads, navigate to the offset
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                self.navigateToOffsetInCurrentChapter(offset)
+            }
+        } else {
+            navigateToOffsetInCurrentChapter(offset)
+        }
+    }
+
+    private func navigateToOffsetInCurrentChapter(_ offset: Int) {
+        guard let map = chapterPlainTextMaps[currentSpineIndex],
+              let attrRange = map.attrStringRange(for: NSRange(location: offset, length: 1)) else { return }
+        showPage(containingRange: attrRange)
+    }
+
+    /// Briefly flash-highlight a plain text range, then fade it out.
+    /// Used to show the user where they left off when exiting reader mode.
+    func flashHighlight(plainTextOffset: Int, length: Int, inSpine spineIndex: Int) {
+        guard spineIndex == currentSpineIndex,
+              let map = chapterPlainTextMaps[spineIndex],
+              let attrRange = map.attrStringRange(for: NSRange(location: plainTextOffset, length: length))
+        else { return }
+
+        let flashId = "_flash_highlight_"
+        let accentColor = UIColor.systemYellow
+
+        // Add the flash highlight on top of existing highlights
+        var current = pageViewController?.currentHighlightRanges ?? []
+        current.append((id: flashId, range: attrRange, color: accentColor))
+        pageViewController?.applyHighlights(current)
+
+        // Remove it after a brief delay
+        Task {
+            try? await Task.sleep(for: .milliseconds(1500))
+            var updated = pageViewController?.currentHighlightRanges ?? []
+            updated.removeAll { $0.id == flashId }
+            pageViewController?.applyHighlights(updated)
+        }
     }
 
     // MARK: - Chapter Loading
@@ -2030,7 +2112,6 @@ class NativeEPUBEngine: ReaderEngine {
         let manifestItem = parser.manifestItem(forSpineIndex: currentSpineIndex)
         let currentHref = manifestItem?.href ?? ""
         let highlights = pendingHighlights
-        let readAlongRange = readAlongHighlightRange
 
         Task.detached { [weak self] in
             // Filter and parse highlights off main thread
@@ -2054,7 +2135,7 @@ class NativeEPUBEngine: ReaderEngine {
             }
 
             await MainActor.run {
-                self?.pageViewController?.applyHighlights(ranges, readAlongRange: readAlongRange)
+                self?.pageViewController?.applyHighlights(ranges)
             }
         }
     }

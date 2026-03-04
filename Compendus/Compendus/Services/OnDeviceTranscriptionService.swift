@@ -71,6 +71,9 @@ class OnDeviceTranscriptionService {
         partialTranscript?.segments.last?.end
     }
 
+    /// App settings reference for background processing preferences (e.g. charging-only).
+    weak var appSettings: AppSettings?
+
     @ObservationIgnored private var currentTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     @ObservationIgnored private var whisperContext: WhisperContext?
@@ -209,7 +212,7 @@ class OnDeviceTranscriptionService {
         saveProgressToDisk()
 
         let request = BGProcessingTaskRequest(identifier: Self.backgroundTaskIdentifier)
-        request.requiresExternalPower = false
+        request.requiresExternalPower = appSettings?.backgroundProcessingChargingOnly ?? true
         request.requiresNetworkConnectivity = false
 
         do {
