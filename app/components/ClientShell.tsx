@@ -6,6 +6,7 @@ import { DarkModeToggle } from "./DarkModeToggle";
 import { GlobalUploadDropzone } from "./GlobalUploadDropzone";
 import { SearchInput } from "./SearchInput";
 import { Footer } from "./Footer";
+import { CompendusLogo } from "./CompendusLogo";
 
 function GlobalNavigationLoadingBar() {
   const navigation = useNavigation();
@@ -30,14 +31,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 to="/"
                 className="text-primary hover:text-primary-hover transition-colors flex items-center gap-2"
               >
-                <svg
-                  className="w-6 h-6"
-                  viewBox="0 0 64 64"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect x="14" y="10" width="38" height="44" rx="6" fill="currentColor"/>
-                  <rect x="18" y="14" width="26" height="36" rx="3" fill="rgba(255,255,255,0.15)"/>
-                </svg>
+                <CompendusLogo />
                 Compendus
               </Link>
             </li>

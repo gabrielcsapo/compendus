@@ -59,12 +59,12 @@ export function ShowcaseBookCard({ book }: { book: MockBook }) {
           <img
             src={book.coverImage}
             alt={book.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-primary-light/20 to-accent-light/20">
-            <span className="text-center text-white/90 text-sm font-medium line-clamp-4 drop-shadow-md">
+          <div className="w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-primary-light to-accent-light">
+            <span className="text-center text-foreground-muted text-sm font-medium line-clamp-4">
               {book.title}
             </span>
           </div>

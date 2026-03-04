@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { CodeBlock } from "@app/components/docs";
+import { CompendusLogo } from "@app/components/CompendusLogo";
 import { ShowcaseBookCard } from "../components/ShowcaseBookCard";
 import { mockBooks } from "../data/mockBooks";
 
@@ -178,7 +179,38 @@ const formats = [
   { ext: "MP3", type: "audio" },
 ];
 
-const typeTabs = ["All", "Ebooks", "Audiobooks", "Comics"];
+const typeTabs = [
+  {
+    label: "All",
+    icon: null,
+  },
+  {
+    label: "Ebooks",
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+  },
+  {
+    label: "Audiobooks",
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828-2.828" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5V9" />
+      </svg>
+    ),
+  },
+  {
+    label: "Comics",
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+  },
+];
 
 const fakeNavItems = [
   "Library",
@@ -268,32 +300,18 @@ export default function Landing() {
               </div>
 
               {/* Faux nav */}
-              <div className="flex items-center gap-1 ml-4">
-                <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
-                  <svg
-                    className="w-3 h-3 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-semibold text-foreground ml-1.5 mr-4">
+              <div className="flex items-center gap-0.5 ml-4">
+                <CompendusLogo className="w-5 h-5 text-primary" />
+                <span className="text-sm font-bold text-primary ml-1.5 mr-3">
                   Compendus
                 </span>
                 {fakeNavItems.map((item, i) => (
                   <span
                     key={item}
-                    className={`hidden sm:inline px-2.5 py-1 text-xs rounded-md ${
+                    className={`hidden sm:inline px-2.5 py-1.5 text-xs rounded-lg font-medium ${
                       i === 0
-                        ? "bg-primary-light text-primary font-medium"
-                        : "text-foreground-muted"
+                        ? "text-foreground"
+                        : "text-foreground-muted hover:text-foreground"
                     }`}
                   >
                     {item}
@@ -304,44 +322,83 @@ export default function Landing() {
               <div className="flex-1" />
 
               {/* Faux search */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 border border-border rounded-lg text-xs text-foreground-muted">
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
+              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 bg-surface-elevated border border-border rounded-lg text-xs text-foreground-muted">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                Search...
+                Search
+                <kbd className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-mono bg-background rounded border border-border">
+                  <span>⌘</span>K
+                </kbd>
               </div>
+
+              {/* Faux dark mode toggle */}
+              <span className="hidden sm:flex p-1.5 rounded-lg text-foreground-muted">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              </span>
+
+              {/* Faux admin icon */}
+              <span className="hidden sm:flex p-1.5 rounded-lg text-foreground-muted">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </span>
             </div>
 
             {/* Faux content area */}
             <div className="p-4 sm:p-6 bg-background">
-              {/* Type tabs */}
-              <div className="flex gap-2 mb-5">
-                {typeTabs.map((tab, i) => (
-                  <span
-                    key={tab}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      i === 0
-                        ? "bg-primary text-white shadow-sm"
-                        : "bg-surface-elevated text-foreground-muted"
-                    }`}
-                  >
-                    {tab}
+              {/* Toolbar row: view toggle + type tabs + sort */}
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                {/* View mode toggle */}
+                <div className="inline-flex gap-0.5 p-0.5 bg-surface-elevated rounded-lg">
+                  <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md bg-primary text-white shadow-sm">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    Books
                   </span>
-                ))}
+                  <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md text-foreground-muted">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Series
+                  </span>
+                </div>
+
+                {/* Type tabs */}
+                <div className="inline-flex gap-0.5 p-0.5 bg-surface-elevated rounded-lg">
+                  {typeTabs.map((tab, i) => (
+                    <span
+                      key={tab.label}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                        i === 0
+                          ? "bg-primary text-white shadow-sm"
+                          : "text-foreground-muted"
+                      }`}
+                    >
+                      {tab.icon}
+                      {tab.label}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Sort dropdown (faux) */}
+                <div className="ml-auto hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-lg text-[11px] text-foreground-muted bg-surface">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  </svg>
+                  Recent
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
 
               {/* Book grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
                 {mockBooks.map((book) => (
                   <ShowcaseBookCard key={book.title} book={book} />
                 ))}

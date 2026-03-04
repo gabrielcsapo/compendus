@@ -1,4 +1,5 @@
 import { Link } from "react-flight-router/client";
+import { CompendusLogo } from "./CompendusLogo";
 
 interface FooterProps {
   variant?: "full" | "compact";
@@ -55,13 +56,7 @@ export function Footer({ variant = "full" }: FooterProps) {
               to="/"
               className="flex items-center gap-2 text-foreground hover:text-primary transition-colors mb-4"
             >
-              <svg
-                className="w-6 h-6"
-                viewBox="0 0 64 64"
-              >
-                <rect x="14" y="10" width="38" height="44" rx="6" fill="currentColor"/>
-                <rect x="18" y="14" width="26" height="36" rx="3" fill="rgba(255,255,255,0.15)"/>
-              </svg>
+              <CompendusLogo />
               <span className="font-bold text-lg">Compendus</span>
             </Link>
             <p className="text-sm text-foreground-muted">
