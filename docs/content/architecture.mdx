@@ -135,17 +135,17 @@ Reader/
 
 Compendus uses SQLite with Drizzle ORM. The schema is defined in `app/lib/db/schema.ts`.
 
-| Table | Description |
-|---|---|
-| `books` | Core book collection with metadata, file info, and reading state |
-| `collections` | User-created groupings with hierarchical support |
-| `booksCollections` | Junction table linking books to collections |
-| `tags` | Color-coded tags for categorization |
-| `booksTags` | Junction table linking books to tags |
-| `bookmarks` | Position-based bookmarks within books |
-| `highlights` | Text highlights with notes and colors |
-| `readingSessions` | Reading time tracking (start/end, pages read) |
-| `wantedBooks` | Wishlist items with metadata from external sources |
+| Table              | Description                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `books`            | Core book collection with metadata, file info, and reading state |
+| `collections`      | User-created groupings with hierarchical support                 |
+| `booksCollections` | Junction table linking books to collections                      |
+| `tags`             | Color-coded tags for categorization                              |
+| `booksTags`        | Junction table linking books to tags                             |
+| `bookmarks`        | Position-based bookmarks within books                            |
+| `highlights`       | Text highlights with notes and colors                            |
+| `readingSessions`  | Reading time tracking (start/end, pages read)                    |
+| `wantedBooks`      | Wishlist items with metadata from external sources               |
 
 ## Background Processing
 

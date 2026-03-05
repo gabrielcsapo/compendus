@@ -15,14 +15,22 @@ export async function getTags(profileId?: string): Promise<Tag[]> {
 async function getTag(id: string, profileId?: string): Promise<Tag | null> {
   const conditions = [eq(tags.id, id)];
   if (profileId) conditions.push(eq(tags.profileId, profileId));
-  const result = await db.select().from(tags).where(and(...conditions)).get();
+  const result = await db
+    .select()
+    .from(tags)
+    .where(and(...conditions))
+    .get();
   return result || null;
 }
 
 async function getTagByName(name: string, profileId?: string): Promise<Tag | null> {
   const conditions = [eq(tags.name, name.toLowerCase())];
   if (profileId) conditions.push(eq(tags.profileId, profileId));
-  const result = await db.select().from(tags).where(and(...conditions)).get();
+  const result = await db
+    .select()
+    .from(tags)
+    .where(and(...conditions))
+    .get();
   return result || null;
 }
 
@@ -59,7 +67,11 @@ async function addTagToBook(bookId: string, tagId: string): Promise<boolean> {
   }
 }
 
-export async function addTagToBookByName(bookId: string, tagName: string, profileId?: string): Promise<Tag | null> {
+export async function addTagToBookByName(
+  bookId: string,
+  tagName: string,
+  profileId?: string,
+): Promise<Tag | null> {
   // Create or get existing tag (for this profile if provided)
   const tag = await createTag({ name: tagName }, profileId);
 
@@ -69,7 +81,11 @@ export async function addTagToBookByName(bookId: string, tagName: string, profil
   return tag;
 }
 
-export async function removeTagFromBook(bookId: string, tagId: string, profileId?: string): Promise<boolean> {
+export async function removeTagFromBook(
+  bookId: string,
+  tagId: string,
+  profileId?: string,
+): Promise<boolean> {
   // Verify tag belongs to this profile (if profileId provided)
   const tag = await getTag(tagId, profileId);
   if (!tag) return false;
@@ -121,7 +137,9 @@ export async function getTagsForBook(bookId: string, profileId?: string): Promis
     .where(and(...conditions));
 }
 
-export async function getTagsWithCounts(profileId?: string): Promise<Array<Tag & { count: number }>> {
+export async function getTagsWithCounts(
+  profileId?: string,
+): Promise<Array<Tag & { count: number }>> {
   const allTags = await getTags(profileId);
   const counts = await db
     .select({

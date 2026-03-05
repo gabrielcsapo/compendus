@@ -33,11 +33,14 @@ app.post("/api/books/:id/convert-to-epub", async (c) => {
   }
 
   if (!CONVERTIBLE_FORMATS.includes(book.format)) {
-    return c.json({
-      success: false,
-      error: "not_convertible",
-      message: "Only PDF and MOBI/AZW3 books can be converted to EPUB",
-    }, 400);
+    return c.json(
+      {
+        success: false,
+        error: "not_convertible",
+        message: "Only PDF and MOBI/AZW3 books can be converted to EPUB",
+      },
+      400,
+    );
   }
 
   // Check if already converted (allow force reconversion)

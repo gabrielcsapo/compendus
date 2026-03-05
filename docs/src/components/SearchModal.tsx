@@ -56,9 +56,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         let score = 0;
         const titleLower = entry.title.toLowerCase();
         const contentLower = entry.content.toLowerCase();
-        const headingsLower = entry.headings
-          .join(" ")
-          .toLowerCase();
+        const headingsLower = entry.headings.join(" ").toLowerCase();
 
         if (titleLower === q) score += 100;
         else if (titleLower.startsWith(q)) score += 60;
@@ -131,10 +129,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative w-full max-w-xl mx-4 bg-surface border border-border rounded-xl shadow-xl overflow-hidden">
@@ -167,10 +162,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         </div>
 
         {/* Results */}
-        <div
-          ref={listRef}
-          className="max-h-[50vh] overflow-y-auto py-2"
-        >
+        <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2">
           {results.length === 0 && query.trim() ? (
             <div className="px-4 py-8 text-center text-foreground-muted text-sm">
               No results found for &ldquo;{query}&rdquo;
@@ -208,12 +200,8 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                   )}
                 </svg>
                 <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {entry.title}
-                  </div>
-                  <div className="text-xs opacity-60 truncate">
-                    {entry.section}
-                  </div>
+                  <div className="text-sm font-medium truncate">{entry.title}</div>
+                  <div className="text-xs opacity-60 truncate">{entry.section}</div>
                 </div>
               </button>
             ))

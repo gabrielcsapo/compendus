@@ -67,10 +67,7 @@ async function buildWorkers() {
 
   // Copy pdf.worker.mjs to dist/worker directory
   // pdfjs-dist requires this worker file to exist alongside the bundled parser-worker
-  const pdfWorkerSrc = join(
-    rootDir,
-    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
-  );
+  const pdfWorkerSrc = join(rootDir, "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs");
   const pdfWorkerDest = join(rootDir, "dist/worker/pdf.worker.mjs");
 
   await mkdir(dirname(pdfWorkerDest), { recursive: true });

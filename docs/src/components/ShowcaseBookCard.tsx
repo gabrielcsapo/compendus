@@ -13,12 +13,7 @@ export interface MockBook {
 function TypeIcon({ type }: { type: MockBook["bookType"] }) {
   if (type === "audiobook") {
     return (
-      <svg
-        className="w-3.5 h-3.5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -26,12 +21,7 @@ function TypeIcon({ type }: { type: MockBook["bookType"] }) {
           d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828-2.828"
         />
         <circle cx="12" cy="17" r="1.5" strokeWidth={2} />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 15.5V9"
-        />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5V9" />
       </svg>
     );
   }
@@ -82,12 +72,7 @@ export function ShowcaseBookCard({ book }: { book: MockBook }) {
       {/* Hover overlay */}
       <div className="absolute inset-0 aspect-[2/3] bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none">
         <span className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-medium text-sm shadow-lg">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -101,19 +86,13 @@ export function ShowcaseBookCard({ book }: { book: MockBook }) {
 
       {/* Info */}
       <div className="p-4">
-        <h3 className="font-semibold line-clamp-2 mb-1 text-foreground text-sm">
-          {book.title}
-        </h3>
-        <p className="text-foreground-muted line-clamp-1 text-xs">
-          {book.author}
-        </p>
+        <h3 className="font-semibold line-clamp-2 mb-1 text-foreground text-sm">{book.title}</h3>
+        <p className="text-foreground-muted line-clamp-1 text-xs">{book.author}</p>
 
         {book.series && (
           <p className="line-clamp-1 text-xs mt-0.5">
             {book.seriesNumber && (
-              <span className="text-foreground-muted">
-                #{book.seriesNumber} in{" "}
-              </span>
+              <span className="text-foreground-muted">#{book.seriesNumber} in </span>
             )}
             <span className="text-primary font-medium">{book.series}</span>
           </p>
@@ -128,9 +107,7 @@ export function ShowcaseBookCard({ book }: { book: MockBook }) {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-xs text-foreground-muted mt-1">
-              {progressPercent}%
-            </p>
+            <p className="text-xs text-foreground-muted mt-1">{progressPercent}%</p>
           </div>
         )}
       </div>

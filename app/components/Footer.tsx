@@ -24,10 +24,7 @@ export function Footer({ variant = "full" }: FooterProps) {
               <span>Personal Library Manager</span>
             </div>
             <div className="flex items-center gap-4">
-              <Link
-                to="/docs"
-                className="hover:text-foreground transition-colors"
-              >
+              <Link to="/docs" className="hover:text-foreground transition-colors">
                 API Docs
               </Link>
               <a
@@ -60,8 +57,7 @@ export function Footer({ variant = "full" }: FooterProps) {
               <span className="font-bold text-lg">Compendus</span>
             </Link>
             <p className="text-sm text-foreground-muted">
-              Self-hosted personal library manager for ebooks, audiobooks, and
-              comics.
+              Self-hosted personal library manager for ebooks, audiobooks, and comics.
             </p>
           </div>
 
@@ -154,11 +150,7 @@ export function Footer({ variant = "full" }: FooterProps) {
                   rel="noopener noreferrer"
                   className="text-foreground-muted hover:text-foreground transition-colors inline-flex items-center gap-1.5"
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path
                       fillRule="evenodd"
                       clipRule="evenodd"

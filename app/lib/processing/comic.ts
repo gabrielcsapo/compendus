@@ -267,7 +267,9 @@ export async function convertCbrToCbz(cbrBuffer: Buffer): Promise<Buffer> {
     compression: "STORE",
   });
 
-  console.log(`[CBR→CBZ] Conversion complete, output size: ${(cbzBuffer.length / 1024 / 1024).toFixed(1)}MB`);
+  console.log(
+    `[CBR→CBZ] Conversion complete, output size: ${(cbzBuffer.length / 1024 / 1024).toFixed(1)}MB`,
+  );
 
   return cbzBuffer;
 }

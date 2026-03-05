@@ -11,8 +11,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "lint": "oxfmt && oxlint",
+    "lint": "oxfmt --check && oxlint",
+    "lint:fix": "oxfmt --write && oxlint",
     "make-admin": "tsx scripts/make-admin.ts",
+    "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -64,7 +66,9 @@
     "@vitejs/plugin-react": "5.1.4",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.27.3",
+    "husky": "^9.1.7",
     "knip": "^5.85.0",
+    "lint-staged": "^16.3.2",
     "oxfmt": "0.36.0",
     "oxlint": "1.51.0",
     "puppeteer": "^24.38.0",
@@ -74,6 +78,15 @@
     "vite": "8.0.0-beta.14",
     "vitest": "^4.0.18",
     "wrangler": "^4.70.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "oxfmt --write",
+      "oxlint"
+    ],
+    "*.{json,css,md}": [
+      "oxfmt --write"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [

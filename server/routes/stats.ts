@@ -47,9 +47,7 @@ app.get("/api/stats", (c) => {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-  const recentSessions = allSessions.filter(
-    (s) => toMs(s.startedAt) >= thirtyDaysAgo.getTime(),
-  );
+  const recentSessions = allSessions.filter((s) => toMs(s.startedAt) >= thirtyDaysAgo.getTime());
 
   // Bucket sessions by day
   const dailyMap = new Map<string, number>();
@@ -100,9 +98,7 @@ app.get("/api/stats", (c) => {
   for (const dayStr of sortedDays) {
     const d = new Date(dayStr + "T00:00:00");
     if (prevDate) {
-      const diffDays = Math.round(
-        (d.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const diffDays = Math.round((d.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
       if (diffDays === 1) {
         runStreak++;
       } else {
@@ -122,19 +118,25 @@ app.get("/api/stats", (c) => {
     bookTimeMap.set(s.bookId, (bookTimeMap.get(s.bookId) ?? 0) + mins);
   }
 
-  const topBookIds = [...bookTimeMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  const topBookIds = [...bookTimeMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
 
   // Batch-fetch book details for top books (single query instead of N)
   const topBookIdList = topBookIds.map(([bookId]) => bookId);
-  const topBookRecords = topBookIdList.length > 0
-    ? db.select({ id: books.id, title: books.title, authors: books.authors, coverPath: books.coverPath, updatedAt: books.updatedAt })
-        .from(books)
-        .where(inArray(books.id, topBookIdList))
-        .all()
-    : [];
-  const bookLookup = new Map(topBookRecords.map(b => [b.id, b]));
+  const topBookRecords =
+    topBookIdList.length > 0
+      ? db
+          .select({
+            id: books.id,
+            title: books.title,
+            authors: books.authors,
+            coverPath: books.coverPath,
+            updatedAt: books.updatedAt,
+          })
+          .from(books)
+          .where(inArray(books.id, topBookIdList))
+          .all()
+      : [];
+  const bookLookup = new Map(topBookRecords.map((b) => [b.id, b]));
 
   const topBooks = topBookIds.map(([bookId, minutes]) => {
     const book = bookLookup.get(bookId);

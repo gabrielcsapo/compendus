@@ -212,10 +212,7 @@ export default function AdminProfilesClient() {
     return (
       <div className="text-center py-16">
         <p className="text-foreground-muted mb-4">{error}</p>
-        <button
-          onClick={fetchData}
-          className={`${buttonStyles.base} ${buttonStyles.primary}`}
-        >
+        <button onClick={fetchData} className={`${buttonStyles.base} ${buttonStyles.primary}`}>
           Try Again
         </button>
       </div>
@@ -232,10 +229,7 @@ export default function AdminProfilesClient() {
             {profiles.length} {profiles.length === 1 ? "profile" : "profiles"}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className={`${buttonStyles.base} ${buttonStyles.primary}`}
-        >
+        <button onClick={openCreate} className={`${buttonStyles.base} ${buttonStyles.primary}`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -246,10 +240,7 @@ export default function AdminProfilesClient() {
       {error && (
         <div className="mb-4 px-4 py-3 rounded-lg bg-danger-light text-danger text-sm border border-danger/20">
           {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 underline hover:no-underline"
-          >
+          <button onClick={() => setError(null)} className="ml-2 underline hover:no-underline">
             Dismiss
           </button>
         </div>
@@ -260,8 +251,18 @@ export default function AdminProfilesClient() {
         {profiles.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-surface-elevated flex items-center justify-center">
-              <svg className="w-7 h-7 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <svg
+                className="w-7 h-7 text-foreground-muted"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
               </svg>
             </div>
             <p className="text-foreground-muted">No profiles yet</p>
@@ -292,19 +293,25 @@ export default function AdminProfilesClient() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-foreground">{profile.name}</span>
                       {isSelf && (
-                        <span className={`${badgeStyles.base} ${badgeStyles.primary}`}>
-                          You
-                        </span>
+                        <span className={`${badgeStyles.base} ${badgeStyles.primary}`}>You</span>
                       )}
                       {profile.isAdmin && (
-                        <span className={`${badgeStyles.base} ${badgeStyles.warning}`}>
-                          Admin
-                        </span>
+                        <span className={`${badgeStyles.base} ${badgeStyles.warning}`}>Admin</span>
                       )}
                       {profile.hasPin && (
                         <span className={`${badgeStyles.base} ${badgeStyles.neutral}`}>
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          <svg
+                            className="w-3 h-3 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                            />
                           </svg>
                           PIN
                         </span>
@@ -321,7 +328,13 @@ export default function AdminProfilesClient() {
                     <button
                       onClick={() => toggleAdmin(profile)}
                       disabled={isSelf}
-                      title={isSelf ? "Cannot change your own admin status" : profile.isAdmin ? "Remove admin" : "Make admin"}
+                      title={
+                        isSelf
+                          ? "Cannot change your own admin status"
+                          : profile.isAdmin
+                            ? "Remove admin"
+                            : "Make admin"
+                      }
                       className={`p-2 rounded-lg transition-colors ${
                         isSelf
                           ? "opacity-30 cursor-not-allowed text-foreground-muted"
@@ -330,8 +343,18 @@ export default function AdminProfilesClient() {
                             : "text-foreground-muted hover:bg-surface-elevated hover:text-foreground"
                       }`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                        />
                       </svg>
                     </button>
 
@@ -341,8 +364,18 @@ export default function AdminProfilesClient() {
                       className="p-2 rounded-lg text-foreground-muted hover:bg-surface-elevated hover:text-foreground transition-colors"
                       title="Edit profile"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
                       </svg>
                     </button>
 
@@ -357,8 +390,18 @@ export default function AdminProfilesClient() {
                           : "text-foreground-muted hover:bg-danger-light hover:text-danger"
                       }`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -393,8 +436,18 @@ export default function AdminProfilesClient() {
                       {modalName.charAt(0).toUpperCase()}
                     </span>
                   ) : (
-                    <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <svg
+                      className="w-8 h-8 text-foreground-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                   )}
                 </div>
@@ -402,9 +455,7 @@ export default function AdminProfilesClient() {
 
               {/* Name */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Name
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
                 <input
                   type="text"
                   value={modalName}
@@ -427,7 +478,7 @@ export default function AdminProfilesClient() {
                   value={modalAvatar}
                   onChange={(e) => {
                     const val = e.target.value;
-                    const segments = [...new Intl.Segmenter().segment(val)].map(s => s.segment);
+                    const segments = [...new Intl.Segmenter().segment(val)].map((s) => s.segment);
                     setModalAvatar(segments.length > 0 ? segments[segments.length - 1] : "");
                   }}
                   placeholder="e.g. a book or face emoji"
@@ -534,9 +585,7 @@ export default function AdminProfilesClient() {
                 </div>
               )}
 
-              {modalError && (
-                <p className="text-sm text-danger mb-4">{modalError}</p>
-              )}
+              {modalError && <p className="text-sm text-danger mb-4">{modalError}</p>}
 
               <div className="flex gap-3">
                 <button
@@ -571,8 +620,9 @@ export default function AdminProfilesClient() {
           <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
             <h2 className="text-lg font-semibold text-foreground mb-2">Delete Profile</h2>
             <p className="text-sm text-foreground-muted mb-6">
-              Are you sure you want to delete <strong className="text-foreground">{deletingProfile.name}</strong>?
-              This will remove all their reading progress, highlights, and settings. This action cannot be undone.
+              Are you sure you want to delete{" "}
+              <strong className="text-foreground">{deletingProfile.name}</strong>? This will remove
+              all their reading progress, highlights, and settings. This action cannot be undone.
             </p>
 
             <div className="flex gap-3">

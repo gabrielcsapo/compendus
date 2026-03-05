@@ -62,14 +62,14 @@ export default function Highlights() {
 
   const handleDelete = (highlightId: string) => {
     // Optimistic: remove from local state immediately
-    setData(prev => {
+    setData((prev) => {
       if (!prev) return prev;
       const newGroups = prev.groups
-        .map(g => ({
+        .map((g) => ({
           ...g,
-          highlights: g.highlights.filter(h => h.id !== highlightId),
+          highlights: g.highlights.filter((h) => h.id !== highlightId),
         }))
-        .filter(g => g.highlights.length > 0);
+        .filter((g) => g.highlights.length > 0);
       return { totalCount: prev.totalCount - 1, groups: newGroups };
     });
 
@@ -85,12 +85,12 @@ export default function Highlights() {
 
   const handleUpdateNote = (highlightId: string, note: string | null) => {
     // Optimistic: update in local state immediately
-    setData(prev => {
+    setData((prev) => {
       if (!prev) return prev;
-      const newGroups = prev.groups.map(g => ({
+      const newGroups = prev.groups.map((g) => ({
         ...g,
-        highlights: g.highlights.map(h =>
-          h.id === highlightId ? { ...h, note: note ?? undefined } : h
+        highlights: g.highlights.map((h) =>
+          h.id === highlightId ? { ...h, note: note ?? undefined } : h,
         ),
       }));
       return { ...prev, groups: newGroups };
@@ -123,8 +123,8 @@ export default function Highlights() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Highlights</h1>
         <p className="text-foreground-muted">
-          {totalCount} {totalCount === 1 ? "highlight" : "highlights"} across{" "}
-          {groups.length} {groups.length === 1 ? "book" : "books"}
+          {totalCount} {totalCount === 1 ? "highlight" : "highlights"} across {groups.length}{" "}
+          {groups.length === 1 ? "book" : "books"}
         </p>
       </div>
 
@@ -133,10 +133,7 @@ export default function Highlights() {
           {groups.map((group) => (
             <div key={group.bookId}>
               {/* Book header */}
-              <Link
-                to={`/book/${group.bookId}`}
-                className="flex items-center gap-4 mb-4 group"
-              >
+              <Link to={`/book/${group.bookId}`} className="flex items-center gap-4 mb-4 group">
                 <div className="w-12 h-[4.5rem] rounded-md shadow-sm overflow-hidden">
                   <BookCover
                     book={{
@@ -187,14 +184,11 @@ export default function Highlights() {
                         {/* Metadata */}
                         <div className="flex items-center gap-3 mt-2 text-sm text-foreground-muted">
                           <span>
-                            {new Date(highlight.createdAt).toLocaleDateString(
-                              undefined,
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                            {new Date(highlight.createdAt).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
                           </span>
                         </div>
                       </div>

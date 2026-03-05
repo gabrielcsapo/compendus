@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { updateBook, deleteBook } from "../actions/books";
-import {
-  getTags,
-  addTagToBookByName,
-  removeTagFromBook,
-} from "../actions/tags";
+import { getTags, addTagToBookByName, removeTagFromBook } from "../actions/tags";
 import { getDistinctSeries, getDistinctAuthors } from "../actions/batch";
 import { CoverExtractButton } from "./CoverExtractButton";
 import { CoverUploadButton } from "./CoverUploadButton";
@@ -16,15 +12,61 @@ import type { Book, Tag } from "../lib/db/schema";
 import type { BookFormat } from "../lib/types";
 
 const LANGUAGES = [
-  "", "English", "Spanish", "French", "German", "Italian", "Portuguese",
-  "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi", "Dutch",
-  "Swedish", "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Turkish",
-  "Greek", "Hebrew", "Thai", "Vietnamese", "Indonesian", "Malay", "Romanian",
-  "Hungarian", "Bulgarian", "Croatian", "Serbian", "Slovak", "Slovenian",
-  "Ukrainian", "Lithuanian", "Latvian", "Estonian", "Catalan", "Basque",
-  "Galician", "Welsh", "Irish", "Scottish Gaelic", "Icelandic", "Farsi",
-  "Urdu", "Bengali", "Tamil", "Telugu", "Kannada", "Malayalam", "Swahili",
-  "Afrikaans", "Latin",
+  "",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Arabic",
+  "Hindi",
+  "Dutch",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Polish",
+  "Czech",
+  "Turkish",
+  "Greek",
+  "Hebrew",
+  "Thai",
+  "Vietnamese",
+  "Indonesian",
+  "Malay",
+  "Romanian",
+  "Hungarian",
+  "Bulgarian",
+  "Croatian",
+  "Serbian",
+  "Slovak",
+  "Slovenian",
+  "Ukrainian",
+  "Lithuanian",
+  "Latvian",
+  "Estonian",
+  "Catalan",
+  "Basque",
+  "Galician",
+  "Welsh",
+  "Irish",
+  "Scottish Gaelic",
+  "Icelandic",
+  "Farsi",
+  "Urdu",
+  "Bengali",
+  "Tamil",
+  "Telugu",
+  "Kannada",
+  "Malayalam",
+  "Swahili",
+  "Afrikaans",
+  "Latin",
 ];
 
 interface EditBookModalProps {
@@ -67,9 +109,7 @@ export function EditBookModal({
   const [pageCount, setPageCount] = useState(book.pageCount?.toString() || "");
   const [series, setSeries] = useState(book.series || "");
   const [seriesNumber, setSeriesNumber] = useState(book.seriesNumber || "");
-  const [bookTypeOverride, setBookTypeOverride] = useState(
-    book.bookTypeOverride || "",
-  );
+  const [bookTypeOverride, setBookTypeOverride] = useState(book.bookTypeOverride || "");
 
   const [bookTags, setBookTags] = useState<Tag[]>(currentTags);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -231,13 +271,9 @@ export function EditBookModal({
   };
 
   // Filter tags for dropdown (exclude already added)
-  const availableTags = allTags.filter(
-    (tag) => !bookTags.some((bt) => bt.id === tag.id),
-  );
+  const availableTags = allTags.filter((tag) => !bookTags.some((bt) => bt.id === tag.id));
   const filteredTags = newTagName
-    ? availableTags.filter((tag) =>
-        tag.name.toLowerCase().includes(newTagName.toLowerCase()),
-      )
+    ? availableTags.filter((tag) => tag.name.toLowerCase().includes(newTagName.toLowerCase()))
     : availableTags;
 
   if (!isOpen) return null;
@@ -251,20 +287,13 @@ export function EditBookModal({
       <div className="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-foreground">
-            Edit Book Details
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground">Edit Book Details</h2>
           <button
             onClick={handleClose}
             disabled={isSubmitting}
             className="text-foreground-muted hover:text-foreground disabled:opacity-50"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -280,10 +309,7 @@ export function EditBookModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Title */}
             <div className="md:col-span-2">
-              <label
-                htmlFor="title"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="title" className="block text-sm font-medium text-foreground mb-1">
                 Title <span className="text-error">*</span>
               </label>
               <input
@@ -298,10 +324,7 @@ export function EditBookModal({
 
             {/* Subtitle */}
             <div className="md:col-span-2">
-              <label
-                htmlFor="subtitle"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="subtitle" className="block text-sm font-medium text-foreground mb-1">
                 Subtitle
               </label>
               <input
@@ -316,14 +339,8 @@ export function EditBookModal({
 
             {/* Authors */}
             <div className="md:col-span-2">
-              <label
-                htmlFor="authors"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
-                Authors{" "}
-                <span className="text-foreground-muted text-xs">
-                  (comma-separated)
-                </span>
+              <label htmlFor="authors" className="block text-sm font-medium text-foreground mb-1">
+                Authors <span className="text-foreground-muted text-xs">(comma-separated)</span>
               </label>
               <input
                 type="text"
@@ -344,10 +361,7 @@ export function EditBookModal({
 
             {/* Publisher */}
             <div>
-              <label
-                htmlFor="publisher"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="publisher" className="block text-sm font-medium text-foreground mb-1">
                 Publisher
               </label>
               <input
@@ -381,10 +395,7 @@ export function EditBookModal({
 
             {/* ISBN */}
             <div>
-              <label
-                htmlFor="isbn"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="isbn" className="block text-sm font-medium text-foreground mb-1">
                 ISBN
               </label>
               <input
@@ -400,10 +411,7 @@ export function EditBookModal({
 
             {/* Language */}
             <div>
-              <label
-                htmlFor="language"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="language" className="block text-sm font-medium text-foreground mb-1">
                 Language
               </label>
               <select
@@ -423,10 +431,7 @@ export function EditBookModal({
 
             {/* Page Count */}
             <div>
-              <label
-                htmlFor="pageCount"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="pageCount" className="block text-sm font-medium text-foreground mb-1">
                 Page Count
               </label>
               <input
@@ -442,10 +447,7 @@ export function EditBookModal({
 
             {/* Series */}
             <div>
-              <label
-                htmlFor="series"
-                className="block text-sm font-medium text-foreground mb-1"
-              >
+              <label htmlFor="series" className="block text-sm font-medium text-foreground mb-1">
                 Series
               </label>
               <input
@@ -502,16 +504,13 @@ export function EditBookModal({
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               >
-                <option value="">
-                  Auto (based on file format: {book.format})
-                </option>
+                <option value="">Auto (based on file format: {book.format})</option>
                 <option value="ebook">eBook</option>
                 <option value="comic">Comic</option>
                 <option value="audiobook">Audiobook</option>
               </select>
               <p className="mt-1 text-xs text-foreground-muted">
-                Use this to treat an EPUB as a comic, or change how the book
-                appears in filters.
+                Use this to treat an EPUB as a comic, or change how the book appears in filters.
               </p>
             </div>
 
@@ -535,9 +534,7 @@ export function EditBookModal({
 
             {/* Tags */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Tags
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-2">Tags</label>
 
               <div className="relative">
                 <div className="flex flex-wrap items-center gap-1.5 border border-border rounded-lg px-3 py-2 bg-background min-h-[42px] focus-within:ring-2 focus-within:ring-primary focus-within:border-primary">
@@ -600,10 +597,7 @@ export function EditBookModal({
                 {showTagDropdown && (newTagName || filteredTags.length > 0) && (
                   <div className="absolute z-10 w-full mt-1 bg-surface border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {newTagName &&
-                      !allTags.some(
-                        (t) =>
-                          t.name.toLowerCase() === newTagName.toLowerCase(),
-                      ) && (
+                      !allTags.some((t) => t.name.toLowerCase() === newTagName.toLowerCase()) && (
                         <button
                           type="button"
                           onClick={() => handleAddTag(newTagName)}
@@ -650,10 +644,7 @@ export function EditBookModal({
 
               {/* Click outside to close dropdown */}
               {showTagDropdown && (
-                <div
-                  className="fixed inset-0 z-0"
-                  onClick={() => setShowTagDropdown(false)}
-                />
+                <div className="fixed inset-0 z-0" onClick={() => setShowTagDropdown(false)} />
               )}
             </div>
           </div>
@@ -755,9 +746,7 @@ export function EditBookModal({
                   This will permanently remove the book file, cover image, and all associated data
                   including bookmarks, highlights, and reading progress.
                 </p>
-                {deleteError && (
-                  <p className="text-xs text-error mb-2">{deleteError}</p>
-                )}
+                {deleteError && <p className="text-xs text-error mb-2">{deleteError}</p>}
                 <div className="flex gap-2">
                   <button
                     type="button"

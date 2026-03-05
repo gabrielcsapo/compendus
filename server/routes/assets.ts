@@ -7,11 +7,7 @@ import { extractEpubResource } from "../../app/lib/processing/epub";
 import { convertMobiToEpub } from "../../app/lib/processing/mobi-to-epub";
 import { db, books } from "../../app/lib/db";
 import type { BookFormat } from "../../app/lib/types";
-import {
-  getFileStat,
-  streamFileResponse,
-  serveCachedResource,
-} from "../lib/file-serving";
+import { getFileStat, streamFileResponse, serveCachedResource } from "../lib/file-serving";
 
 const app = new Hono();
 
@@ -117,7 +113,9 @@ app.get("/books/:id/as-epub", async (c) => {
         })
         .where(eq(books.id, bookId));
 
-      console.log(`[as-epub] Conversion complete for ${bookId} (${(epubFileStat.size / 1024).toFixed(1)} KB)`);
+      console.log(
+        `[as-epub] Conversion complete for ${bookId} (${(epubFileStat.size / 1024).toFixed(1)} KB)`,
+      );
 
       return new Response(new Uint8Array(epubBuffer), {
         headers: {

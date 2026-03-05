@@ -1,13 +1,7 @@
 import { Hono } from "hono";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import {
-  db,
-  userBookState,
-  highlights,
-  bookmarks,
-  readingSessions,
-} from "../../app/lib/db";
+import { db, userBookState, highlights, bookmarks, readingSessions } from "../../app/lib/db";
 import { requireProfile } from "../middleware/profile";
 
 const app = new Hono();
@@ -85,21 +79,13 @@ app.put("/api/sync/reading-progress", async (c) => {
   }>();
 
   if (!body.bookId) {
-    return c.json(
-      { success: false, error: "bookId is required", code: "VALIDATION" },
-      400,
-    );
+    return c.json({ success: false, error: "bookId is required", code: "VALIDATION" }, 400);
   }
 
   const existing = db
     .select()
     .from(userBookState)
-    .where(
-      and(
-        eq(userBookState.profileId, profileId),
-        eq(userBookState.bookId, body.bookId),
-      ),
-    )
+    .where(and(eq(userBookState.profileId, profileId), eq(userBookState.bookId, body.bookId)))
     .get();
 
   // Conflict resolution: if client sends updatedAt, check if server is newer
@@ -128,20 +114,14 @@ app.put("/api/sync/reading-progress", async (c) => {
   try {
     if (existing) {
       const updates: Record<string, unknown> = { updatedAt: now };
-      if (body.readingProgress !== undefined)
-        updates.readingProgress = body.readingProgress;
-      if (body.lastPosition !== undefined)
-        updates.lastPosition = body.lastPosition;
-      if (body.lastReadAt !== undefined)
-        updates.lastReadAt = new Date(body.lastReadAt);
+      if (body.readingProgress !== undefined) updates.readingProgress = body.readingProgress;
+      if (body.lastPosition !== undefined) updates.lastPosition = body.lastPosition;
+      if (body.lastReadAt !== undefined) updates.lastReadAt = new Date(body.lastReadAt);
       if (body.isRead !== undefined) updates.isRead = body.isRead;
       if (body.rating !== undefined) updates.rating = body.rating;
       if (body.review !== undefined) updates.review = body.review;
 
-      db.update(userBookState)
-        .set(updates)
-        .where(eq(userBookState.id, existing.id))
-        .run();
+      db.update(userBookState).set(updates).where(eq(userBookState.id, existing.id)).run();
     } else {
       db.insert(userBookState)
         .values({
@@ -237,10 +217,18 @@ app.post("/api/sync/highlights", async (c) => {
   const now = new Date();
 
   // Batch-fetch existing highlights by ID (single query instead of N)
-  const highlightIds = body.highlights.map(h => h.id);
-  const existingHighlights = highlightIds.length > 0
-    ? new Map(db.select().from(highlights).where(inArray(highlights.id, highlightIds)).all().map(h => [h.id, h]))
-    : new Map();
+  const highlightIds = body.highlights.map((h) => h.id);
+  const existingHighlights =
+    highlightIds.length > 0
+      ? new Map(
+          db
+            .select()
+            .from(highlights)
+            .where(inArray(highlights.id, highlightIds))
+            .all()
+            .map((h) => [h.id, h]),
+        )
+      : new Map();
 
   for (const h of body.highlights) {
     try {
@@ -305,10 +293,7 @@ app.delete("/api/sync/highlights/:id", (c) => {
     .get();
 
   if (!existing) {
-    return c.json(
-      { success: false, error: "Highlight not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Highlight not found", code: "NOT_FOUND" }, 404);
   }
 
   db.update(highlights)
@@ -382,10 +367,18 @@ app.post("/api/sync/bookmarks", async (c) => {
   const now = new Date();
 
   // Batch-fetch existing bookmarks by ID (single query instead of N)
-  const bookmarkIds = body.bookmarks.map(b => b.id);
-  const existingBookmarks = bookmarkIds.length > 0
-    ? new Map(db.select().from(bookmarks).where(inArray(bookmarks.id, bookmarkIds)).all().map(b => [b.id, b]))
-    : new Map();
+  const bookmarkIds = body.bookmarks.map((b) => b.id);
+  const existingBookmarks =
+    bookmarkIds.length > 0
+      ? new Map(
+          db
+            .select()
+            .from(bookmarks)
+            .where(inArray(bookmarks.id, bookmarkIds))
+            .all()
+            .map((b) => [b.id, b]),
+        )
+      : new Map();
 
   for (const b of body.bookmarks) {
     try {
@@ -447,10 +440,7 @@ app.delete("/api/sync/bookmarks/:id", (c) => {
     .get();
 
   if (!existing) {
-    return c.json(
-      { success: false, error: "Bookmark not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Bookmark not found", code: "NOT_FOUND" }, 404);
   }
 
   db.update(bookmarks)
@@ -518,10 +508,18 @@ app.post("/api/sync/reading-sessions", async (c) => {
   }>();
 
   // Batch-fetch existing session IDs (single query instead of N)
-  const sessionIds = body.sessions.map(s => s.id);
-  const existingSessionIds = sessionIds.length > 0
-    ? new Set(db.select({ id: readingSessions.id }).from(readingSessions).where(inArray(readingSessions.id, sessionIds)).all().map(s => s.id))
-    : new Set<string>();
+  const sessionIds = body.sessions.map((s) => s.id);
+  const existingSessionIds =
+    sessionIds.length > 0
+      ? new Set(
+          db
+            .select({ id: readingSessions.id })
+            .from(readingSessions)
+            .where(inArray(readingSessions.id, sessionIds))
+            .all()
+            .map((s) => s.id),
+        )
+      : new Set<string>();
 
   for (const s of body.sessions) {
     try {

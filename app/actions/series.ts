@@ -193,18 +193,21 @@ export async function findMissingSeriesBooks(seriesName: string): Promise<Metada
  * Used to show "In a different format" section on series detail pages.
  */
 export async function getSeriesBooksOtherFormats(seriesName: string, currentType: BookType) {
-  const otherTypes = (["audiobook", "ebook", "comic"] as BookType[]).filter(t => t !== currentType);
+  const otherTypes = (["audiobook", "ebook", "comic"] as BookType[]).filter(
+    (t) => t !== currentType,
+  );
 
-  const conditions = [
-    eq(books.series, seriesName),
-  ];
+  const conditions = [eq(books.series, seriesName)];
 
   // Build OR condition for all other types
-  const typeConditions = otherTypes.map(otherType => {
+  const typeConditions = otherTypes.map((otherType) => {
     const formats = getFormatsByType(otherType);
     return or(
       and(
-        sql`${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)})`,
+        sql`${books.format} IN (${sql.join(
+          formats.map((f) => sql`${f}`),
+          sql`, `,
+        )})`,
         sql`${books.bookTypeOverride} IS NULL`,
       ),
       eq(books.bookTypeOverride, otherType),
@@ -245,7 +248,10 @@ export async function getSeriesWithCovers(type?: BookType): Promise<SeriesWithCo
     conditions.push(
       or(
         and(
-          sql`${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)})`,
+          sql`${books.format} IN (${sql.join(
+            formats.map((f) => sql`${f}`),
+            sql`, `,
+          )})`,
           sql`${books.bookTypeOverride} IS NULL`,
         ),
         eq(books.bookTypeOverride, type),
@@ -283,9 +289,9 @@ export async function getSeriesWithCovers(type?: BookType): Promise<SeriesWithCo
           coverColor: book.coverColor,
           updatedAt: book.updatedAt,
         });
-      } else if (book.coverPath && existing.coverBooks.some(b => !b.coverPath)) {
+      } else if (book.coverPath && existing.coverBooks.some((b) => !b.coverPath)) {
         // Replace a book without cover with one that has a cover
-        const noCoverIndex = existing.coverBooks.findIndex(b => !b.coverPath);
+        const noCoverIndex = existing.coverBooks.findIndex((b) => !b.coverPath);
         if (noCoverIndex !== -1) {
           existing.coverBooks[noCoverIndex] = {
             id: book.id,
@@ -299,12 +305,14 @@ export async function getSeriesWithCovers(type?: BookType): Promise<SeriesWithCo
       seriesMap.set(book.series, {
         name: book.series,
         bookCount: 1,
-        coverBooks: [{
-          id: book.id,
-          coverPath: book.coverPath,
-          coverColor: book.coverColor,
-          updatedAt: book.updatedAt,
-        }],
+        coverBooks: [
+          {
+            id: book.id,
+            coverPath: book.coverPath,
+            coverColor: book.coverColor,
+            updatedAt: book.updatedAt,
+          },
+        ],
       });
     }
   }

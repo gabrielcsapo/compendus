@@ -184,11 +184,7 @@
     "slug": "index",
     "path": "/docs",
     "section": "Overview",
-    "headings": [
-      "Quick Links",
-      "Features",
-      "Tech Stack"
-    ],
+    "headings": ["Quick Links", "Features", "Tech Stack"],
     "content": "Compendus Documentation\nCompendus is a self-hosted personal digital library manager. Upload,\norganize, and read books across web and iOS with automatic metadata,\nfull-text search, and reading progress tracking.\nQuick Links\n- Getting Started — Install and run Compendus locally\n- API Reference — Browse all REST API endpoints\n- Architecture — Understand the technical design\n- Supported Formats — View all supported file types\n- iOS App — Set up the native iOS client\nFeatures\n- Multi-Format Support — Read and manage PDF, EPUB, MOBI, CBR, CBZ ebooks, M4B/MP3/M4A audiobooks, and comic archives.\n- Automatic Metadata — Fetch book metadata, covers, and descriptions from Google Books and Open Library automatically.\n- Reading Progress — Track reading progress, create highlights with notes, bookmark pages, and log reading sessions.\n- iOS & Web — Native iOS app with custom EPUB/PDF reader engine plus a full-featured responsive web interface.\n- Full-Text Search — Search across titles, authors, descriptions, and optionally within book content itself.\n- Collections & Tags — Organize your library with hierarchical collections, color-coded tags, and series tracking.\nTech Stack\nReact 19, Vite, Hono, SQLite, Tailwind CSS, Drizzle ORM, SwiftUI, SwiftData"
   },
   {

@@ -24,18 +24,9 @@ export default function App() {
 
       {/* Documentation — sidebar layout */}
       <Route path="docs" element={<DocsLayout />}>
-        <Route
-          index
-          element={<MdxPage Component={GettingStartedContent} />}
-        />
-        <Route
-          path="getting-started"
-          element={<MdxPage Component={GettingStartedContent} />}
-        />
-        <Route
-          path="architecture"
-          element={<MdxPage Component={ArchitectureContent} />}
-        />
+        <Route index element={<MdxPage Component={GettingStartedContent} />} />
+        <Route path="getting-started" element={<MdxPage Component={GettingStartedContent} />} />
+        <Route path="architecture" element={<MdxPage Component={ArchitectureContent} />} />
         <Route path="ios" element={<MdxPage Component={IOSContent} />} />
         <Route path="api" element={<ApiReference />} />
         <Route path="formats" element={<Formats />} />

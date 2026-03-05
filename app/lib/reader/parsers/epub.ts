@@ -49,11 +49,7 @@ function sanitizeHtml(html: string, bookId: string): string {
         /(<img[^>]*\s+src\s*=\s*["'])([^"']+)(["'][^>]*>)/gi,
         (match, before, src, after) => {
           // Skip absolute URLs and data URIs
-          if (
-            src.startsWith("http://") ||
-            src.startsWith("https://") ||
-            src.startsWith("data:")
-          ) {
+          if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) {
             return match;
           }
           // Handle absolute filesystem paths (from epub-parser extracting to disk)
@@ -71,11 +67,7 @@ function sanitizeHtml(html: string, bookId: string): string {
       .replace(
         /(<(?:video|audio|source)[^>]*\s+src\s*=\s*["'])([^"']+)(["'][^>]*>)/gi,
         (match, before, src, after) => {
-          if (
-            src.startsWith("http://") ||
-            src.startsWith("https://") ||
-            src.startsWith("data:")
-          ) {
+          if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) {
             return match;
           }
           if (src.startsWith("/") && src.includes("/images/")) {
@@ -116,10 +108,7 @@ function sanitizeHtml(html: string, bookId: string): string {
 /**
  * Parse EPUB file into normalized content for the reader
  */
-export async function parseEpub(
-  buffer: Buffer,
-  bookId: string,
-): Promise<TextContent> {
+export async function parseEpub(buffer: Buffer, bookId: string): Promise<TextContent> {
   // Create book-specific directory for extracted resources
   const resourceDir = resolve(process.cwd(), "images", bookId);
   mkdirSync(resourceDir, { recursive: true });
@@ -236,12 +225,8 @@ function buildToc(
 ): TocEntry[] {
   return rawToc.map((item) => {
     // Find the chapter that matches this TOC entry
-    const chapter = chapters.find(
-      (ch) => ch.id.includes(item.href) || item.href.includes(ch.id),
-    );
-    const position = chapter
-      ? chapter.characterStart / Math.max(1, totalCharacters)
-      : 0;
+    const chapter = chapters.find((ch) => ch.id.includes(item.href) || item.href.includes(ch.id));
+    const position = chapter ? chapter.characterStart / Math.max(1, totalCharacters) : 0;
 
     const entry: TocEntry = {
       title: item.label,
@@ -249,11 +234,7 @@ function buildToc(
       level,
     };
 
-    if (
-      item.children &&
-      Array.isArray(item.children) &&
-      item.children.length > 0
-    ) {
+    if (item.children && Array.isArray(item.children) && item.children.length > 0) {
       entry.children = buildToc(
         item.children as Array<{
           label: string;

@@ -13,9 +13,25 @@ const GAP = 20; // matches gap-5 (1.25rem = 20px)
 function LoadingSpinner() {
   return (
     <div className="flex items-center gap-2 text-foreground-muted">
-      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <svg
+        className="animate-spin h-5 w-5"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        />
       </svg>
       <span className="text-sm">Loading more books...</span>
     </div>
@@ -81,15 +97,18 @@ export function InfiniteBookGrid({
     setHasMore(initialBooks.length < totalCount);
   }, [initialBooks, totalCount]);
 
-  const buildFetchUrl = useCallback((offset: number) => {
-    const params = new URLSearchParams();
-    params.set("offset", String(offset));
-    if (currentSort !== "recent") params.set("sort", currentSort);
-    if (currentType !== "all") params.set("type", currentType);
-    if (currentFormats.length > 0) params.set("format", currentFormats.join(","));
-    if (seriesFilter) params.set("series", seriesFilter);
-    return `/api/library?${params.toString()}`;
-  }, [currentSort, currentType, currentFormats, seriesFilter]);
+  const buildFetchUrl = useCallback(
+    (offset: number) => {
+      const params = new URLSearchParams();
+      params.set("offset", String(offset));
+      if (currentSort !== "recent") params.set("sort", currentSort);
+      if (currentType !== "all") params.set("type", currentType);
+      if (currentFormats.length > 0) params.set("format", currentFormats.join(","));
+      if (seriesFilter) params.set("series", seriesFilter);
+      return `/api/library?${params.toString()}`;
+    },
+    [currentSort, currentType, currentFormats, seriesFilter],
+  );
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
@@ -105,7 +124,7 @@ export function InfiniteBookGrid({
         lastReadAt: b.lastReadAt ? new Date(b.lastReadAt as string) : null,
         importedAt: b.importedAt ? new Date(b.importedAt as string) : null,
       }));
-      setBooks(prev => [...prev, ...newBooks]);
+      setBooks((prev) => [...prev, ...newBooks]);
       if (newBooks.length < BOOKS_PER_PAGE) {
         setHasMore(false);
       }

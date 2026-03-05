@@ -82,7 +82,12 @@ function rewriteUrlsForPreview(html: string, bookId: string, fileDir: string): s
   const baseUrl = `/api/reader/${bookId}/resource`;
 
   function resolveUrl(href: string): string {
-    if (href.startsWith("http") || href.startsWith("//") || href.startsWith("data:") || href.startsWith("#")) {
+    if (
+      href.startsWith("http") ||
+      href.startsWith("//") ||
+      href.startsWith("data:") ||
+      href.startsWith("#")
+    ) {
       return href;
     }
     const fullPath = resolveRelativePath(fileDir, href);
@@ -121,13 +126,10 @@ function rewriteUrlsForPreview(html: string, bookId: string, fileDir: string): s
         (_, before, src, after) => `${before}${resolveUrl(src)}${after}`,
       )
       // Rewrite url() in inline styles
-      .replace(
-        /(url\(["']?)([^)"']+)(["']?\))/gi,
-        (_, before, url, after) => {
-          if (url.startsWith("http") || url.startsWith("data:")) return `${before}${url}${after}`;
-          return `${before}${resolveUrl(url)}${after}`;
-        },
-      )
+      .replace(/(url\(["']?)([^)"']+)(["']?\))/gi, (_, before, url, after) => {
+        if (url.startsWith("http") || url.startsWith("data:")) return `${before}${url}${after}`;
+        return `${before}${resolveUrl(url)}${after}`;
+      })
   );
 }
 
@@ -188,9 +190,8 @@ function injectPreviewHelpers(html: string): string {
 export function EditorPreview({ content, filePath, bookId, onNavigate }: EditorPreviewProps) {
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const isTextFile = filePath.endsWith(".xhtml") ||
-    filePath.endsWith(".html") ||
-    filePath.endsWith(".htm");
+  const isTextFile =
+    filePath.endsWith(".xhtml") || filePath.endsWith(".html") || filePath.endsWith(".htm");
 
   const isCssFile = filePath.endsWith(".css");
 
@@ -253,8 +254,17 @@ export function EditorPreview({ content, filePath, bookId, onNavigate }: EditorP
     return (
       <div className="flex-1 flex items-center justify-center text-foreground-muted text-sm border-l border-border bg-surface-elevated">
         <div className="text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 mx-auto mb-2 opacity-30">
-            <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625Z" clipRule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="w-8 h-8 mx-auto mb-2 opacity-30"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625Z"
+              clipRule="evenodd"
+            />
           </svg>
           <p>Preview not available for this file type</p>
         </div>
@@ -272,7 +282,12 @@ export function EditorPreview({ content, filePath, bookId, onNavigate }: EditorP
           className="hover:text-foreground transition-colors"
           title="Refresh preview"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className="w-3.5 h-3.5"
+          >
             <path
               fillRule="evenodd"
               d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.681.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-.908l.84.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 13.199 11a6 6 0 0 1-9.44.908l-.84-.84v1.836a.75.75 0 0 1-1.5 0V9.723a.75.75 0 0 1 .75-.75h3.182a.75.75 0 0 1 0 1.5H4.07l.84.841a4.5 4.5 0 0 0 7.08-.681.75.75 0 0 1 1.025-.274l-.091.068Z"

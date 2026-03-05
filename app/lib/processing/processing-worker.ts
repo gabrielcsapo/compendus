@@ -75,10 +75,7 @@ export interface WorkerResult {
   error?: string;
 }
 
-async function extractMetadata(
-  buffer: Buffer,
-  format: BookFormat,
-): Promise<BookMetadata> {
+async function extractMetadata(buffer: Buffer, format: BookFormat): Promise<BookMetadata> {
   switch (format) {
     case "pdf":
       return (await getExtractPdfMetadata())(buffer);
@@ -101,9 +98,7 @@ async function extractMetadata(
 
 async function handleTask(task: WorkerTask): Promise<unknown> {
   // Ensure buffer is a proper Buffer (serialization may convert to Uint8Array)
-  const buffer = Buffer.isBuffer(task.buffer)
-    ? task.buffer
-    : Buffer.from(task.buffer);
+  const buffer = Buffer.isBuffer(task.buffer) ? task.buffer : Buffer.from(task.buffer);
 
   switch (task.type) {
     case "extractMetadata":

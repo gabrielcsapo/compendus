@@ -46,9 +46,7 @@ export function EditorToolbar({
       <div className="w-px h-5 bg-border" />
 
       {/* Book title */}
-      <span className="text-sm text-foreground-muted truncate max-w-48">
-        {bookTitle}
-      </span>
+      <span className="text-sm text-foreground-muted truncate max-w-48">{bookTitle}</span>
 
       {/* Active file */}
       {activeFile && (

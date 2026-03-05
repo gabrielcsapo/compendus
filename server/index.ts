@@ -144,7 +144,8 @@ app.all("/api/*", (c) => {
         upload: "POST /api/upload (multipart/form-data with 'file' field)",
         uploadCover: "POST /api/books/:id/cover (multipart/form-data with 'cover' field)",
         wishlist: "GET /api/wishlist?status=<status>&series=<series>&limit=<limit>",
-        wishlistByIsbn: "POST /api/wishlist/isbn/:isbn (JSON body: {status?, priority?, notes?, title?, author?})",
+        wishlistByIsbn:
+          "POST /api/wishlist/isbn/:isbn (JSON body: {status?, priority?, notes?, title?, author?})",
         readerPdfPage: "GET /api/reader/:bookId/pdf-page/:pageNum?scale=2.0 (returns PNG)",
         readerResource: "GET /api/reader/:bookId/resource/* (returns EPUB embedded resources)",
         convertToEpub: "POST /api/books/:id/convert-to-epub (converts PDF to EPUB)",

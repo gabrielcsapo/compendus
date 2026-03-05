@@ -69,7 +69,11 @@ export async function convertMobiToEpub(
 
     // Use parser metadata as fallback for missing fields
     const title = metadata.title || parserMetadata.title || "Untitled";
-    const authors = metadata.authors?.length ? metadata.authors : parserMetadata.author?.length ? parserMetadata.author : ["Unknown"];
+    const authors = metadata.authors?.length
+      ? metadata.authors
+      : parserMetadata.author?.length
+        ? parserMetadata.author
+        : ["Unknown"];
     const language = metadata.language || parserMetadata.language || "en";
 
     // Extract chapters
@@ -152,10 +156,7 @@ export async function convertMobiToEpub(
  * Initialize both MOBI and KF8 parsers and pick the one with more content.
  * AZW3 files are KF8 format; many MOBIs are dual-format.
  */
-async function initBestParser(
-  data: Uint8Array,
-  resourceSaveDir: string,
-): Promise<MobiParser> {
+async function initBestParser(data: Uint8Array, resourceSaveDir: string): Promise<MobiParser> {
   let mobiParser: MobiParser | null = null;
   let kf8Parser: MobiParser | null = null;
 
@@ -258,10 +259,7 @@ function sanitizeChapterHtml(html: string): string {
   // Ensure XHTML self-closing tags
   sanitized = sanitized.replace(/<br\s*>/gi, "<br/>");
   sanitized = sanitized.replace(/<hr\s*>/gi, "<hr/>");
-  sanitized = sanitized.replace(
-    /<img([^>]*[^/])>/gi,
-    "<img$1/>",
-  );
+  sanitized = sanitized.replace(/<img([^>]*[^/])>/gi, "<img$1/>");
 
   // Fix bare ampersands (but not already-escaped entities)
   sanitized = sanitized.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/g, "&amp;");
@@ -290,7 +288,8 @@ function flattenToc(
     for (const entry of entries) {
       // Try to match TOC entry to a chapter file
       const matchedChapter = chapterFiles.find(
-        (_ch, i) => entry.href.includes(`chapter-${i + 1}`) || entry.href.includes(chapterFiles[i]?.id),
+        (_ch, i) =>
+          entry.href.includes(`chapter-${i + 1}`) || entry.href.includes(chapterFiles[i]?.id),
       );
       result.push({
         label: entry.label,
@@ -405,8 +404,7 @@ img {
     `    <item id="styles" href="styles.css" media-type="text/css"/>`,
     `    <item id="toc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
     ...chapterFiles.map(
-      (ch) =>
-        `    <item id="${ch.id}" href="${ch.href}" media-type="application/xhtml+xml"/>`,
+      (ch) => `    <item id="${ch.id}" href="${ch.href}" media-type="application/xhtml+xml"/>`,
     ),
     ...images.map((img) => {
       const props = img.id === coverImageId ? ` properties="cover-image"` : "";
@@ -414,9 +412,7 @@ img {
     }),
   ].join("\n");
 
-  const spineItems = chapterFiles
-    .map((ch) => `    <itemref idref="${ch.id}"/>`)
-    .join("\n");
+  const spineItems = chapterFiles.map((ch) => `    <itemref idref="${ch.id}"/>`).join("\n");
 
   zip.file(
     "OEBPS/content.opf",
@@ -448,10 +444,7 @@ ${spineItems}
       .join("\n");
   } else {
     tocListItems = chapterFiles
-      .map(
-        (ch) =>
-          `      <li><a href="${ch.href}">${escapeHtml(ch.title)}</a></li>`,
-      )
+      .map((ch) => `      <li><a href="${ch.href}">${escapeHtml(ch.title)}</a></li>`)
       .join("\n");
   }
 

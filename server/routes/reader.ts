@@ -56,7 +56,9 @@ app.get("/api/reader/:bookId/pdf-page/:pageNum", async (c) => {
 app.get("/api/reader/:bookId/resource/*", async (c) => {
   try {
     const bookId = c.req.param("bookId");
-    const resourcePath = decodeURIComponent(c.req.path.replace(`/api/reader/${bookId}/resource/`, ""));
+    const resourcePath = decodeURIComponent(
+      c.req.path.replace(`/api/reader/${bookId}/resource/`, ""),
+    );
 
     // Get book to find the file
     const book = await db.query.books.findFirst({

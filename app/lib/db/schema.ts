@@ -17,9 +17,7 @@ export const profiles = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (table) => [
-    uniqueIndex("idx_profiles_name").on(table.name),
-  ],
+  (table) => [uniqueIndex("idx_profiles_name").on(table.name)],
 );
 
 // Per-user reading state for each book (replaces reading state columns on books table)
@@ -37,8 +35,8 @@ export const userBookState = sqliteTable(
     lastReadAt: integer("last_read_at", { mode: "timestamp" }),
     lastPosition: text("last_position"), // JSON: {type, spineIndex, charOffset, progress} or {type, page, progress}
     isRead: integer("is_read", { mode: "boolean" }).default(false),
-    rating: integer("rating"),       // 1-5, null = unrated
-    review: text("review"),          // free-text, null = no review
+    rating: integer("rating"), // 1-5, null = unrated
+    review: text("review"), // free-text, null = no review
     updatedAt: integer("updated_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -124,8 +122,8 @@ export const books = sqliteTable(
     lastReadAt: integer("last_read_at", { mode: "timestamp" }),
     lastPosition: text("last_position"),
     isRead: integer("is_read", { mode: "boolean" }).default(false),
-    rating: integer("rating"),       // 1-5, null = unrated
-    review: text("review"),          // free-text, null = no review
+    rating: integer("rating"), // 1-5, null = unrated
+    review: text("review"), // free-text, null = no review
 
     // Timestamps
     createdAt: integer("created_at", { mode: "timestamp" })

@@ -87,7 +87,12 @@ export function useEditorSession(bookId: string) {
   );
 
   const addNewFile = useCallback(
-    async (path: string, content: string, mediaType: string, addToSpine: boolean = false): Promise<void> => {
+    async (
+      path: string,
+      content: string,
+      mediaType: string,
+      addToSpine: boolean = false,
+    ): Promise<void> => {
       const res = await fetch(`/api/editor/${bookId}/file/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

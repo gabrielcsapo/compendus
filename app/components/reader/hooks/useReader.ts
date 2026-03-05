@@ -107,7 +107,11 @@ interface UseReaderReturn {
 /**
  * Main hook for the unified reader
  */
-export function useReader({ bookId, initialPosition = 0, formatOverride }: UseReaderOptions): UseReaderReturn {
+export function useReader({
+  bookId,
+  initialPosition = 0,
+  formatOverride,
+}: UseReaderOptions): UseReaderReturn {
   const viewport = useViewport();
   const { settings, updateGlobalSetting, updateBookSetting } = useReaderSettings(bookId);
 
@@ -215,7 +219,7 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
         } else {
           setError("Failed to load book");
         }
-      } catch (err) {
+      } catch {
         setError("Failed to connect to server");
       } finally {
         setLoading(false);
@@ -267,7 +271,12 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
 
           // In spread mode, also fetch the right page if available
           if (isSpreadMode && currentPage < bookInfo.totalPages) {
-            const rightData = await getReaderPage(bookId, currentPage + 1, viewportConfig, formatOverride);
+            const rightData = await getReaderPage(
+              bookId,
+              currentPage + 1,
+              viewportConfig,
+              formatOverride,
+            );
             if (rightData) {
               setRightPageContent(rightData.content);
             } else {
@@ -368,12 +377,12 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
   }, [currentPage]);
 
   useEffect(() => {
-    const totalPages = isColumnPaginated && clientTotalPages !== null
-      ? clientTotalPages
-      : bookInfo?.totalPages || 0;
-    const pos = isColumnPaginated && totalPages > 0
-      ? (currentPage - 1) / totalPages
-      : pageContent?.position ?? 0;
+    const totalPages =
+      isColumnPaginated && clientTotalPages !== null ? clientTotalPages : bookInfo?.totalPages || 0;
+    const pos =
+      isColumnPaginated && totalPages > 0
+        ? (currentPage - 1) / totalPages
+        : (pageContent?.position ?? 0);
     currentPositionRef.current = pos;
   }, [currentPage, pageContent, isColumnPaginated, clientTotalPages, bookInfo]);
 
@@ -418,9 +427,8 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
   }, [bookId, bookInfo]); // Only depend on bookId and bookInfo — we read current values from refs
 
   // The effective total pages (client-reported for column pagination, server for others)
-  const effectiveTotalPages = isColumnPaginated && clientTotalPages !== null
-    ? clientTotalPages
-    : bookInfo?.totalPages || 0;
+  const effectiveTotalPages =
+    isColumnPaginated && clientTotalPages !== null ? clientTotalPages : bookInfo?.totalPages || 0;
 
   // Callback for client to report total pages from CSS column measurement
   const setClientTotalPagesCallback = useCallback(
@@ -462,7 +470,12 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
           return;
         }
 
-        const data = await getReaderPageForPosition(bookId, position, viewportConfig, formatOverride);
+        const data = await getReaderPageForPosition(
+          bookId,
+          position,
+          viewportConfig,
+          formatOverride,
+        );
         if (data) {
           setCurrentPage(data.pageNum);
           setPageContent(data.content);
@@ -471,7 +484,15 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
         console.error("Failed to go to position:", err);
       }
     },
-    [bookId, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, isColumnPaginated, effectiveTotalPages],
+    [
+      bookId,
+      viewport.width,
+      viewport.height,
+      settings.fontSize,
+      settings.lineHeight,
+      isColumnPaginated,
+      effectiveTotalPages,
+    ],
   );
 
   // In spread mode, move by 2 pages
@@ -546,37 +567,25 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
     }
   }, []);
 
-  const updateHighlightNote = useCallback(
-    async (highlightId: string, note: string | null) => {
-      try {
-        await updateHighlightNoteAction(highlightId, note);
-        setHighlights((prev) =>
-          prev.map((h) =>
-            h.id === highlightId ? { ...h, note: note ?? undefined } : h,
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to update highlight note:", err);
-      }
-    },
-    [],
-  );
+  const updateHighlightNote = useCallback(async (highlightId: string, note: string | null) => {
+    try {
+      await updateHighlightNoteAction(highlightId, note);
+      setHighlights((prev) =>
+        prev.map((h) => (h.id === highlightId ? { ...h, note: note ?? undefined } : h)),
+      );
+    } catch (err) {
+      console.error("Failed to update highlight note:", err);
+    }
+  }, []);
 
-  const updateHighlightColor = useCallback(
-    async (highlightId: string, color: string) => {
-      try {
-        await updateHighlightColorAction(highlightId, color);
-        setHighlights((prev) =>
-          prev.map((h) =>
-            h.id === highlightId ? { ...h, color } : h,
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to update highlight color:", err);
-      }
-    },
-    [],
-  );
+  const updateHighlightColor = useCallback(async (highlightId: string, color: string) => {
+    try {
+      await updateHighlightColorAction(highlightId, color);
+      setHighlights((prev) => prev.map((h) => (h.id === highlightId ? { ...h, color } : h)));
+    } catch (err) {
+      console.error("Failed to update highlight color:", err);
+    }
+  }, []);
 
   // Search function
   const searchBook = useCallback(
@@ -588,12 +597,7 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
       }
       setSearching(true);
       try {
-        const results = await searchContentAction(
-          bookId,
-          query,
-          viewportConfig,
-          formatOverride,
-        );
+        const results = await searchContentAction(bookId, query, viewportConfig, formatOverride);
         setSearchResults(results);
       } catch (err) {
         console.error("Search failed:", err);
@@ -602,13 +606,19 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
         setSearching(false);
       }
     },
-    [bookId, viewport.width, viewport.height, settings.fontSize, settings.lineHeight, formatOverride],
+    [
+      bookId,
+      viewport.width,
+      viewport.height,
+      settings.fontSize,
+      settings.lineHeight,
+      formatOverride,
+    ],
   );
 
   // Compute position for column-paginated content
-  const columnPosition = isColumnPaginated && effectiveTotalPages > 0
-    ? (currentPage - 1) / effectiveTotalPages
-    : null;
+  const columnPosition =
+    isColumnPaginated && effectiveTotalPages > 0 ? (currentPage - 1) / effectiveTotalPages : null;
 
   // Save progress
   const saveProgress = useCallback(async () => {
@@ -666,7 +676,14 @@ export function useReader({ bookId, initialPosition = 0, formatOverride }: UseRe
     error,
     currentPage,
     totalPages: effectiveTotalPages,
-    pageContent: isColumnPaginated ? { type: "text" as const, position: columnPosition ?? 0, endPosition: effectiveTotalPages > 0 ? currentPage / effectiveTotalPages : 1, chapterTitle } : pageContent,
+    pageContent: isColumnPaginated
+      ? {
+          type: "text" as const,
+          position: columnPosition ?? 0,
+          endPosition: effectiveTotalPages > 0 ? currentPage / effectiveTotalPages : 1,
+          chapterTitle,
+        }
+      : pageContent,
     rightPageContent,
     position: columnPosition ?? pageContent?.position ?? 0,
     isSpreadMode,

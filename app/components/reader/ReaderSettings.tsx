@@ -225,7 +225,9 @@ export function ReaderSettings({
               <div
                 className="w-10 h-6 rounded-full relative transition-colors"
                 style={{
-                  backgroundColor: settings.usePublisherStyles ? theme.accent : `${theme.foreground}30`,
+                  backgroundColor: settings.usePublisherStyles
+                    ? theme.accent
+                    : `${theme.foreground}30`,
                 }}
               >
                 <div

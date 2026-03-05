@@ -24,15 +24,11 @@ interface ParseRequest {
 async function parseBook(request: ParseRequest): Promise<NormalizedContent> {
   const { format, bookId } = request;
   // Ensure buffer is a proper Buffer - workerData serialization converts to Uint8Array
-  const buffer = Buffer.isBuffer(request.buffer)
-    ? request.buffer
-    : Buffer.from(request.buffer);
+  const buffer = Buffer.isBuffer(request.buffer) ? request.buffer : Buffer.from(request.buffer);
   const startTime = performance.now();
   const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(1);
 
-  console.log(
-    `[Parser Worker] Starting ${format} parse for ${bookId} (${fileSizeMB}MB)`,
-  );
+  console.log(`[Parser Worker] Starting ${format} parse for ${bookId} (${fileSizeMB}MB)`);
 
   let result: NormalizedContent;
 
@@ -68,9 +64,7 @@ async function parseBook(request: ParseRequest): Promise<NormalizedContent> {
   }
 
   const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-  console.log(
-    `[Parser Worker] Completed ${format} parse for ${bookId} in ${duration}s`,
-  );
+  console.log(`[Parser Worker] Completed ${format} parse for ${bookId} in ${duration}s`);
 
   return result;
 }

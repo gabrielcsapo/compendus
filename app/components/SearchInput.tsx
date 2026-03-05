@@ -13,12 +13,7 @@ export function SearchInput() {
       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-elevated hover:bg-surface border border-border text-foreground-muted hover:text-foreground transition-colors"
       aria-label="Search books"
     >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"

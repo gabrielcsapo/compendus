@@ -155,7 +155,11 @@ export async function streamFileResponse(
 /**
  * Create a ReadableStream from a file range.
  */
-function createFileStream(filePath: string, start: number, end: number): ReadableStream<Uint8Array> {
+function createFileStream(
+  filePath: string,
+  start: number,
+  end: number,
+): ReadableStream<Uint8Array> {
   const stream = createReadStream(filePath, { start, end });
   return new ReadableStream({
     start(controller) {

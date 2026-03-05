@@ -46,7 +46,9 @@ export async function renderPdfPage(
     result = await converter(pageNumber, { responseType: "buffer" });
   } catch (error) {
     console.error(`[PDF] Error rendering page ${pageNumber} for book ${bookId}:`, error);
-    throw new Error(`Failed to render PDF page ${pageNumber}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    throw new Error(
+      `Failed to render PDF page ${pageNumber}: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
   }
 
   if (!result.buffer) {

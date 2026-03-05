@@ -59,7 +59,8 @@ export default function LibraryPage() {
   const seriesFilter = searchParams.get("series");
   const sort = (searchParams.get("sort") as SortOption) || "recent";
   const typeParam = searchParams.get("type") as BookType | null;
-  const type: TypeFilter = typeParam && ["audiobook", "ebook", "comic"].includes(typeParam) ? typeParam : "all";
+  const type: TypeFilter =
+    typeParam && ["audiobook", "ebook", "comic"].includes(typeParam) ? typeParam : "all";
   const formatParam = searchParams.get("format");
   const format = formatParam ? formatParam.split(",").filter(Boolean) : undefined;
 
@@ -74,9 +75,9 @@ export default function LibraryPage() {
       // Series grid view
       if (view === "series") {
         const rawSeriesList = await getSeriesWithCovers(typeFilter);
-        const seriesList = rawSeriesList.map(s => ({
+        const seriesList = rawSeriesList.map((s) => ({
           ...s,
-          coverBooks: s.coverBooks.map(b => ({
+          coverBooks: s.coverBooks.map((b) => ({
             id: b.id,
             coverUrl: getCoverUrl(b),
           })),
@@ -96,14 +97,26 @@ export default function LibraryPage() {
         };
       }
 
-      const [books, totalCount, unmatchedCount, formatCounts, otherFormatBooks] = await Promise.all([
-        getBooks({ limit: BOOKS_PER_PAGE, offset: 0, orderBy, order, type: typeFilter, format, series: seriesFilter || undefined }),
-        getBooksCount(typeFilter, format, seriesFilter || undefined),
-        getUnmatchedBooksCount(),
-        getFormatCounts(typeFilter),
-        // When viewing a series with a type filter, also get books in other formats
-        seriesFilter && typeFilter ? getSeriesBooksOtherFormats(seriesFilter, typeFilter) : Promise.resolve([]),
-      ]);
+      const [books, totalCount, unmatchedCount, formatCounts, otherFormatBooks] = await Promise.all(
+        [
+          getBooks({
+            limit: BOOKS_PER_PAGE,
+            offset: 0,
+            orderBy,
+            order,
+            type: typeFilter,
+            format,
+            series: seriesFilter || undefined,
+          }),
+          getBooksCount(typeFilter, format, seriesFilter || undefined),
+          getUnmatchedBooksCount(),
+          getFormatCounts(typeFilter),
+          // When viewing a series with a type filter, also get books in other formats
+          seriesFilter && typeFilter
+            ? getSeriesBooksOtherFormats(seriesFilter, typeFilter)
+            : Promise.resolve([]),
+        ],
+      );
 
       return {
         view: "books" as const,
@@ -120,14 +133,16 @@ export default function LibraryPage() {
       };
     }
 
-    loadData().then(result => {
+    loadData().then((result) => {
       if (!cancelled) {
         setData(result);
         setLoading(false);
       }
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams.toString()]);
 
   if (loading || !data) {
@@ -141,9 +156,17 @@ export default function LibraryPage() {
   }
 
   const {
-    view: currentView, seriesList, seriesFilter: currentSeriesFilter,
-    books, totalCount, unmatchedCount,
-    currentSort, currentType, currentFormats, formatCounts, otherFormatBooks,
+    view: currentView,
+    seriesList,
+    seriesFilter: currentSeriesFilter,
+    books,
+    totalCount,
+    unmatchedCount,
+    currentSort,
+    currentType,
+    currentFormats,
+    formatCounts,
+    otherFormatBooks,
   } = data;
 
   return (
@@ -155,7 +178,10 @@ export default function LibraryPage() {
             {currentSeriesFilter ? (
               <>
                 <div className="flex items-center gap-2 mb-1">
-                  <Link to={`/library?view=series${currentType !== "all" ? `&type=${currentType}` : ""}`} className="text-sm text-primary hover:text-primary-hover transition-colors">
+                  <Link
+                    to={`/library?view=series${currentType !== "all" ? `&type=${currentType}` : ""}`}
+                    className="text-sm text-primary hover:text-primary-hover transition-colors"
+                  >
                     &larr; All Series
                   </Link>
                 </div>
@@ -168,12 +194,13 @@ export default function LibraryPage() {
               <>
                 <h1 className="text-2xl font-bold text-foreground">Library</h1>
                 <p className="text-foreground-muted">
-                  {currentView === "series"
-                    ? `${seriesList.length} ${seriesList.length === 1 ? "series" : "series"}`
-                    : <>
-                        {totalCount} {totalCount === 1 ? "book" : "books"}
-                      </>
-                  }
+                  {currentView === "series" ? (
+                    `${seriesList.length} ${seriesList.length === 1 ? "series" : "series"}`
+                  ) : (
+                    <>
+                      {totalCount} {totalCount === 1 ? "book" : "books"}
+                    </>
+                  )}
                 </p>
               </>
             )}
@@ -203,7 +230,12 @@ export default function LibraryPage() {
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-foreground-muted hover:text-foreground hover:bg-surface-elevated rounded-lg transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                    />
                   </svg>
                   Collections
                 </Link>
@@ -212,7 +244,12 @@ export default function LibraryPage() {
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-foreground-muted hover:text-foreground hover:bg-surface-elevated rounded-lg transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    />
                   </svg>
                   Tags
                 </Link>
@@ -233,7 +270,12 @@ export default function LibraryPage() {
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
                 </svg>
                 Books
               </Link>
@@ -246,12 +288,22 @@ export default function LibraryPage() {
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
                 </svg>
                 Series
               </Link>
             </div>
-            <TypeTabs currentType={currentType} currentSort={currentSort} currentView={currentView} basePath="/library" />
+            <TypeTabs
+              currentType={currentType}
+              currentSort={currentSort}
+              currentView={currentView}
+              basePath="/library"
+            />
             {currentView !== "series" && (
               <>
                 {formatCounts.length > 1 && (
@@ -277,12 +329,24 @@ export default function LibraryPage() {
           {seriesList.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-elevated flex items-center justify-center">
-                <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                <svg
+                  className="w-8 h-8 text-foreground-muted"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
                 </svg>
               </div>
               <p className="text-foreground-muted">No series found in your library.</p>
-              <p className="text-foreground-muted/60 text-sm mt-1">Books with series metadata will appear here.</p>
+              <p className="text-foreground-muted/60 text-sm mt-1">
+                Books with series metadata will appear here.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -309,7 +373,11 @@ export default function LibraryPage() {
               currentType={currentType}
               currentFormats={currentFormats}
               seriesFilter={currentSeriesFilter}
-              emptyMessage={currentSeriesFilter ? "No books found in this series." : "Your library is empty. Drop some books above to get started!"}
+              emptyMessage={
+                currentSeriesFilter
+                  ? "No books found in this series."
+                  : "Your library is empty. Drop some books above to get started!"
+              }
             />
           </section>
 
@@ -318,7 +386,8 @@ export default function LibraryPage() {
             <section className="mt-10 pt-8 border-t border-border">
               <h2 className="text-lg font-semibold mb-1 text-foreground">In a different format</h2>
               <p className="text-sm text-foreground-muted mb-4">
-                {otherFormatBooks.length} {otherFormatBooks.length === 1 ? "book" : "books"} from this series in other formats
+                {otherFormatBooks.length} {otherFormatBooks.length === 1 ? "book" : "books"} from
+                this series in other formats
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
                 {otherFormatBooks.map((book) => (
@@ -333,7 +402,9 @@ export default function LibraryPage() {
                         }
                       />
                     </div>
-                    <p className="text-xs font-medium mt-1 text-foreground line-clamp-1">{book.title}</p>
+                    <p className="text-xs font-medium mt-1 text-foreground line-clamp-1">
+                      {book.title}
+                    </p>
                     <p className="text-[10px] text-foreground-muted uppercase">{book.format}</p>
                   </Link>
                 ))}

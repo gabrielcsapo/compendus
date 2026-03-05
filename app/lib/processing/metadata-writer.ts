@@ -19,7 +19,9 @@ async function safeWriteFile(targetPath: string, content: Buffer): Promise<void>
     await writeFile(tempPath, content);
     await rename(tempPath, targetPath);
   } catch (error) {
-    try { await unlink(tempPath); } catch {}
+    try {
+      await unlink(tempPath);
+    } catch {}
     throw error;
   }
 }
@@ -46,7 +48,9 @@ async function atomicReplace(tempPath: string, targetPath: string): Promise<void
   try {
     await rename(tempPath, targetPath);
   } catch (error) {
-    try { await unlink(tempPath); } catch {}
+    try {
+      await unlink(tempPath);
+    } catch {}
     throw error;
   }
 }
@@ -132,9 +136,7 @@ async function writeEpubMetadata(
   const zip = await JSZip.loadAsync(buffer);
 
   // Step 2: Find the OPF file path from container.xml
-  const containerXml = await zip
-    .file("META-INF/container.xml")
-    ?.async("string");
+  const containerXml = await zip.file("META-INF/container.xml")?.async("string");
   if (!containerXml) {
     return {
       success: false,
@@ -171,9 +173,7 @@ async function writeEpubMetadata(
   let coverEmbedded = false;
   if (metadata.coverImage) {
     // Determine the directory where OPF lives to place cover alongside it
-    const opfDir = opfPath.includes("/")
-      ? opfPath.substring(0, opfPath.lastIndexOf("/"))
-      : "";
+    const opfDir = opfPath.includes("/") ? opfPath.substring(0, opfPath.lastIndexOf("/")) : "";
     const coverFileName = "cover.jpg";
     const coverPath = opfDir ? `${opfDir}/${coverFileName}` : coverFileName;
 
@@ -207,10 +207,7 @@ function addCoverToOpf(opfContent: string, coverFileName: string): string {
   let result = opfContent;
 
   // Remove any existing cover-image manifest item
-  result = result.replace(
-    /<item[^>]*id=["']cover-image["'][^>]*(?:\/>|>[^<]*<\/item>)\s*/gi,
-    "",
-  );
+  result = result.replace(/<item[^>]*id=["']cover-image["'][^>]*(?:\/>|>[^<]*<\/item>)\s*/gi, "");
 
   // Remove any existing cover meta element
   result = result.replace(/<meta\s+name=["']cover["'][^>]*\/>\s*/gi, "");
@@ -219,20 +216,14 @@ function addCoverToOpf(opfContent: string, coverFileName: string): string {
   const manifestEnd = result.match(/<\/manifest>/i);
   if (manifestEnd && manifestEnd.index !== undefined) {
     const manifestItem = `    <item id="cover-image" href="${escapeXml(coverFileName)}" media-type="image/jpeg"/>\n  `;
-    result =
-      result.slice(0, manifestEnd.index) +
-      manifestItem +
-      result.slice(manifestEnd.index);
+    result = result.slice(0, manifestEnd.index) + manifestItem + result.slice(manifestEnd.index);
   }
 
   // Add meta cover element before </metadata>
   const metadataEnd = result.match(/<\/(?:opf:)?metadata>/i);
   if (metadataEnd && metadataEnd.index !== undefined) {
     const metaElement = `    <meta name="cover" content="cover-image"/>\n  `;
-    result =
-      result.slice(0, metadataEnd.index) +
-      metaElement +
-      result.slice(metadataEnd.index);
+    result = result.slice(0, metadataEnd.index) + metaElement + result.slice(metadataEnd.index);
   }
 
   return result;
@@ -242,10 +233,7 @@ function addCoverToOpf(opfContent: string, coverFileName: string): string {
  * Update Dublin Core metadata elements in OPF XML content.
  * Uses regex-based manipulation to avoid XML parser dependency.
  */
-function updateOpfMetadata(
-  opfContent: string,
-  metadata: WritableMetadata,
-): string {
+function updateOpfMetadata(opfContent: string, metadata: WritableMetadata): string {
   let result = opfContent;
 
   // Update title
@@ -254,10 +242,7 @@ function updateOpfMetadata(
   // Update creators (authors) - remove existing and add new
   if (metadata.authors.length > 0) {
     // Remove existing dc:creator elements
-    result = result.replace(
-      /<(?:dc:)?creator[^>]*>[^<]*<\/(?:dc:)?creator>\s*/gi,
-      "",
-    );
+    result = result.replace(/<(?:dc:)?creator[^>]*>[^<]*<\/(?:dc:)?creator>\s*/gi, "");
 
     // Add new creator elements before </metadata>
     const metadataEnd = result.match(/<\/(?:opf:)?metadata>/i);
@@ -266,10 +251,7 @@ function updateOpfMetadata(
         .map((author) => `    <dc:creator>${escapeXml(author)}</dc:creator>`)
         .join("\n");
       result =
-        result.slice(0, metadataEnd.index) +
-        creators +
-        "\n  " +
-        result.slice(metadataEnd.index);
+        result.slice(0, metadataEnd.index) + creators + "\n  " + result.slice(metadataEnd.index);
     }
   }
 
@@ -291,10 +273,7 @@ function updateOpfMetadata(
     const metadataEnd = result.match(/<\/(?:opf:)?metadata>/i);
     if (metadataEnd && metadataEnd.index !== undefined) {
       result =
-        result.slice(0, metadataEnd.index) +
-        newIsbn +
-        "\n  " +
-        result.slice(metadataEnd.index);
+        result.slice(0, metadataEnd.index) + newIsbn + "\n  " + result.slice(metadataEnd.index);
     }
   }
 
@@ -302,10 +281,7 @@ function updateOpfMetadata(
   if (metadata.series) {
     // Remove existing calibre series meta
     result = result.replace(/<meta\s+name="calibre:series"[^>]*\/>\s*/gi, "");
-    result = result.replace(
-      /<meta\s+name="calibre:series_index"[^>]*\/>\s*/gi,
-      "",
-    );
+    result = result.replace(/<meta\s+name="calibre:series_index"[^>]*\/>\s*/gi, "");
 
     const metadataEnd = result.match(/<\/(?:opf:)?metadata>/i);
     if (metadataEnd && metadataEnd.index !== undefined) {
@@ -314,10 +290,7 @@ function updateOpfMetadata(
         seriesMeta += `\n    <meta name="calibre:series_index" content="${escapeXml(metadata.seriesNumber)}" />`;
       }
       result =
-        result.slice(0, metadataEnd.index) +
-        seriesMeta +
-        "\n  " +
-        result.slice(metadataEnd.index);
+        result.slice(0, metadataEnd.index) + seriesMeta + "\n  " + result.slice(metadataEnd.index);
     }
   }
 
@@ -337,10 +310,7 @@ function updateDcElement(
   const escaped = escapeXml(value);
 
   // Pattern to match existing element (handles namespace prefix)
-  const pattern = new RegExp(
-    `(<(?:dc:)?${element}[^>]*>)[^<]*(</(?:dc:)?${element}>)`,
-    "i",
-  );
+  const pattern = new RegExp(`(<(?:dc:)?${element}[^>]*>)[^<]*(</(?:dc:)?${element}>)`, "i");
 
   if (pattern.test(content)) {
     // Replace existing element content
@@ -351,11 +321,7 @@ function updateDcElement(
   const metadataEnd = content.match(/<\/(?:opf:)?metadata>/i);
   if (metadataEnd && metadataEnd.index !== undefined) {
     const newElement = `    <dc:${element}>${escaped}</dc:${element}>\n  `;
-    return (
-      content.slice(0, metadataEnd.index) +
-      newElement +
-      content.slice(metadataEnd.index)
-    );
+    return content.slice(0, metadataEnd.index) + newElement + content.slice(metadataEnd.index);
   }
 
   return content;
@@ -509,8 +475,7 @@ async function writeMp3Metadata(
   return {
     success: false,
     format: "mp3",
-    error:
-      result instanceof Error ? result.message : "Failed to write ID3 tags",
+    error: result instanceof Error ? result.message : "Failed to write ID3 tags",
   };
 }
 
@@ -584,25 +549,38 @@ async function writeMp3MetadataWithFfmpeg(
     let ffmpegArgs: string[];
     if (coverTempPath) {
       ffmpegArgs = [
-        "-i", filePath,
-        "-i", coverTempPath,
-        "-map", "0:a",
-        "-map", "1:v",
-        "-c:a", "copy",
-        "-c:v", "mjpeg",
-        "-id3v2_version", "3",
-        "-disposition:v:0", "attached_pic",
+        "-i",
+        filePath,
+        "-i",
+        coverTempPath,
+        "-map",
+        "0:a",
+        "-map",
+        "1:v",
+        "-c:a",
+        "copy",
+        "-c:v",
+        "mjpeg",
+        "-id3v2_version",
+        "3",
+        "-disposition:v:0",
+        "attached_pic",
         ...metadataArgs,
-        "-y", tempPath,
+        "-y",
+        tempPath,
       ];
       coverEmbedded = true;
     } else {
       ffmpegArgs = [
-        "-i", filePath,
-        "-c", "copy",
-        "-id3v2_version", "3",
+        "-i",
+        filePath,
+        "-c",
+        "copy",
+        "-id3v2_version",
+        "3",
         ...metadataArgs,
-        "-y", tempPath,
+        "-y",
+        tempPath,
       ];
     }
 
@@ -627,7 +605,9 @@ async function writeMp3MetadataWithFfmpeg(
 
     return { success: true, format: "mp3", coverEmbedded };
   } catch (error) {
-    try { await unlink(tempPath); } catch {}
+    try {
+      await unlink(tempPath);
+    } catch {}
     return {
       success: false,
       format: "mp3",
@@ -635,7 +615,9 @@ async function writeMp3MetadataWithFfmpeg(
     };
   } finally {
     if (coverTempPath) {
-      try { await unlink(coverTempPath); } catch {}
+      try {
+        await unlink(coverTempPath);
+      } catch {}
     }
   }
 }
@@ -717,25 +699,28 @@ async function writeM4Metadata(
     if (coverTempPath) {
       // With cover: map audio from input 0, video (cover) from input 1
       ffmpegArgs = [
-        "-i", filePath,
-        "-i", coverTempPath,
-        "-map", "0:a",
-        "-map", "1:v",
-        "-c:a", "copy",
-        "-c:v", "mjpeg",
-        "-disposition:v:0", "attached_pic",
+        "-i",
+        filePath,
+        "-i",
+        coverTempPath,
+        "-map",
+        "0:a",
+        "-map",
+        "1:v",
+        "-c:a",
+        "copy",
+        "-c:v",
+        "mjpeg",
+        "-disposition:v:0",
+        "attached_pic",
         ...metadataArgs,
-        "-y", tempPath,
+        "-y",
+        tempPath,
       ];
       coverEmbedded = true;
     } else {
       // Without cover: just copy all streams
-      ffmpegArgs = [
-        "-i", filePath,
-        "-c", "copy",
-        ...metadataArgs,
-        "-y", tempPath,
-      ];
+      ffmpegArgs = ["-i", filePath, "-c", "copy", ...metadataArgs, "-y", tempPath];
     }
 
     // Use spawn instead of exec to avoid buffering all output in memory
@@ -771,10 +756,7 @@ async function writeM4Metadata(
     return {
       success: false,
       format,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to write M4B/M4A metadata",
+      error: error instanceof Error ? error.message : "Failed to write M4B/M4A metadata",
     };
   } finally {
     // Clean up cover temp file

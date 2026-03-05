@@ -10,61 +10,66 @@ export function apiPlugin(): Plugin {
     name: "compendus-api",
     configureServer(server: ViteDevServer) {
       // Start the background job processor in dev mode
-      server.ssrLoadModule("/app/lib/queue.ts").then(({ startJobProcessor }) => {
-        startJobProcessor();
-      }).catch((err) => {
-        console.error("[API Plugin] Failed to start job processor:", err);
-      });
+      server
+        .ssrLoadModule("/app/lib/queue.ts")
+        .then(({ startJobProcessor }) => {
+          startJobProcessor();
+        })
+        .catch((err) => {
+          console.error("[API Plugin] Failed to start job processor:", err);
+        });
 
-      server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-        const url = req.url || "";
+      server.middlewares.use(
+        async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+          const url = req.url || "";
 
-        // Check if this is an API/asset route that should be handled by Hono
-        if (
-          url.startsWith("/api/") ||
-          url.startsWith("/books/") ||
-          url.startsWith("/covers/") ||
-          url.startsWith("/comic/") ||
-          url.startsWith("/mobi-images/") ||
-          isBookResource(url)
-        ) {
-          try {
-            const { app } = await server.ssrLoadModule("/server/index.ts");
-            const webRequest = toWebRequest(req);
-            const response: Response = await app.fetch(webRequest);
-            await writeWebResponse(res, response);
-          } catch (error) {
-            console.error("[API Plugin] Error:", error);
-            res.statusCode = 500;
-            res.end("Internal Server Error");
-          }
-          return;
-        }
-
-        // Profile gate: redirect page requests to /profiles if no profile selected.
-        // In dev, page routes bypass Hono, so we need this check here too.
-        if (isPageRoute(url)) {
-          try {
-            const { app } = await server.ssrLoadModule("/server/index.ts");
-            // Run the profile gate through the full Hono app so profileMiddleware sets context
-            const webRequest = toWebRequest(req);
-            const response: Response = await app.fetch(webRequest);
-            if (response.status === 302) {
-              const location = response.headers.get("location");
-              if (location) {
-                res.writeHead(302, { Location: location });
-                res.end();
-                return;
-              }
+          // Check if this is an API/asset route that should be handled by Hono
+          if (
+            url.startsWith("/api/") ||
+            url.startsWith("/books/") ||
+            url.startsWith("/covers/") ||
+            url.startsWith("/comic/") ||
+            url.startsWith("/mobi-images/") ||
+            isBookResource(url)
+          ) {
+            try {
+              const { app } = await server.ssrLoadModule("/server/index.ts");
+              const webRequest = toWebRequest(req);
+              const response: Response = await app.fetch(webRequest);
+              await writeWebResponse(res, response);
+            } catch (error) {
+              console.error("[API Plugin] Error:", error);
+              res.statusCode = 500;
+              res.end("Internal Server Error");
             }
-          } catch (error) {
-            // If profile gate check fails, let the page through
-            console.warn("[API Plugin] Profile gate check failed:", error);
+            return;
           }
-        }
 
-        next();
-      });
+          // Profile gate: redirect page requests to /profiles if no profile selected.
+          // In dev, page routes bypass Hono, so we need this check here too.
+          if (isPageRoute(url)) {
+            try {
+              const { app } = await server.ssrLoadModule("/server/index.ts");
+              // Run the profile gate through the full Hono app so profileMiddleware sets context
+              const webRequest = toWebRequest(req);
+              const response: Response = await app.fetch(webRequest);
+              if (response.status === 302) {
+                const location = response.headers.get("location");
+                if (location) {
+                  res.writeHead(302, { Location: location });
+                  res.end();
+                  return;
+                }
+              }
+            } catch (error) {
+              // If profile gate check fails, let the page through
+              console.warn("[API Plugin] Profile gate check failed:", error);
+            }
+          }
+
+          next();
+        },
+      );
     },
   };
 }

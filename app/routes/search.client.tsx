@@ -49,10 +49,13 @@ export default function Search() {
   const query = searchParams.get("q") || "";
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const typeParam = searchParams.get("type") as BookType | null;
-  const type = typeParam && ["ebook", "audiobook", "comic"].includes(typeParam) ? typeParam : undefined;
+  const type =
+    typeParam && ["ebook", "audiobook", "comic"].includes(typeParam) ? typeParam : undefined;
   const missingParam = searchParams.get("missing");
   const missing = missingParam
-    ? (missingParam.split(",").filter((f) => VALID_MISSING_FIELDS.includes(f as MissingField)) as MissingField[])
+    ? (missingParam
+        .split(",")
+        .filter((f) => VALID_MISSING_FIELDS.includes(f as MissingField)) as MissingField[])
     : [];
   const hasQuery = query.trim().length >= 2;
   const hasMissing = missing.length > 0;
@@ -98,7 +101,8 @@ export default function Search() {
 
       // Filter out "content" for the search API (handled separately) and cast to valid types
       const validSearchIn = searchIn.filter(
-        (s): s is "title" | "subtitle" | "authors" | "description" => ["title", "subtitle", "authors", "description"].includes(s)
+        (s): s is "title" | "subtitle" | "authors" | "description" =>
+          ["title", "subtitle", "authors", "description"].includes(s),
       );
       const searchOpts = {
         searchIn: validSearchIn.length > 0 ? validSearchIn : undefined,
@@ -113,17 +117,28 @@ export default function Search() {
 
       const totalPages = Math.ceil(totalCount / RESULTS_PER_PAGE);
 
-      return { query, results, searchIn, type: type ?? ("all" as const), missing, currentPage: page, totalPages, totalCount };
+      return {
+        query,
+        results,
+        searchIn,
+        type: type ?? ("all" as const),
+        missing,
+        currentPage: page,
+        totalPages,
+        totalCount,
+      };
     }
 
-    loadData().then(result => {
+    loadData().then((result) => {
       if (!cancelled) {
         setData(result);
         setLoading(false);
       }
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams.toString()]);
 
   if (loading || !data) {
@@ -291,10 +306,18 @@ export default function Search() {
             </svg>
           </div>
           <p className="text-foreground-muted mb-2">
-            {query ? `No books found matching "${query}"` : missing.length > 0 ? "No books found with missing fields" : "No books in your library"}
+            {query
+              ? `No books found matching "${query}"`
+              : missing.length > 0
+                ? "No books found with missing fields"
+                : "No books in your library"}
           </p>
           <p className="text-foreground-muted/60 text-sm">
-            {query ? "Try different keywords or enable Full Text search" : missing.length > 0 ? "All your books have complete metadata!" : ""}
+            {query
+              ? "Try different keywords or enable Full Text search"
+              : missing.length > 0
+                ? "All your books have complete metadata!"
+                : ""}
           </p>
         </div>
       )}
@@ -362,7 +385,13 @@ function InlineSearchInput({
   );
 }
 
-function buildSearchUrl(query: string, searchIn: string[], type?: string, missing?: string[], page?: number) {
+function buildSearchUrl(
+  query: string,
+  searchIn: string[],
+  type?: string,
+  missing?: string[],
+  page?: number,
+) {
   const params = new URLSearchParams();
   if (query) {
     params.set("q", query);
@@ -591,7 +620,7 @@ const SearchResultCard = memo(function SearchResultCard({
   };
 }) {
   const { book, highlights } = result;
-  const authors = useMemo(() => book.authors ? JSON.parse(book.authors) : [], [book.authors]);
+  const authors = useMemo(() => (book.authors ? JSON.parse(book.authors) : []), [book.authors]);
 
   return (
     <Link

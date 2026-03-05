@@ -22,11 +22,7 @@ function getLanguageExtension(path: string) {
   if (path.endsWith(".css")) {
     return css();
   }
-  if (
-    path.endsWith(".opf") ||
-    path.endsWith(".ncx") ||
-    path.endsWith(".xml")
-  ) {
+  if (path.endsWith(".opf") || path.endsWith(".ncx") || path.endsWith(".xml")) {
     return xml();
   }
   // Default to XML for unknown types in an EPUB context
@@ -104,10 +100,7 @@ export function EditorPane({ content, filePath, isDark, onChange }: EditorPanePr
   }, [content]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 min-w-0 overflow-hidden [&_.cm-editor]:h-full"
-    />
+    <div ref={containerRef} className="flex-1 min-w-0 overflow-hidden [&_.cm-editor]:h-full" />
   );
 }
 

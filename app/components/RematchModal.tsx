@@ -28,7 +28,10 @@ export function RematchModal({
   coverUrl,
 }: RematchModalProps) {
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
   const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState(bookTitle);
   const [pendingMetadata, setPendingMetadata] = useState<MetadataSearchResult | null>(null);
@@ -127,7 +130,12 @@ export function RematchModal({
             className="text-foreground-muted hover:text-foreground disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -149,7 +157,12 @@ export function RematchModal({
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
                   </svg>
                   Refresh Metadata
                 </>
@@ -163,7 +176,9 @@ export function RematchModal({
           {/* Divider */}
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 border-t border-border" />
-            <span className="text-xs text-foreground-muted uppercase tracking-wider">or search manually</span>
+            <span className="text-xs text-foreground-muted uppercase tracking-wider">
+              or search manually
+            </span>
             <div className="flex-1 border-t border-border" />
           </div>
 
@@ -188,7 +203,12 @@ export function RematchModal({
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                   Search
                 </>
@@ -198,13 +218,15 @@ export function RematchModal({
 
           {/* Message */}
           {message && (
-            <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
-              message.type === "success"
-                ? "bg-success-light text-success border border-success/20"
-                : message.type === "error"
-                ? "bg-danger-light text-danger border border-danger/20"
-                : "bg-surface-elevated text-foreground-muted border border-border"
-            }`}>
+            <div
+              className={`mb-4 px-4 py-3 rounded-lg text-sm ${
+                message.type === "success"
+                  ? "bg-success-light text-success border border-success/20"
+                  : message.type === "error"
+                    ? "bg-danger-light text-danger border border-danger/20"
+                    : "bg-surface-elevated text-foreground-muted border border-border"
+              }`}
+            >
               {message.text}
             </div>
           )}
@@ -213,7 +235,8 @@ export function RematchModal({
           {searchResults.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-foreground-muted mb-3">
-                {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found. Click to apply.
+                {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found. Click to
+                apply.
               </p>
               {searchResults.map((result, index) => (
                 <button
@@ -252,17 +275,23 @@ export function RematchModal({
                       )}
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {result.publishedDate && (
-                          <span className="text-xs text-foreground-muted/70">{result.publishedDate}</span>
+                          <span className="text-xs text-foreground-muted/70">
+                            {result.publishedDate}
+                          </span>
                         )}
                         {result.pageCount && (
-                          <span className="text-xs text-foreground-muted/70">{result.pageCount} pages</span>
+                          <span className="text-xs text-foreground-muted/70">
+                            {result.pageCount} pages
+                          </span>
                         )}
                         {result.series && (
                           <span className="text-xs text-accent">{result.series}</span>
                         )}
                       </div>
                       {result.description && (
-                        <p className="text-xs text-foreground-muted mt-1 line-clamp-2">{result.description}</p>
+                        <p className="text-xs text-foreground-muted mt-1 line-clamp-2">
+                          {result.description}
+                        </p>
                       )}
                       {result.subjects.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -297,7 +326,8 @@ export function RematchModal({
           <div className="relative bg-surface border border-border rounded-xl p-6 max-w-lg w-full mx-4 shadow-xl">
             <h3 className="text-lg font-semibold text-foreground mb-2">Update Cover Image?</h3>
             <p className="text-foreground-muted mb-4">
-              This book already has a cover. Would you like to replace it with the one from the metadata source?
+              This book already has a cover. Would you like to replace it with the one from the
+              metadata source?
             </p>
 
             <div className="flex gap-4 justify-center mb-6">
@@ -305,7 +335,11 @@ export function RematchModal({
                 <div className="text-center">
                   <p className="text-xs font-medium text-foreground-muted mb-2">Current</p>
                   <div className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated">
-                    <img src={coverUrl} alt="Current cover" className="w-full h-full object-cover" />
+                    <img
+                      src={coverUrl}
+                      alt="Current cover"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
               )}

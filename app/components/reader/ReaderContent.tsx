@@ -96,14 +96,17 @@ function scopeEpubCss(css: string, scope: string): string {
 
     // Scope each selector
     if (selectorText) {
-      const scopedSelectors = selectorText.split(",").map((sel) => {
-        const s = sel.trim();
-        if (!s) return s;
-        // Remap body/html selectors to the scope container
-        if (/^(html|body)$/i.test(s)) return scope;
-        if (/^(html|body)\s/i.test(s)) return s.replace(/^(html|body)\s/i, `${scope} `);
-        return `${scope} ${s}`;
-      }).join(", ");
+      const scopedSelectors = selectorText
+        .split(",")
+        .map((sel) => {
+          const s = sel.trim();
+          if (!s) return s;
+          // Remap body/html selectors to the scope container
+          if (/^(html|body)$/i.test(s)) return scope;
+          if (/^(html|body)\s/i.test(s)) return s.replace(/^(html|body)\s/i, `${scope} `);
+          return `${scope} ${s}`;
+        })
+        .join(", ");
       output.push(scopedSelectors + " " + ruleBody);
     }
 
@@ -313,12 +316,24 @@ function ColumnPaginatedText({
   bookId?: string;
   formatOverride?: string;
   highlights?: ReaderHighlight[];
-  onAddHighlight?: (startPosition: number, endPosition: number, text: string, note?: string, color?: string) => void;
+  onAddHighlight?: (
+    startPosition: number,
+    endPosition: number,
+    text: string,
+    note?: string,
+    color?: string,
+  ) => void;
   onRemoveHighlight?: (highlightId: string) => void;
   onUpdateHighlightColor?: (highlightId: string, color: string) => void;
   onUpdateHighlightNote?: (highlightId: string, note: string | null) => void;
   onNavigateToPosition?: (position: number) => void;
-  theme: { background: string; foreground: string; muted: string; accent: string; selection: string };
+  theme: {
+    background: string;
+    foreground: string;
+    muted: string;
+    accent: string;
+    selection: string;
+  };
   textContentRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const font = FONTS[settings.fontFamily];
@@ -335,20 +350,41 @@ function ColumnPaginatedText({
 
   // Highlight state
   const [showToolbar, setShowToolbar] = useState(false);
-  const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number; above: boolean }>({ x: 0, y: 0, above: true });
-  const [currentSelection, setCurrentSelection] = useState<{ startPosition: number; endPosition: number; text: string } | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number; above: boolean }>({
+    x: 0,
+    y: 0,
+    above: true,
+  });
+  const [currentSelection, setCurrentSelection] = useState<{
+    startPosition: number;
+    endPosition: number;
+    text: string;
+  } | null>(null);
   const [showEditToolbar, setShowEditToolbar] = useState(false);
-  const [editToolbarPosition, setEditToolbarPosition] = useState<{ x: number; y: number; above: boolean }>({ x: 0, y: 0, above: true });
-  const [editingHighlight, setEditingHighlight] = useState<{ id: string; text: string; note?: string; color: string } | null>(null);
-  const [footnotePopover, setFootnotePopover] = useState<{ content: string; position: { x: number; y: number } } | null>(null);
+  const [editToolbarPosition, setEditToolbarPosition] = useState<{
+    x: number;
+    y: number;
+    above: boolean;
+  }>({ x: 0, y: 0, above: true });
+  const [editingHighlight, setEditingHighlight] = useState<{
+    id: string;
+    text: string;
+    note?: string;
+    color: string;
+  } | null>(null);
+  const [footnotePopover, setFootnotePopover] = useState<{
+    content: string;
+    position: { x: number; y: number };
+  } | null>(null);
   const [tapFeedback, setTapFeedback] = useState<"left" | "right" | null>(null);
   const [epubCss, setEpubCss] = useState("");
 
   // Column layout calculations
   const containerWidth = readingArea.width;
-  const readingWidth = containerWidth > 0
-    ? Math.min(containerWidth * (1 - 2 * settings.margins / 100), settings.maxWidth)
-    : 0;
+  const readingWidth =
+    containerWidth > 0
+      ? Math.min(containerWidth * (1 - (2 * settings.margins) / 100), settings.maxWidth)
+      : 0;
   const marginPx = containerWidth > 0 ? (containerWidth - readingWidth) / 2 : 0;
   const columnGap = containerWidth > 0 ? containerWidth - readingWidth : 40;
 
@@ -376,7 +412,18 @@ function ColumnPaginatedText({
         onTotalPagesChange?.(pages);
       });
     });
-  }, [fullContent.html, containerWidth, readingArea.height, settings.fontSize, settings.lineHeight, settings.fontFamily, settings.textAlign, settings.maxWidth, settings.margins, epubCss]);
+  }, [
+    fullContent.html,
+    containerWidth,
+    readingArea.height,
+    settings.fontSize,
+    settings.lineHeight,
+    settings.fontFamily,
+    settings.textAlign,
+    settings.maxWidth,
+    settings.margins,
+    epubCss,
+  ]);
 
   // Detect current chapter from page position
   useEffect(() => {
@@ -395,19 +442,32 @@ function ColumnPaginatedText({
       return;
     }
     let cancelled = false;
-    Promise.all(fullContent.cssUrls.map((url) => fetch(url).then((r) => r.text()).catch(() => ""))).then((sheets) => {
+    Promise.all(
+      fullContent.cssUrls.map((url) =>
+        fetch(url)
+          .then((r) => r.text())
+          .catch(() => ""),
+      ),
+    ).then((sheets) => {
       if (!cancelled) {
         setEpubCss(sheets.map((css) => scopeEpubCss(css, ".epub-content")).join("\n"));
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fullContent.cssUrls, settings.usePublisherStyles]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      )
+        return;
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
         onNextPage?.();
@@ -467,7 +527,12 @@ function ColumnPaginatedText({
       if (containerRect) {
         setEditToolbarPosition(calculateToolbarPosition(markRect, containerRect));
       }
-      setEditingHighlight({ id: highlight.id, text: highlight.text, note: highlight.note, color: highlight.color });
+      setEditingHighlight({
+        id: highlight.id,
+        text: highlight.text,
+        note: highlight.note,
+        color: highlight.color,
+      });
       setShowEditToolbar(true);
       setShowToolbar(false);
     };
@@ -498,7 +563,10 @@ function ColumnPaginatedText({
             if (containerRect) {
               setFootnotePopover({
                 content: text,
-                position: { x: Math.min(rect.left - containerRect.left, containerRect.width - 320), y: rect.bottom - containerRect.top + 8 },
+                position: {
+                  x: Math.min(rect.left - containerRect.left, containerRect.width - 320),
+                  y: rect.bottom - containerRect.top + 8,
+                },
               });
             }
             return;
@@ -506,7 +574,12 @@ function ColumnPaginatedText({
         }
       }
       const href = link.getAttribute("href");
-      if (href && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("mailto:")) {
+      if (
+        href &&
+        !href.startsWith("http://") &&
+        !href.startsWith("https://") &&
+        !href.startsWith("mailto:")
+      ) {
         e.preventDefault();
         e.stopPropagation();
         let epubPath = href;
@@ -561,7 +634,13 @@ function ColumnPaginatedText({
   const handleHighlight = useCallback(
     (color: string, note?: string) => {
       if (currentSelection && onAddHighlight) {
-        onAddHighlight(currentSelection.startPosition, currentSelection.endPosition, currentSelection.text, note, color);
+        onAddHighlight(
+          currentSelection.startPosition,
+          currentSelection.endPosition,
+          currentSelection.text,
+          note,
+          color,
+        );
       }
       window.getSelection()?.removeAllRanges();
       setShowToolbar(false);
@@ -606,11 +685,7 @@ function ColumnPaginatedText({
       {/* Padding wrapper for toolbar space */}
       <div className="h-full flex flex-col">
         {/* Reading area - measured by ResizeObserver */}
-        <div
-          ref={readingAreaRef}
-          className="flex-1 overflow-hidden"
-          onClick={handleContentClick}
-        >
+        <div ref={readingAreaRef} className="flex-1 overflow-hidden" onClick={handleContentClick}>
           {readingArea.width > 0 && readingArea.height > 0 && (
             <div
               ref={paginatorRef}
@@ -683,7 +758,13 @@ function ColumnPaginatedText({
             animation: "tapFlash 150ms ease-out forwards",
           }}
         >
-          <svg className="w-8 h-8" fill="none" stroke={`${theme.foreground}30`} viewBox="0 0 24 24" strokeWidth={2}>
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            stroke={`${theme.foreground}30`}
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+          >
             {tapFeedback === "left" ? (
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             ) : (
@@ -699,7 +780,10 @@ function ColumnPaginatedText({
           position={toolbarPosition}
           selectedText={currentSelection.text}
           onHighlight={handleHighlight}
-          onDismiss={() => { setShowToolbar(false); window.getSelection()?.removeAllRanges(); }}
+          onDismiss={() => {
+            setShowToolbar(false);
+            window.getSelection()?.removeAllRanges();
+          }}
           theme={theme}
         />
       )}
@@ -711,19 +795,24 @@ function ColumnPaginatedText({
           highlight={editingHighlight}
           onChangeColor={(highlightId, color) => {
             onUpdateHighlightColor?.(highlightId, color);
-            setEditingHighlight((prev) => prev ? { ...prev, color } : null);
+            setEditingHighlight((prev) => (prev ? { ...prev, color } : null));
           }}
           onSaveNote={(highlightId, note) => {
             onUpdateHighlightNote?.(highlightId, note);
-            setEditingHighlight((prev) => prev ? { ...prev, note: note ?? undefined } : null);
+            setEditingHighlight((prev) => (prev ? { ...prev, note: note ?? undefined } : null));
           }}
           onCopy={(text) => {
             if (navigator.clipboard?.writeText) {
               navigator.clipboard.writeText(text);
             }
           }}
-          onDelete={(highlightId) => { onRemoveHighlight?.(highlightId); }}
-          onDismiss={() => { setShowEditToolbar(false); setEditingHighlight(null); }}
+          onDelete={(highlightId) => {
+            onRemoveHighlight?.(highlightId);
+          }}
+          onDismiss={() => {
+            setShowEditToolbar(false);
+            setEditingHighlight(null);
+          }}
           theme={theme}
         />
       )}
@@ -800,7 +889,13 @@ function TextContent({
   onUpdateHighlightColor?: (highlightId: string, color: string) => void;
   onUpdateHighlightNote?: (highlightId: string, note: string | null) => void;
   onNavigateToPosition?: (position: number) => void;
-  theme: { background: string; foreground: string; muted: string; accent: string; selection: string };
+  theme: {
+    background: string;
+    foreground: string;
+    muted: string;
+    accent: string;
+    selection: string;
+  };
   textContentRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const font = FONTS[settings.fontFamily];
@@ -822,7 +917,11 @@ function TextContent({
 
   // Edit toolbar state for existing highlights
   const [showEditToolbar, setShowEditToolbar] = useState(false);
-  const [editToolbarPosition, setEditToolbarPosition] = useState<{ x: number; y: number; above: boolean }>({
+  const [editToolbarPosition, setEditToolbarPosition] = useState<{
+    x: number;
+    y: number;
+    above: boolean;
+  }>({
     x: 0,
     y: 0,
     above: true,
@@ -869,9 +968,7 @@ function TextContent({
       ),
     ).then((sheets) => {
       if (!cancelled) {
-        const scoped = sheets
-          .map((css) => scopeEpubCss(css, ".epub-content"))
-          .join("\n");
+        const scoped = sheets.map((css) => scopeEpubCss(css, ".epub-content")).join("\n");
         setEpubCss(scoped);
       }
     });
@@ -915,7 +1012,11 @@ function TextContent({
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't handle shortcuts when typing in input fields
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      ) {
         return;
       }
 
@@ -1104,7 +1205,15 @@ function TextContent({
         );
       }
     });
-  }, [displayContent.html, displayContent.position, displayContent.endPosition, displayRightContent?.html, displayRightContent?.position, displayRightContent?.endPosition, highlights]);
+  }, [
+    displayContent.html,
+    displayContent.position,
+    displayContent.endPosition,
+    displayRightContent?.html,
+    displayRightContent?.position,
+    displayRightContent?.endPosition,
+    highlights,
+  ]);
 
   // Handle tap navigation with 1/3 zones
   const handleContentClick = useCallback(
@@ -1333,23 +1442,23 @@ function TextContent({
           highlight={editingHighlight}
           onChangeColor={(highlightId, color) => {
             onUpdateHighlightColor?.(highlightId, color);
-            setEditingHighlight((prev) => prev ? { ...prev, color } : null);
+            setEditingHighlight((prev) => (prev ? { ...prev, color } : null));
           }}
           onSaveNote={(highlightId, note) => {
             onUpdateHighlightNote?.(highlightId, note);
-            setEditingHighlight((prev) => prev ? { ...prev, note: note ?? undefined } : null);
+            setEditingHighlight((prev) => (prev ? { ...prev, note: note ?? undefined } : null));
           }}
           onCopy={(text) => {
             if (navigator.clipboard?.writeText) {
               navigator.clipboard.writeText(text);
             } else {
-              const ta = document.createElement('textarea');
+              const ta = document.createElement("textarea");
               ta.value = text;
-              ta.style.position = 'fixed';
-              ta.style.opacity = '0';
+              ta.style.position = "fixed";
+              ta.style.opacity = "0";
               document.body.appendChild(ta);
               ta.select();
-              document.execCommand('copy');
+              document.execCommand("copy");
               document.body.removeChild(ta);
             }
           }}
@@ -1367,10 +1476,7 @@ function TextContent({
       {/* Footnote popover */}
       {footnotePopover && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setFootnotePopover(null)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setFootnotePopover(null)} />
           <div
             className="absolute z-50 max-w-xs p-4 rounded-lg shadow-xl border"
             style={{
@@ -1502,7 +1608,11 @@ function ImageContent({
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't handle shortcuts when typing in input fields
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      ) {
         return;
       }
 
@@ -1810,12 +1920,7 @@ function AudioContent({
       {/* Lyrics display */}
       {showLyrics && bookId && (
         <div className="w-full max-w-lg mb-4">
-          <AudioLyrics
-            bookId={bookId}
-            currentTime={currentTime}
-            onSeek={seekTo}
-            theme={theme}
-          />
+          <AudioLyrics bookId={bookId} currentTime={currentTime} onSeek={seekTo} theme={theme} />
         </div>
       )}
 

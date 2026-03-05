@@ -1,6 +1,14 @@
 "use server";
 
-import { db, books, bookmarks, highlights, userBookState, readingSessions, profiles } from "../lib/db";
+import {
+  db,
+  books,
+  bookmarks,
+  highlights,
+  userBookState,
+  readingSessions,
+  profiles,
+} from "../lib/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getRequest } from "react-flight-router/server";
@@ -85,7 +93,10 @@ export async function deleteBookmark(bookmarkId: string, profileId?: string): Pr
 // HIGHLIGHTS
 // ============================================
 
-export async function getHighlights(bookId: string, profileId?: string): Promise<ReaderHighlight[]> {
+export async function getHighlights(
+  bookId: string,
+  profileId?: string,
+): Promise<ReaderHighlight[]> {
   const conditions = [eq(highlights.bookId, bookId), isNull(highlights.deletedAt)];
   if (profileId) conditions.push(eq(highlights.profileId, profileId));
 
@@ -272,12 +283,7 @@ export async function saveReadingProgress(
   const existing = await db
     .select()
     .from(userBookState)
-    .where(
-      and(
-        eq(userBookState.profileId, profileId),
-        eq(userBookState.bookId, bookId),
-      ),
-    )
+    .where(and(eq(userBookState.profileId, profileId), eq(userBookState.bookId, bookId)))
     .get();
 
   if (existing) {
@@ -308,7 +314,11 @@ export async function saveReadingProgress(
 export async function getBookProgress(
   bookId: string,
   profileId?: string,
-): Promise<{ readingProgress: number; lastPosition: string | null; lastReadAt: Date | null } | null> {
+): Promise<{
+  readingProgress: number;
+  lastPosition: string | null;
+  lastReadAt: Date | null;
+} | null> {
   const conditions = [eq(userBookState.bookId, bookId)];
   if (profileId) conditions.push(eq(userBookState.profileId, profileId));
 
@@ -421,13 +431,17 @@ export async function getReaderInfo(
   if (!book) return null;
 
   // Get normalized content
-  console.log(`[getReaderInfo] Getting content for book ${bookId} (format: ${book.format}${formatOverride ? `, override: ${formatOverride}` : ''})`);
+  console.log(
+    `[getReaderInfo] Getting content for book ${bookId} (format: ${book.format}${formatOverride ? `, override: ${formatOverride}` : ""})`,
+  );
   const content = await getContent(bookId, formatOverride);
   if (!content) {
     console.log(`[getReaderInfo] No content returned for book ${bookId}`);
     return null;
   }
-  console.log(`[getReaderInfo] Content type: ${content.type}, pageCount: ${'pageCount' in content ? content.pageCount : 'N/A'}`);
+  console.log(
+    `[getReaderInfo] Content type: ${content.type}, pageCount: ${"pageCount" in content ? content.pageCount : "N/A"}`,
+  );
 
   // Check for empty content (indicates parsing failure)
   // For text content, check both totalCharacters and chapters length (image-based books have chapters but 0 chars)
@@ -631,8 +645,7 @@ export async function resolveInternalLink(
       filePart &&
       (chapter.href.includes(filePart) || filePart.includes(chapter.href))
     ) {
-      const position =
-        chapter.characterStart / Math.max(1, textContent.totalCharacters);
+      const position = chapter.characterStart / Math.max(1, textContent.totalCharacters);
       return { position };
     }
   }
@@ -678,9 +691,7 @@ export async function getFootnoteContent(
   }
 
   // If no file part, search all chapters
-  const chaptersToSearch = targetChapter
-    ? [targetChapter]
-    : textContent.chapters;
+  const chaptersToSearch = targetChapter ? [targetChapter] : textContent.chapters;
 
   for (const chapter of chaptersToSearch) {
     // Look for element with matching id attribute
@@ -702,4 +713,3 @@ export async function getFootnoteContent(
 
   return null;
 }
-

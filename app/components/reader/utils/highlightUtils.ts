@@ -40,7 +40,7 @@ export function selectionToPositions(
   let node: Node | null;
 
   while ((node = walker.nextNode())) {
-    const nodeLength = (node.textContent?.length) || 0;
+    const nodeLength = node.textContent?.length || 0;
 
     // Check if this node contains the selection start
     if (node === range.startContainer) {

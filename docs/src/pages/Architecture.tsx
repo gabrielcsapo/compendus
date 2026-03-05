@@ -4,21 +4,16 @@ export default function Architecture() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Architecture
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Architecture</h1>
         <p className="text-foreground-muted">
-          Compendus is a full-stack application with a web frontend, server API,
-          and native iOS app. Both platforms communicate through a shared REST
-          API.
+          Compendus is a full-stack application with a web frontend, server API, and native iOS app.
+          Both platforms communicate through a shared REST API.
         </p>
       </div>
 
       {/* Overview Diagram */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          System Overview
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">System Overview</h2>
         <div className="bg-surface-elevated border border-border rounded-xl p-6 font-mono text-sm text-foreground overflow-x-auto">
           <pre>{`┌─────────────────────────────────────────────┐
 │                 Clients                     │
@@ -59,17 +54,13 @@ export default function Architecture() {
 
       {/* Web Architecture */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Web Application
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Web Application</h2>
         <p className="text-foreground mb-4">
-          The web app uses React Server Components via react-flight-router with
-          Vite as the build tool and Hono as the server framework.
+          The web app uses React Server Components via react-flight-router with Vite as the build
+          tool and Hono as the server framework.
         </p>
 
-        <h3 className="text-lg font-medium text-foreground mb-2">
-          Key Technologies
-        </h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Key Technologies</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {[
             {
@@ -97,21 +88,14 @@ export default function Architecture() {
               desc: "Utility-first CSS with design token system",
             },
           ].map((tech) => (
-            <div
-              key={tech.name}
-              className="p-3 border border-border rounded-lg"
-            >
-              <h4 className="font-medium text-foreground text-sm">
-                {tech.name}
-              </h4>
+            <div key={tech.name} className="p-3 border border-border rounded-lg">
+              <h4 className="font-medium text-foreground text-sm">{tech.name}</h4>
               <p className="text-xs text-foreground-muted mt-1">{tech.desc}</p>
             </div>
           ))}
         </div>
 
-        <h3 className="text-lg font-medium text-foreground mb-2">
-          Project Structure
-        </h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Project Structure</h3>
         <CodeBlock language="text">{`app/
 ├── routes/           # Page routes (server + client components)
 ├── components/       # Reusable React components
@@ -136,9 +120,7 @@ server/
     ├── transcribe.ts # Audiobook transcription (Whisper)
     └── ...           # 14 route modules total`}</CodeBlock>
 
-        <h3 className="text-lg font-medium text-foreground mt-6 mb-2">
-          Data Flow
-        </h3>
+        <h3 className="text-lg font-medium text-foreground mt-6 mb-2">Data Flow</h3>
         <ol className="list-decimal list-inside space-y-2 text-foreground">
           <li>
             Server components in{" "}
@@ -147,9 +129,7 @@ server/
             </code>{" "}
             fetch data directly from the database
           </li>
-          <li>
-            Data is passed to client components via props (RSC serialization)
-          </li>
+          <li>Data is passed to client components via props (RSC serialization)</li>
           <li>
             Client components use{" "}
             <code className="bg-surface-elevated px-1 rounded border border-border text-sm">
@@ -169,18 +149,13 @@ server/
 
       {/* iOS Architecture */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          iOS Application
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">iOS Application</h2>
         <p className="text-foreground mb-4">
-          The iOS app is a native SwiftUI application with SwiftData for local
-          persistence. It communicates with the server via REST API for library
-          syncing and book downloads.
+          The iOS app is a native SwiftUI application with SwiftData for local persistence. It
+          communicates with the server via REST API for library syncing and book downloads.
         </p>
 
-        <h3 className="text-lg font-medium text-foreground mb-2">
-          Key Technologies
-        </h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Key Technologies</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {[
             {
@@ -208,21 +183,14 @@ server/
               desc: "Text-to-speech with pre-generation and caching",
             },
           ].map((tech) => (
-            <div
-              key={tech.name}
-              className="p-3 border border-border rounded-lg"
-            >
-              <h4 className="font-medium text-foreground text-sm">
-                {tech.name}
-              </h4>
+            <div key={tech.name} className="p-3 border border-border rounded-lg">
+              <h4 className="font-medium text-foreground text-sm">{tech.name}</h4>
               <p className="text-xs text-foreground-muted mt-1">{tech.desc}</p>
             </div>
           ))}
         </div>
 
-        <h3 className="text-lg font-medium text-foreground mb-2">
-          Reader Engine
-        </h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Reader Engine</h3>
         <CodeBlock language="text">{`Reader/
 ├── Engine/
 │   ├── ReaderEngine.swift          # Protocol for all reader engines
@@ -241,9 +209,7 @@ server/
 
       {/* Database */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Database Schema
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Database Schema</h2>
         <p className="text-foreground mb-4">
           Compendus uses SQLite with Drizzle ORM. The schema is defined in{" "}
           <code className="bg-surface-elevated px-1 rounded border border-border text-sm">
@@ -287,27 +253,23 @@ server/
 
       {/* Background Processing */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Background Processing
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Background Processing</h2>
         <p className="text-foreground mb-3">
-          Long-running operations are handled by a background job queue with
-          real-time progress tracking via Server-Sent Events (SSE).
+          Long-running operations are handled by a background job queue with real-time progress
+          tracking via Server-Sent Events (SSE).
         </p>
         <ul className="list-disc list-inside space-y-2 text-foreground">
           <li>
             <strong>Format conversion</strong> — PDF/MOBI/AZW3 to EPUB
           </li>
           <li>
-            <strong>Audiobook transcription</strong> — Whisper-based speech to
-            text
+            <strong>Audiobook transcription</strong> — Whisper-based speech to text
           </li>
           <li>
             <strong>TTS pre-generation</strong> — Text-to-speech audio caching
           </li>
           <li>
-            <strong>Multi-file audio merge</strong> — Combining audio tracks
-            into single audiobook
+            <strong>Multi-file audio merge</strong> — Combining audio tracks into single audiobook
           </li>
         </ul>
         <p className="text-sm text-foreground-muted mt-3">

@@ -58,11 +58,7 @@ async function parseInWorker(
 
     worker.on(
       "message",
-      (result: {
-        success: boolean;
-        content?: NormalizedContent;
-        error?: string;
-      }) => {
+      (result: { success: boolean; content?: NormalizedContent; error?: string }) => {
         clearTimeout(timeout);
         worker.terminate();
         if (result.success && result.content) {
@@ -161,24 +157,19 @@ async function parseByFormat(
       );
       const result = await parseInWorker(buffer, format, bookId);
       console.log(
-        `[Content Store] Worker returned content type: ${result.type}, pageCount: ${'pageCount' in result ? result.pageCount : 'N/A'}`,
+        `[Content Store] Worker returned content type: ${result.type}, pageCount: ${"pageCount" in result ? result.pageCount : "N/A"}`,
       );
       return result;
     } catch (error) {
       // Fall back to main thread parsing if worker fails
-      console.error(
-        `[Content Store] Worker parsing failed, falling back to main thread:`,
-        error,
-      );
+      console.error(`[Content Store] Worker parsing failed, falling back to main thread:`, error);
     }
   }
 
   // Parse on main thread (for small files, non-heavy formats, or worker fallback)
   const startTime = performance.now();
   const fileSizeMB = (buffer.length / 1024 / 1024).toFixed(1);
-  console.log(
-    `[Content Store] Starting main thread ${format} parse (${fileSizeMB}MB)`,
-  );
+  console.log(`[Content Store] Starting main thread ${format} parse (${fileSizeMB}MB)`);
 
   let result: NormalizedContent;
 
@@ -210,17 +201,8 @@ async function parseByFormat(
     case "mp3": {
       const { parseAudio } = await import("./parsers/audio");
       // Need to get duration and chapters from database
-      const book = await db
-        .select()
-        .from(books)
-        .where(eq(books.id, bookId))
-        .get();
-      result = await parseAudio(
-        bookId,
-        format,
-        book?.duration || 0,
-        book?.chapters,
-      );
+      const book = await db.select().from(books).where(eq(books.id, bookId)).get();
+      result = await parseAudio(bookId, format, book?.duration || 0, book?.chapters);
       break;
     }
     default:
@@ -228,9 +210,7 @@ async function parseByFormat(
   }
 
   const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-  console.log(
-    `[Content Store] Completed main thread ${format} parse in ${duration}s`,
-  );
+  console.log(`[Content Store] Completed main thread ${format} parse in ${duration}s`);
 
   return result;
 }

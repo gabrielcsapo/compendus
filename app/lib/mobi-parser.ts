@@ -4,13 +4,7 @@
  * Supports MOBI7 (version 6) files with PalmDOC or HUFF/CDIC compression.
  * Replaces the unmaintained @lingo-reader/mobi-parser package.
  */
-import {
-  writeFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  unlinkSync,
-} from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -132,10 +126,7 @@ const fileSignatures: [string, string][] = [
   ["504c", "font/eot"],
 ];
 
-const exthRecordTypes: Record<
-  number,
-  [string, "string" | "uint", boolean]
-> = {
+const exthRecordTypes: Record<number, [string, "string" | "uint", boolean]> = {
   100: ["creator", "string", true],
   101: ["publisher", "string", false],
   103: ["description", "string", false],
@@ -183,10 +174,7 @@ function getString(buf: ArrayBuffer): string {
 
 type StructDef = Record<string, [number, number, "string" | "uint"]>;
 
-function getStruct(
-  def: StructDef,
-  buf: ArrayBuffer,
-): Record<string, string | number> {
+function getStruct(def: StructDef, buf: ArrayBuffer): Record<string, string | number> {
   const res: Record<string, string | number> = {};
   for (const key in def) {
     const [start, len, type] = def[key];
@@ -298,10 +286,10 @@ function setupHuffCdic(
     [0, 0],
     ...Array.from({ length: 32 }, (_, i) => offset2 + i * 8).map(
       (off) =>
-        [
-          getUint(huffRecord.slice(off, off + 4)),
-          getUint(huffRecord.slice(off + 4, off + 8)),
-        ] as [number, number],
+        [getUint(huffRecord.slice(off, off + 4)), getUint(huffRecord.slice(off + 4, off + 8))] as [
+          number,
+          number,
+        ],
     ),
   ];
 
@@ -339,8 +327,7 @@ function setupHuffCdic(
       const bits = Number(read32Bits(byteArray, i));
       let [found, codeLength, value] = table1[bits >>> 24];
       if (!found) {
-        while (bits >>> (32 - codeLength) < table2[codeLength][0])
-          codeLength += 1;
+        while (bits >>> (32 - codeLength) < table2[codeLength][0]) codeLength += 1;
         value = table2[codeLength][1];
       }
       i += codeLength;
@@ -363,9 +350,7 @@ function setupHuffCdic(
 // Trailing entry removal
 // ---------------------------------------------------------------------------
 
-function makeTrailingEntryRemover(
-  trailingFlags: number,
-): (arr: Uint8Array) => Uint8Array {
+function makeTrailingEntryRemover(trailingFlags: number): (arr: Uint8Array) => Uint8Array {
   const multibyte = trailingFlags & 1;
   const numTrailingEntries = countBitsSet(trailingFlags >>> 1);
   return (array: Uint8Array): Uint8Array => {
@@ -452,16 +437,11 @@ function saveResourceToDisk(
 
 function unescapeHTML(str: string): string {
   if (!str.includes("&")) return str;
-  return str.replace(
-    /&(#x[\dA-Fa-f]+|#\d+|[a-zA-Z]+);/g,
-    (match, entity: string) => {
-      if (entity.startsWith("#x"))
-        return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
-      if (entity.startsWith("#"))
-        return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
-      return htmlEntityMap[match] ?? match;
-    },
-  );
+  return str.replace(/&(#x[\dA-Fa-f]+|#\d+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity.startsWith("#x")) return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
+    if (entity.startsWith("#")) return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
+    return htmlEntityMap[match] ?? match;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -470,8 +450,7 @@ function unescapeHTML(str: string): string {
 
 function extractTocFromChapter(chapterText: string): MobiTocItem[] {
   const toc: MobiTocItem[] = [];
-  const linkRegex =
-    /<a[^>]*filepos\s*=\s*["']?(\d+)["']?[^>]*>([\s\S]*?)<\/a>/gi;
+  const linkRegex = /<a[^>]*filepos\s*=\s*["']?(\d+)["']?[^>]*>([\s\S]*?)<\/a>/gi;
   let match: RegExpExecArray | null;
   while ((match = linkRegex.exec(chapterText)) !== null) {
     const filepos = match[1];
@@ -498,9 +477,7 @@ function findTocChapter(
       if (fileposMatch) {
         const tocPos = parseInt(fileposMatch[1], 10);
         const chapter = chapters.find(
-          (ch) =>
-            ch.start <= tocPos &&
-            (ch.end === undefined || ch.end > tocPos),
+          (ch) => ch.start <= tocPos && (ch.end === undefined || ch.end > tocPos),
         );
         if (chapter) return chapter;
       }
@@ -603,9 +580,7 @@ class MobiFile implements MobiParser {
   private recindexRegex = /recindex\s*=\s*["']?(\d+)["']?/;
 
   constructor(data: Uint8Array | Buffer, resourceSaveDir?: string) {
-    this.arrayBuffer = bufferToArrayBuffer(
-      data instanceof Buffer ? new Uint8Array(data) : data,
-    );
+    this.arrayBuffer = bufferToArrayBuffer(data instanceof Buffer ? new Uint8Array(data) : data);
     this.resourceSaveDir = resourceSaveDir ?? "./images";
     if (!existsSync(this.resourceSaveDir)) {
       mkdirSync(this.resourceSaveDir, { recursive: true });
@@ -733,9 +708,7 @@ class MobiFile implements MobiParser {
     // PalmDOC header (first 16 bytes)
     this.palmdoc = getStruct(palmdocHeaderDef, record0) as unknown as PalmDocHeader;
     if (this.palmdoc.encryption !== 0) {
-      throw new Error(
-        "Encrypted MOBI files are not supported. The file requires a DRM key.",
-      );
+      throw new Error("Encrypted MOBI files are not supported. The file requires a DRM key.");
     }
 
     // MOBI header (starts at offset 16)
@@ -746,9 +719,7 @@ class MobiFile implements MobiParser {
     }
 
     // Encoding
-    this.textDecoder = new TextDecoder(
-      mobiEncoding[this.mobi.encoding] ?? "utf-8",
-    );
+    this.textDecoder = new TextDecoder(mobiEncoding[this.mobi.encoding] ?? "utf-8");
 
     // Title from record 0
     try {
@@ -758,17 +729,15 @@ class MobiFile implements MobiParser {
       );
       this.title = this.textDecoder.decode(titleBuf);
     } catch {
-      this.title = this.pdb.name.replace(/\0/g, "").replace(/_/g, " ");
+      // eslint-disable-next-line no-control-regex
+      this.title = this.pdb.name.replace(/\u0000/g, "").replace(/_/g, " ");
     }
 
     // EXTH header (if present)
     if (this.mobi.exthFlag & 0x40) {
       const exthOffset = 16 + this.mobi.length;
       try {
-        this.exth = parseExth(
-          record0.slice(exthOffset),
-          this.mobi.encoding,
-        );
+        this.exth = parseExth(record0.slice(exthOffset), this.mobi.encoding);
       } catch {
         this.exth = {};
       }
@@ -796,9 +765,7 @@ class MobiFile implements MobiParser {
     }
 
     // Set up trailing entry removal
-    const removeTrailing = makeTrailingEntryRemover(
-      this.mobi.trailingFlags,
-    );
+    const removeTrailing = makeTrailingEntryRemover(this.mobi.trailingFlags);
 
     // Decompress all text records
     const buffers: Uint8Array[] = [];
@@ -814,9 +781,7 @@ class MobiFile implements MobiParser {
     const rawBytes = concatTypedArrays(buffers);
 
     // Build binary string (1 char = 1 byte) for filepos mapping
-    const str = Array.from(rawBytes, (val) =>
-      String.fromCharCode(val),
-    ).join("");
+    const str = Array.from(rawBytes, (val) => String.fromCharCode(val)).join("");
 
     // Split by pagebreak markers
     const chapters: MobiSpineItem[] = [];
@@ -922,24 +887,18 @@ class MobiFile implements MobiParser {
     let html = text;
 
     // Replace <img recindex="N"> with saved resource paths
-    html = html.replace(
-      /<img([^>]*)>/gi,
-      (match: string, attrs: string) => {
-        const recMatch = attrs.match(this.recindexRegex);
-        if (!recMatch) return match;
-        const recIndex = parseInt(recMatch[1], 10) - 1; // recindex is 1-based
-        const resourcePath = this.ensureResourceSaved(recIndex);
-        if (!resourcePath) return match;
-        // Replace recindex with src
-        const newAttrs = attrs
-          .replace(/recindex\s*=\s*["']?\d+["']?/gi, `src="${resourcePath}"`)
-          .replace(
-            /mediarecindex\s*=\s*["']?\d+["']?/gi,
-            "",
-          );
-        return `<img${newAttrs}>`;
-      },
-    );
+    html = html.replace(/<img([^>]*)>/gi, (match: string, attrs: string) => {
+      const recMatch = attrs.match(this.recindexRegex);
+      if (!recMatch) return match;
+      const recIndex = parseInt(recMatch[1], 10) - 1; // recindex is 1-based
+      const resourcePath = this.ensureResourceSaved(recIndex);
+      if (!resourcePath) return match;
+      // Replace recindex with src
+      const newAttrs = attrs
+        .replace(/recindex\s*=\s*["']?\d+["']?/gi, `src="${resourcePath}"`)
+        .replace(/mediarecindex\s*=\s*["']?\d+["']?/gi, "");
+      return `<img${newAttrs}>`;
+    });
 
     // Replace filepos in anchors
     html = html.replace(

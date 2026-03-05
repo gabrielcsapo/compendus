@@ -35,9 +35,7 @@ function buildMissingConditions(missing: MissingField[]) {
     conditions.push(sql`(${books.authors} IS NULL OR ${books.authors} = '[]')`);
   }
   if (missing.includes("tags")) {
-    const bookIdsWithTags = db
-      .select({ bookId: booksTags.bookId })
-      .from(booksTags);
+    const bookIdsWithTags = db.select({ bookId: booksTags.bookId }).from(booksTags);
     conditions.push(notInArray(books.id, bookIdsWithTags));
   }
   if (missing.includes("language")) {
@@ -97,17 +95,19 @@ function buildWhereConditions(options: {
 }
 
 export async function searchBooks(options: SearchOptions): Promise<SearchResult[]> {
-  const { query, limit = 20, offset = 0, searchIn = ["title", "subtitle", "authors", "description"], type, missing } = options;
+  const {
+    query,
+    limit = 20,
+    offset = 0,
+    searchIn = ["title", "subtitle", "authors", "description"],
+    type,
+    missing,
+  } = options;
 
   const where = buildWhereConditions({ query, searchIn, type, missing });
   if (!where) return [];
 
-  const results = await db
-    .select()
-    .from(books)
-    .where(where)
-    .limit(limit)
-    .offset(offset);
+  const results = await db.select().from(books).where(where).limit(limit).offset(offset);
 
   return results.map((book) => ({
     book,
@@ -121,16 +121,20 @@ export async function searchBooks(options: SearchOptions): Promise<SearchResult[
   }));
 }
 
-export async function searchBooksCount(options: Omit<SearchOptions, "limit" | "offset">): Promise<number> {
-  const { query, searchIn = ["title", "subtitle", "authors", "description"], type, missing } = options;
+export async function searchBooksCount(
+  options: Omit<SearchOptions, "limit" | "offset">,
+): Promise<number> {
+  const {
+    query,
+    searchIn = ["title", "subtitle", "authors", "description"],
+    type,
+    missing,
+  } = options;
 
   const where = buildWhereConditions({ query, searchIn, type, missing });
   if (!where) return 0;
 
-  const result = await db
-    .select({ count: count() })
-    .from(books)
-    .where(where);
+  const result = await db.select({ count: count() }).from(books).where(where);
 
   return result[0]?.count ?? 0;
 }

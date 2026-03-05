@@ -62,7 +62,7 @@ export default function Component() {
         }),
       );
       setWantedMap((prev) => new Map([...prev, ...wantedEntries]));
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to load series details" });
     } finally {
       setLoading(false);

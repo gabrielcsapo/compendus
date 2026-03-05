@@ -67,10 +67,7 @@ function slugify(text: string): string {
     .replace(/`([^`]+)`/g, "$1")
     .replace(/[*_~]+/g, "")
     .toLowerCase()
-    .replace(
-      /[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g,
-      "",
-    )
+    .replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g, "")
     .replace(/\s/g, "-");
 }
 
@@ -92,10 +89,7 @@ function extractSections(md: string): MdSection[] {
         heading: lastHeading.text,
         slug: lastHeading.slug,
         content: stripMarkdown(
-          md.slice(
-            lastHeading.index + md.slice(lastHeading.index).indexOf("\n"),
-            match.index,
-          ),
+          md.slice(lastHeading.index + md.slice(lastHeading.index).indexOf("\n"), match.index),
         ).slice(0, 1000),
       });
     }
@@ -111,9 +105,7 @@ function extractSections(md: string): MdSection[] {
       heading: lastHeading.text,
       slug: lastHeading.slug,
       content: stripMarkdown(
-        md.slice(
-          lastHeading.index + md.slice(lastHeading.index).indexOf("\n"),
-        ),
+        md.slice(lastHeading.index + md.slice(lastHeading.index).indexOf("\n")),
       ).slice(0, 1000),
     });
   }
@@ -196,14 +188,7 @@ entries.push({
   slug: "formats",
   path: "/docs/formats",
   section: "Reference",
-  headings: [
-    "MIME Types",
-    "Ebooks",
-    "Comics",
-    "Audiobooks",
-    "Cover Images",
-    "Conversion Support",
-  ],
+  headings: ["MIME Types", "Ebooks", "Comics", "Audiobooks", "Cover Images", "Conversion Support"],
   content:
     "EPUB PDF MOBI AZW3 CBZ CBR M4B M4A MP3 ebook comic audiobook formats. EPUB is the standard ebook format with full reading support. PDF rendered as page images. MOBI and AZW3 auto-convert to EPUB. CBZ comic ZIP archive. CBR auto-converts to CBZ. M4B Apple audiobook format. Cover images extracted automatically. Conversion support: PDF to EPUB, MOBI to EPUB, AZW3 to EPUB, CBR to CBZ.",
 });
@@ -236,9 +221,6 @@ entries.push({
 });
 
 mkdirSync(publicDir, { recursive: true });
-writeFileSync(
-  resolve(publicDir, "search-index.json"),
-  JSON.stringify(entries, null, 2),
-);
+writeFileSync(resolve(publicDir, "search-index.json"), JSON.stringify(entries, null, 2));
 
 console.log(`Search index built with ${entries.length} entries`);

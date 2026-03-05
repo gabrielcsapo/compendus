@@ -52,7 +52,7 @@ export interface EpubParser {
 
 interface ManifestItem {
   id: string;
-  href: string;        // full path within ZIP (e.g. "OEBPS/chapter1.xhtml")
+  href: string; // full path within ZIP (e.g. "OEBPS/chapter1.xhtml")
   mediaType: string;
   properties: string;
   mediaOverlay: string;
@@ -61,8 +61,13 @@ interface ManifestItem {
 // ── MIME types for resources to save to disk ──
 
 const RESOURCE_MIME_PREFIXES = new Set([
-  "image/", "video/", "audio/", "font/", "text/css",
-  "application/font", "application/x-font",
+  "image/",
+  "video/",
+  "audio/",
+  "font/",
+  "text/css",
+  "application/font",
+  "application/x-font",
 ]);
 
 function shouldSaveResource(mediaType: string): boolean {
@@ -128,13 +133,10 @@ class EpubFileParser implements EpubParser {
   }
 
   async load() {
-    const data = typeof this.input === "string"
-      ? (await import("fs")).readFileSync(this.input)
-      : this.input;
+    const data =
+      typeof this.input === "string" ? (await import("fs")).readFileSync(this.input) : this.input;
     this.zip = await new JSZip().loadAsync(data);
-    this.namesMap = new Map(
-      Object.keys(this.zip.files).map((n) => [n.toLowerCase(), n]),
-    );
+    this.namesMap = new Map(Object.keys(this.zip.files).map((n) => [n.toLowerCase(), n]));
   }
 
   // ── ZIP helpers ──
@@ -171,7 +173,7 @@ class EpubFileParser implements EpubParser {
     if (!containerXml && this.hasFile("meta-inf/container.xml")) {
       // Some EPUBs use lowercase
     }
-    const rawContainer = containerXml || await this.readFile("meta-inf/container.xml");
+    const rawContainer = containerXml || (await this.readFile("meta-inf/container.xml"));
     const opfPath = this.parseContainer(rawContainer);
     this.opfDir = dirnamePosix(opfPath);
 
@@ -359,9 +361,7 @@ class EpubFileParser implements EpubParser {
 
   private async parseToc() {
     // Try EPUB 3 nav document first
-    const navItem = Object.values(this.manifest).find(
-      (item) => item.properties.includes("nav"),
-    );
+    const navItem = Object.values(this.manifest).find((item) => item.properties.includes("nav"));
     if (navItem) {
       const navHtml = await this.readFile(navItem.href);
       const navToc = this.parseEpub3Nav(navHtml, dirnamePosix(navItem.href));
@@ -413,7 +413,13 @@ class EpubFileParser implements EpubParser {
           const label = stripTags(spanMatch[1]).trim();
           const children = this.parseOlItems(liHtml, baseDir);
           if (label) {
-            items.push({ label, href: "", id: "", playOrder: "", children: children.length > 0 ? children : undefined });
+            items.push({
+              label,
+              href: "",
+              id: "",
+              playOrder: "",
+              children: children.length > 0 ? children : undefined,
+            });
           }
         }
         continue;
@@ -455,7 +461,9 @@ class EpubFileParser implements EpubParser {
     const navPoints = splitNavPoints(xml);
 
     for (const npXml of navPoints) {
-      const labelMatch = npXml.match(/<navLabel[^>]*>\s*<text[^>]*>([\s\S]*?)<\/text>\s*<\/navLabel>/i);
+      const labelMatch = npXml.match(
+        /<navLabel[^>]*>\s*<text[^>]*>([\s\S]*?)<\/text>\s*<\/navLabel>/i,
+      );
       const contentMatch = npXml.match(/<content[^>]*src\s*=\s*["']([^"']+)["'][^>]*\/?>/i);
       const playOrderMatch = npXml.match(/playOrder\s*=\s*["']([^"']+)["']/i);
 
@@ -552,8 +560,8 @@ class EpubFileParser implements EpubParser {
 
   getCoverImage(): string {
     // Method 1: manifest item with properties="cover-image"
-    const coverImageItem = Object.values(this.manifest).find(
-      (item) => item.properties.includes("cover-image"),
+    const coverImageItem = Object.values(this.manifest).find((item) =>
+      item.properties.includes("cover-image"),
     );
     if (coverImageItem) {
       const fileName = coverImageItem.href.replace(/\//g, "_");

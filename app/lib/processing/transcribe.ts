@@ -109,7 +109,7 @@ async function ensureModelDownloaded(
       stdio: "pipe",
       timeout: 600000, // 10 minutes
     });
-  } catch (err) {
+  } catch {
     // Clean up partial download
     if (existsSync(modelPath)) {
       try {
@@ -123,9 +123,7 @@ async function ensureModelDownloaded(
   }
 
   if (!existsSync(modelPath)) {
-    throw new Error(
-      `Model download completed but file not found at ${modelPath}`,
-    );
+    throw new Error(`Model download completed but file not found at ${modelPath}`);
   }
 
   onProgress?.(4, "Model downloaded");
@@ -158,10 +156,7 @@ async function splitAudioToChunks(
 
   for (let i = 0; i < totalChunks; i++) {
     const startOffset = i * CHUNK_SECONDS;
-    const chunkPath = resolve(
-      tempDir,
-      `chunk_${String(i).padStart(4, "0")}.wav`,
-    );
+    const chunkPath = resolve(tempDir, `chunk_${String(i).padStart(4, "0")}.wav`);
 
     // Report splitting progress (6-8% range)
     const splitPct = 6 + Math.round(((i + 1) / totalChunks) * 2);
@@ -191,16 +186,9 @@ async function splitAudioToChunks(
       });
       ff.on("close", (code) => {
         if (code === 0) res();
-        else
-          rej(
-            new Error(
-              `Failed to split chunk ${i} (exit ${code}): ${stderr.slice(-300)}`,
-            ),
-          );
+        else rej(new Error(`Failed to split chunk ${i} (exit ${code}): ${stderr.slice(-300)}`));
       });
-      ff.on("error", (err) =>
-        rej(new Error(`Failed to start ffmpeg: ${err.message}`)),
-      );
+      ff.on("error", (err) => rej(new Error(`Failed to start ffmpeg: ${err.message}`)));
     });
 
     chunks.push({ path: chunkPath, startOffset });
@@ -260,9 +248,7 @@ async function transcribeChunk(
       const elapsed = Date.now() - lastOutputTime;
       if (elapsed > CHUNK_TIMEOUT_MS) {
         clearInterval(timeoutCheck);
-        onLog?.(
-          `[timeout] No output for ${Math.round(elapsed / 60000)}min, killing process`,
-        );
+        onLog?.(`[timeout] No output for ${Math.round(elapsed / 60000)}min, killing process`);
         proc.kill("SIGKILL");
       }
     }, 30000);
@@ -326,9 +312,7 @@ async function transcribeChunk(
         .slice(-500);
 
       if (errorLines) {
-        reject(
-          new Error(`Transcription failed (exit code ${code}): ${errorLines}`),
-        );
+        reject(new Error(`Transcription failed (exit code ${code}): ${errorLines}`));
       } else if (code === null) {
         reject(
           new Error(
@@ -358,9 +342,7 @@ async function transcribeChunk(
 async function cleanupTempDir(tempDir: string): Promise<void> {
   try {
     const files = await readdir(tempDir);
-    await Promise.all(
-      files.map((f) => unlink(resolve(tempDir, f)).catch(() => {})),
-    );
+    await Promise.all(files.map((f) => unlink(resolve(tempDir, f)).catch(() => {})));
     // Remove the directory itself
     await new Promise<void>((res) => {
       const proc = spawn("rmdir", [tempDir]);
@@ -391,8 +373,7 @@ export async function transcribeAudio(
 
   const threads = Math.max(
     2,
-    (process.env.WHISPER_THREADS ? parseInt(process.env.WHISPER_THREADS) : 0) ||
-      4,
+    (process.env.WHISPER_THREADS ? parseInt(process.env.WHISPER_THREADS) : 0) || 4,
   );
 
   // Create temp directory for chunks
@@ -405,12 +386,7 @@ export async function transcribeAudio(
       `[Transcribe] Duration: ${round3(duration)}s, splitting into ${totalChunks} chunks of ${CHUNK_SECONDS}s`,
     );
 
-    const chunks = await splitAudioToChunks(
-      audioPath,
-      tempDir,
-      duration,
-      options.onProgress,
-    );
+    const chunks = await splitAudioToChunks(audioPath, tempDir, duration, options.onProgress);
 
     // Transcribe each chunk sequentially
     const allSegments: TranscriptSegment[] = [];
@@ -419,23 +395,13 @@ export async function transcribeAudio(
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const chunkPct = Math.round((i / chunks.length) * 85) + 8; // 8-93% range
-      options.onProgress?.(
-        chunkPct,
-        `Transcribing chunk ${i + 1}/${chunks.length}...`,
-      );
+      options.onProgress?.(chunkPct, `Transcribing chunk ${i + 1}/${chunks.length}...`);
 
       console.log(
         `[Transcribe] Processing chunk ${i + 1}/${chunks.length} (offset: ${chunk.startOffset}s)`,
       );
-      options.onLog?.(
-        `--- Chunk ${i + 1}/${chunks.length} (offset: ${chunk.startOffset}s) ---`,
-      );
-      const whisperOutput = await transcribeChunk(
-        chunk.path,
-        modelPath,
-        threads,
-        options.onLog,
-      );
+      options.onLog?.(`--- Chunk ${i + 1}/${chunks.length} (offset: ${chunk.startOffset}s) ---`);
+      const whisperOutput = await transcribeChunk(chunk.path, modelPath, threads, options.onLog);
 
       if (i === 0 && whisperOutput.result?.language) {
         language = whisperOutput.result.language;

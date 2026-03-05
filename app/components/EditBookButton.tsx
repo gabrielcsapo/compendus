@@ -15,7 +15,15 @@ interface EditBookButtonProps {
   hasConvertedEpub?: boolean;
 }
 
-export function EditBookButton({ book, tags, bookFormat, hasCover, coverUrl, bookAuthors, hasConvertedEpub }: EditBookButtonProps) {
+export function EditBookButton({
+  book,
+  tags,
+  bookFormat,
+  hasCover,
+  coverUrl,
+  bookAuthors,
+  hasConvertedEpub,
+}: EditBookButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

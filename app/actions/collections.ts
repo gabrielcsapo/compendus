@@ -7,7 +7,11 @@ import type { Collection, Book } from "../lib/db/schema";
 
 export async function getCollections(profileId?: string): Promise<Collection[]> {
   if (profileId) {
-    return db.select().from(collections).where(eq(collections.profileId, profileId)).orderBy(asc(collections.sortOrder));
+    return db
+      .select()
+      .from(collections)
+      .where(eq(collections.profileId, profileId))
+      .orderBy(asc(collections.sortOrder));
   }
   return db.select().from(collections).orderBy(asc(collections.sortOrder));
 }
@@ -15,23 +19,28 @@ export async function getCollections(profileId?: string): Promise<Collection[]> 
 export async function getCollection(id: string, profileId?: string): Promise<Collection | null> {
   const conditions = [eq(collections.id, id)];
   if (profileId) conditions.push(eq(collections.profileId, profileId));
-  const result = await db.select().from(collections).where(and(...conditions)).get();
+  const result = await db
+    .select()
+    .from(collections)
+    .where(and(...conditions))
+    .get();
   return result || null;
 }
 
-export async function createCollection(data: {
-  name: string;
-  description?: string;
-  color?: string;
-  icon?: string;
-  parentId?: string;
-}, profileId?: string): Promise<Collection> {
+export async function createCollection(
+  data: {
+    name: string;
+    description?: string;
+    color?: string;
+    icon?: string;
+    parentId?: string;
+  },
+  profileId?: string,
+): Promise<Collection> {
   const id = uuid();
 
   // Get max sort order
-  const maxOrderQuery = db
-    .select({ max: sql<number>`max(sort_order)` })
-    .from(collections);
+  const maxOrderQuery = db.select({ max: sql<number>`max(sort_order)` }).from(collections);
   const maxOrder = profileId
     ? await maxOrderQuery.where(eq(collections.profileId, profileId)).get()
     : await maxOrderQuery.get();
@@ -80,7 +89,11 @@ export async function deleteCollection(id: string, profileId?: string): Promise<
   return true;
 }
 
-export async function addBookToCollection(bookId: string, collectionId: string, profileId?: string): Promise<boolean> {
+export async function addBookToCollection(
+  bookId: string,
+  collectionId: string,
+  profileId?: string,
+): Promise<boolean> {
   // Verify collection belongs to this profile (if profileId provided)
   const collection = await getCollection(collectionId, profileId);
   if (!collection) return false;
@@ -114,7 +127,10 @@ export async function removeBookFromCollection(
   return true;
 }
 
-export async function getBooksInCollection(collectionId: string, profileId?: string): Promise<Book[]> {
+export async function getBooksInCollection(
+  collectionId: string,
+  profileId?: string,
+): Promise<Book[]> {
   // Verify collection belongs to this profile (if profileId provided)
   const collection = await getCollection(collectionId, profileId);
   if (!collection) return [];
@@ -137,7 +153,10 @@ export async function getBooksInCollection(collectionId: string, profileId?: str
     );
 }
 
-export async function getCollectionsForBook(bookId: string, profileId?: string): Promise<Collection[]> {
+export async function getCollectionsForBook(
+  bookId: string,
+  profileId?: string,
+): Promise<Collection[]> {
   const collectionIds = await db
     .select({ collectionId: booksCollections.collectionId })
     .from(booksCollections)
@@ -159,7 +178,10 @@ export async function getCollectionsForBook(bookId: string, profileId?: string):
     .where(and(...conditions));
 }
 
-export async function getCollectionBookCount(collectionId: string, profileId?: string): Promise<number> {
+export async function getCollectionBookCount(
+  collectionId: string,
+  profileId?: string,
+): Promise<number> {
   // Verify collection belongs to this profile (if profileId provided)
   const collection = await getCollection(collectionId, profileId);
   if (!collection) return 0;
@@ -188,5 +210,5 @@ export async function getCollectionBookCounts(
     .from(booksCollections)
     .where(inArray(booksCollections.collectionId, collectionIds))
     .groupBy(booksCollections.collectionId);
-  return new Map(rows.map(r => [r.collectionId, r.count]));
+  return new Map(rows.map((r) => [r.collectionId, r.count]));
 }

@@ -48,9 +48,9 @@ function toApiProfile(profile: Profile) {
     hasPin: !!profile.pinHash,
     isAdmin: profile.isAdmin ?? false,
     createdAt: profile.createdAt
-      ? (profile.createdAt instanceof Date
-          ? profile.createdAt.toISOString()
-          : new Date(profile.createdAt * 1000).toISOString())
+      ? profile.createdAt instanceof Date
+        ? profile.createdAt.toISOString()
+        : new Date(profile.createdAt * 1000).toISOString()
       : null,
   };
 }
@@ -70,22 +70,12 @@ app.get("/api/profiles", (c) => {
 app.get("/api/profiles/me", (c) => {
   const profileId = c.get("profileId");
   if (!profileId) {
-    return c.json(
-      { success: false, error: "No profile selected", code: "NO_PROFILE" },
-      401,
-    );
+    return c.json({ success: false, error: "No profile selected", code: "NO_PROFILE" }, 401);
   }
 
-  const profile = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, profileId))
-    .get();
+  const profile = db.select().from(profiles).where(eq(profiles.id, profileId)).get();
   if (!profile) {
-    return c.json(
-      { success: false, error: "Profile not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Profile not found", code: "NOT_FOUND" }, 404);
   }
 
   return c.json({ success: true, profile: toApiProfile(profile) });
@@ -116,18 +106,11 @@ app.post("/api/profiles", async (c) => {
   }>();
 
   if (!body.name || body.name.trim().length === 0) {
-    return c.json(
-      { success: false, error: "Name is required", code: "VALIDATION" },
-      400,
-    );
+    return c.json({ success: false, error: "Name is required", code: "VALIDATION" }, 400);
   }
 
   // Check for duplicate name
-  const existing = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.name, body.name.trim()))
-    .get();
+  const existing = db.select().from(profiles).where(eq(profiles.name, body.name.trim())).get();
   if (existing) {
     return c.json(
       {
@@ -175,16 +158,9 @@ app.put("/api/profiles/:id", async (c) => {
     );
   }
 
-  const existing = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, targetId))
-    .get();
+  const existing = db.select().from(profiles).where(eq(profiles.id, targetId)).get();
   if (!existing) {
-    return c.json(
-      { success: false, error: "Profile not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Profile not found", code: "NOT_FOUND" }, 404);
   }
 
   const body = await c.req.json<{
@@ -206,22 +182,12 @@ app.put("/api/profiles/:id", async (c) => {
 
   if (body.name !== undefined) {
     if (body.name.trim().length === 0) {
-      return c.json(
-        { success: false, error: "Name cannot be empty", code: "VALIDATION" },
-        400,
-      );
+      return c.json({ success: false, error: "Name cannot be empty", code: "VALIDATION" }, 400);
     }
     // Check duplicate name (excluding self)
-    const duplicate = db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.name, body.name.trim()))
-      .get();
+    const duplicate = db.select().from(profiles).where(eq(profiles.name, body.name.trim())).get();
     if (duplicate && duplicate.id !== targetId) {
-      return c.json(
-        { success: false, error: "Name already taken", code: "DUPLICATE" },
-        409,
-      );
+      return c.json({ success: false, error: "Name already taken", code: "DUPLICATE" }, 409);
     }
     updates.name = body.name.trim();
   }
@@ -241,11 +207,7 @@ app.put("/api/profiles/:id", async (c) => {
 
   db.update(profiles).set(updates).where(eq(profiles.id, targetId)).run();
 
-  const updated = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, targetId))
-    .get()!;
+  const updated = db.select().from(profiles).where(eq(profiles.id, targetId)).get()!;
   return c.json({ success: true, profile: toApiProfile(updated) });
 });
 
@@ -339,16 +301,9 @@ app.delete("/api/profiles/:id", requireAdmin, async (c) => {
     );
   }
 
-  const existing = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, targetId))
-    .get();
+  const existing = db.select().from(profiles).where(eq(profiles.id, targetId)).get();
   if (!existing) {
-    return c.json(
-      { success: false, error: "Profile not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Profile not found", code: "NOT_FOUND" }, 404);
   }
 
   // Clean up avatar image file if it exists
@@ -367,16 +322,9 @@ app.delete("/api/profiles/:id", requireAdmin, async (c) => {
 app.post("/api/profiles/:id/select", async (c) => {
   const targetId = c.req.param("id");
 
-  const profile = db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, targetId))
-    .get();
+  const profile = db.select().from(profiles).where(eq(profiles.id, targetId)).get();
   if (!profile) {
-    return c.json(
-      { success: false, error: "Profile not found", code: "NOT_FOUND" },
-      404,
-    );
+    return c.json({ success: false, error: "Profile not found", code: "NOT_FOUND" }, 404);
   }
 
   // Verify PIN if the profile has one
@@ -388,10 +336,7 @@ app.post("/api/profiles/:id/select", async (c) => {
       // No body provided
     }
     if (!body.pin || !verifyPin(body.pin, profile.pinHash)) {
-      return c.json(
-        { success: false, error: "Invalid PIN", code: "INVALID_PIN" },
-        401,
-      );
+      return c.json({ success: false, error: "Invalid PIN", code: "INVALID_PIN" }, 401);
     }
   }
 

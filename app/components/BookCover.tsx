@@ -24,13 +24,7 @@ interface BookCoverProps {
  * Renders a book cover image with fallback.
  * Fills its container — parent controls width, height, aspect-ratio, border-radius, and overflow.
  */
-export function BookCover({
-  book,
-  size = "thumb",
-  alt,
-  imgClassName,
-  fallback,
-}: BookCoverProps) {
+export function BookCover({ book, size = "thumb", alt, imgClassName, fallback }: BookCoverProps) {
   const url = getCoverUrl(book, size);
 
   if (url) {

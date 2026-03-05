@@ -68,7 +68,7 @@ export default function UnmatchedBooks() {
         setCurrentBook(null);
       }
       setTotalRemaining(count);
-    } catch (error) {
+    } catch {
       setMessage("Failed to load book");
     } finally {
       setLoading(false);
@@ -123,7 +123,11 @@ export default function UnmatchedBooks() {
 
     try {
       const authors = currentBook.authors ? JSON.parse(currentBook.authors) : [];
-      const results = await searchMetadata(searchQuery, authors[0], currentBook.format as BookFormat);
+      const results = await searchMetadata(
+        searchQuery,
+        authors[0],
+        currentBook.format as BookFormat,
+      );
       setSearchResults(results);
       if (results.length === 0) {
         setMessage("No results found. Try different search terms.");
@@ -165,7 +169,7 @@ export default function UnmatchedBooks() {
       } else {
         setMessage(result.message);
       }
-    } catch (error) {
+    } catch {
       setMessage("Failed to apply metadata");
     } finally {
       setApplying(false);
@@ -191,7 +195,7 @@ export default function UnmatchedBooks() {
       } else {
         setMessage("Failed to delete book");
       }
-    } catch (error) {
+    } catch {
       setMessage("Failed to delete book");
     } finally {
       setDeleting(false);
@@ -209,12 +213,7 @@ export default function UnmatchedBooks() {
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-foreground mb-2">All caught up!</h2>
@@ -489,7 +488,11 @@ export default function UnmatchedBooks() {
                     className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-foreground"
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   />
-                  <button onClick={handleSearch} disabled={searching} className={`${buttonStyles.base} ${buttonStyles.primary}`}>
+                  <button
+                    onClick={handleSearch}
+                    disabled={searching}
+                    className={`${buttonStyles.base} ${buttonStyles.primary}`}
+                  >
                     {searching ? "..." : "Search"}
                   </button>
                 </div>
@@ -591,7 +594,8 @@ export default function UnmatchedBooks() {
           <div className="bg-surface border border-border rounded-xl p-6 max-w-lg w-full">
             <h3 className="text-lg font-semibold text-foreground mb-2">Update Cover Image?</h3>
             <p className="text-foreground-muted mb-4">
-              This book already has a cover. Would you like to replace it with the one from the metadata source?
+              This book already has a cover. Would you like to replace it with the one from the
+              metadata source?
             </p>
 
             {/* Side by side cover comparison */}
@@ -602,11 +606,7 @@ export default function UnmatchedBooks() {
                   className="w-24 h-36 rounded-lg overflow-hidden border border-border bg-surface-elevated"
                   style={{ backgroundColor: currentBook.coverColor || undefined }}
                 >
-                  <BookCover
-                    book={currentBook}
-                    size="full"
-                    alt="Current cover"
-                  />
+                  <BookCover book={currentBook} size="full" alt="Current cover" />
                 </div>
               </div>
               {(pendingMetadata.coverUrlHQ || pendingMetadata.coverUrl) && (

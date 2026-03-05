@@ -30,7 +30,11 @@ export function MonthlyHeatmap({ dailyData }: MonthlyHeatmapProps) {
       <div className="flex flex-wrap gap-1">
         {dailyData.map(({ date, minutes }) => {
           const d = new Date(date + "T12:00:00");
-          const dayLabel = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+          const dayLabel = d.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          });
 
           return (
             <div

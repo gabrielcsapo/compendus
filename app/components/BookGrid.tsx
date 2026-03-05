@@ -7,7 +7,11 @@ interface BookGridProps {
   size?: "default" | "compact";
 }
 
-export function BookGrid({ books, emptyMessage = "No books found", size = "default" }: BookGridProps) {
+export function BookGrid({
+  books,
+  emptyMessage = "No books found",
+  size = "default",
+}: BookGridProps) {
   if (books.length === 0) {
     return (
       <div className="text-center py-16">
@@ -31,9 +35,10 @@ export function BookGrid({ books, emptyMessage = "No books found", size = "defau
     );
   }
 
-  const gridClass = size === "compact"
-    ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3"
-    : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5";
+  const gridClass =
+    size === "compact"
+      ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3"
+      : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5";
 
   return (
     <div className={gridClass}>

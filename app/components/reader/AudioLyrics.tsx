@@ -146,9 +146,7 @@ export function AudioLyrics({ bookId, currentTime, onSeek, theme }: AudioLyricsP
                 })}
               </span>
             ) : (
-              <span style={{ color: isPast ? theme.foreground : theme.muted }}>
-                {segment.text}
-              </span>
+              <span style={{ color: isPast ? theme.foreground : theme.muted }}>{segment.text}</span>
             )}
           </div>
         );

@@ -49,7 +49,10 @@ async function findOpfPath(zip: JSZip): Promise<{ opfPath: string; opfDir: strin
 /**
  * Parse the OPF content to extract structure
  */
-function parseOpf(opfContent: string, _opfDir: string): {
+function parseOpf(
+  opfContent: string,
+  _opfDir: string,
+): {
   metadata: EpubMetadata;
   manifest: Map<string, { href: string; mediaType: string; properties?: string }>;
   spine: string[];
@@ -239,10 +242,7 @@ export async function updateSpine(bookId: string, newSpine: string[]): Promise<v
   const newSpineBlock = `${spineOpenTag}\n${spineItems}\n  </spine>`;
 
   // Replace the existing spine block
-  const updatedOpf = opfContent.replace(
-    /<spine[^>]*>[\s\S]*?<\/spine>/i,
-    newSpineBlock,
-  );
+  const updatedOpf = opfContent.replace(/<spine[^>]*>[\s\S]*?<\/spine>/i, newSpineBlock);
 
   session.zip.file(session.opfPath, updatedOpf);
   session.isDirty = true;
@@ -272,23 +272,15 @@ export async function addFile(
   const opfContent = await session.zip.file(session.opfPath)?.async("string");
   if (!opfContent) throw new Error("Could not read OPF file");
 
-  const href = path.startsWith(session.opfDir)
-    ? path.slice(session.opfDir.length)
-    : path;
+  const href = path.startsWith(session.opfDir) ? path.slice(session.opfDir.length) : path;
 
   const manifestEntry = `    <item id="${id}" href="${href}" media-type="${mediaType}"/>`;
-  let updatedOpf = opfContent.replace(
-    /<\/manifest>/i,
-    `${manifestEntry}\n  </manifest>`,
-  );
+  let updatedOpf = opfContent.replace(/<\/manifest>/i, `${manifestEntry}\n  </manifest>`);
 
   // Optionally add to spine
   if (addToSpine) {
     const spineEntry = `    <itemref idref="${id}"/>`;
-    updatedOpf = updatedOpf.replace(
-      /<\/spine>/i,
-      `${spineEntry}\n  </spine>`,
-    );
+    updatedOpf = updatedOpf.replace(/<\/spine>/i, `${spineEntry}\n  </spine>`);
   }
 
   session.zip.file(session.opfPath, updatedOpf);
@@ -310,9 +302,7 @@ export async function removeFile(bookId: string, path: string): Promise<void> {
   if (!opfContent) throw new Error("Could not read OPF file");
 
   // Find the manifest item by href
-  const href = path.startsWith(session.opfDir)
-    ? path.slice(session.opfDir.length)
-    : path;
+  const href = path.startsWith(session.opfDir) ? path.slice(session.opfDir.length) : path;
 
   // Find the item ID for this href
   const itemMatch = opfContent.match(

@@ -33,11 +33,14 @@ app.post("/api/books/:id/transcribe", async (c) => {
   }
 
   if (!AUDIO_FORMATS.includes(book.format)) {
-    return c.json({
-      success: false,
-      error: "not_audiobook",
-      message: "Only audiobooks can be transcribed",
-    }, 400);
+    return c.json(
+      {
+        success: false,
+        error: "not_audiobook",
+        message: "Only audiobooks can be transcribed",
+      },
+      400,
+    );
   }
 
   // Check if already transcribed (allow force re-transcription)
@@ -57,11 +60,15 @@ app.post("/api/books/:id/transcribe", async (c) => {
 
   // Check whisper availability
   if (!(await isWhisperAvailable())) {
-    return c.json({
-      success: false,
-      error: "whisper_not_available",
-      message: "whisper-cli is not available. Ensure whisper.cpp is built and whisper-cli is on PATH.",
-    }, 400);
+    return c.json(
+      {
+        success: false,
+        error: "whisper_not_available",
+        message:
+          "whisper-cli is not available. Ensure whisper.cpp is built and whisper-cli is on PATH.",
+      },
+      400,
+    );
   }
 
   // Verify source file exists
@@ -140,10 +147,7 @@ app.put("/api/books/:id/transcript", async (c) => {
 
   await writeFile(outputPath, JSON.stringify(transcript, null, 2), "utf-8");
 
-  await db
-    .update(books)
-    .set({ transcriptPath: relativePath })
-    .where(eq(books.id, bookId));
+  await db.update(books).set({ transcriptPath: relativePath }).where(eq(books.id, bookId));
 
   return c.json({ success: true });
 });
@@ -170,10 +174,7 @@ app.delete("/api/books/:id/transcript", async (c) => {
       await unlink(fullPath).catch(() => {});
     }
 
-    await db
-      .update(books)
-      .set({ transcriptPath: null })
-      .where(eq(books.id, bookId));
+    await db.update(books).set({ transcriptPath: null }).where(eq(books.id, bookId));
   }
 
   return c.json({ success: true });

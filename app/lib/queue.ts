@@ -60,10 +60,7 @@ function notifySubscribers(id: string, job: JobProgress): void {
   }
 }
 
-export function subscribeToJob(
-  id: string,
-  callback: (progress: JobProgress) => void,
-): () => void {
+export function subscribeToJob(id: string, callback: (progress: JobProgress) => void): () => void {
   let subs = subscribers.get(id);
   if (!subs) {
     subs = new Set();
@@ -208,7 +205,11 @@ export function updateJobProgress(
  * Append a line to the job's logs column. Keeps the last 500 lines max.
  */
 export function appendJobLog(id: string, line: string): void {
-  const row = db.select({ logs: backgroundJobs.logs }).from(backgroundJobs).where(eq(backgroundJobs.id, id)).get();
+  const row = db
+    .select({ logs: backgroundJobs.logs })
+    .from(backgroundJobs)
+    .where(eq(backgroundJobs.id, id))
+    .get();
   if (!row) return;
 
   const existing = row.logs ?? "";
@@ -216,7 +217,10 @@ export function appendJobLog(id: string, line: string): void {
   lines.push(line);
   // Keep last 500 lines to prevent unbounded growth
   const trimmed = lines.length > 500 ? lines.slice(-500) : lines;
-  db.update(backgroundJobs).set({ logs: trimmed.join("\n") }).where(eq(backgroundJobs.id, id)).run();
+  db.update(backgroundJobs)
+    .set({ logs: trimmed.join("\n") })
+    .where(eq(backgroundJobs.id, id))
+    .run();
 }
 
 /**
@@ -230,14 +234,25 @@ export function cancelJob(id: string): { success: boolean; message: string } {
 
   if (row.status === "pending") {
     db.delete(backgroundJobs).where(eq(backgroundJobs.id, id)).run();
-    notifySubscribers(id, { id, status: "error", progress: 0, message: "Cancelled", updatedAt: Date.now() });
+    notifySubscribers(id, {
+      id,
+      status: "error",
+      progress: 0,
+      message: "Cancelled",
+      updatedAt: Date.now(),
+    });
     return { success: true, message: "Pending job cancelled" };
   }
 
   if (row.status === "running") {
     // Signal the running job to abort
     currentAbortController?.abort();
-    updateJobProgress(id, { status: "error", progress: 0, message: "Cancelled by user", result: { error: "Cancelled" } });
+    updateJobProgress(id, {
+      status: "error",
+      progress: 0,
+      message: "Cancelled by user",
+      result: { error: "Cancelled" },
+    });
     return { success: true, message: "Running job cancelled" };
   }
 
@@ -266,7 +281,9 @@ async function processTranscribeJob(jobId: string, payload: TranscribePayload): 
 
   // Check whisper availability
   if (!(await isWhisperAvailable())) {
-    throw new Error("whisper-cli is not available. Ensure whisper.cpp is built and whisper-cli is on PATH.");
+    throw new Error(
+      "whisper-cli is not available. Ensure whisper.cpp is built and whisper-cli is on PATH.",
+    );
   }
 
   await transcribeAudio(bookPath, outputPath, {
@@ -330,14 +347,18 @@ async function processConvertJob(jobId: string, payload: ConvertPayload): Promis
     })
     .where(eq(books.id, bookId));
 
-  console.log(`[Queue] ${format.toUpperCase()} → EPUB conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`);
+  console.log(
+    `[Queue] ${format.toUpperCase()} → EPUB conversion complete for ${bookId} (${(epubSize / 1024).toFixed(1)} KB)`,
+  );
 }
 
 async function processNextJob(): Promise<void> {
   if (processorRunning) {
     // Safety valve: if the processor has been "running" for too long, force-reset it
     if (processorStartedAt && Date.now() - processorStartedAt > MAX_JOB_DURATION_MS) {
-      console.warn(`[Queue] Processor appears stuck (running for ${Math.round((Date.now() - processorStartedAt) / 1000)}s), force-resetting`);
+      console.warn(
+        `[Queue] Processor appears stuck (running for ${Math.round((Date.now() - processorStartedAt) / 1000)}s), force-resetting`,
+      );
       processorRunning = false;
       processorStartedAt = null;
       currentAbortController = null;
@@ -426,11 +447,7 @@ export function startJobProcessor(): void {
   processorStarted = true;
 
   // Reset stale running jobs (server crashed while processing)
-  const stale = db
-    .select()
-    .from(backgroundJobs)
-    .where(eq(backgroundJobs.status, "running"))
-    .all();
+  const stale = db.select().from(backgroundJobs).where(eq(backgroundJobs.status, "running")).all();
 
   // Only reset enqueued job types (not inline jobs like audio merge)
   for (const row of stale) {

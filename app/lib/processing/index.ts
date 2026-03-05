@@ -25,12 +25,7 @@ import {
 } from "./audio";
 import { extractCover, processAndStoreCover } from "./cover";
 import { convertCbrToCbz } from "./comic";
-import {
-  suppressConsole,
-  yieldToEventLoop,
-  scheduleBackground,
-  runInWorker,
-} from "./utils";
+import { suppressConsole, yieldToEventLoop, scheduleBackground, runInWorker } from "./utils";
 import { createJob, updateJobProgress } from "../queue";
 import type {
   BookFormat,
@@ -58,11 +53,7 @@ export async function processBook(
   const fileHash = createHash("sha256").update(buffer).digest("hex");
 
   // Step 2: Check for duplicates
-  const existing = await db
-    .select()
-    .from(books)
-    .where(eq(books.fileHash, fileHash))
-    .get();
+  const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
 
   if (existing && !options.overwriteExisting) {
     return {
@@ -84,23 +75,15 @@ export async function processBook(
   let processedFileName = fileName;
   if (detectedFormat === "cbr") {
     try {
-      console.log(
-        `[processBook] Converting CBR → CBZ at upload time: ${fileName}`,
-      );
-      const result = await runInWorker<Uint8Array>(
-        "convertCbrToCbz",
-        buffer,
-        "cbr",
-        async () => convertCbrToCbz(buffer),
+      console.log(`[processBook] Converting CBR → CBZ at upload time: ${fileName}`);
+      const result = await runInWorker<Uint8Array>("convertCbrToCbz", buffer, "cbr", async () =>
+        convertCbrToCbz(buffer),
       );
       processedBuffer = Buffer.from(result);
       format = "cbz";
       processedFileName = fileName.replace(/\.cbr$/i, ".cbz");
     } catch (error) {
-      console.error(
-        "[processBook] CBR → CBZ conversion failed, storing as CBR:",
-        error,
-      );
+      console.error("[processBook] CBR → CBZ conversion failed, storing as CBR:", error);
       // Fall back to storing original CBR
     }
   }
@@ -109,10 +92,7 @@ export async function processBook(
   const bookId = uuid();
   const storedPath = storeBookFile(processedBuffer, bookId, format);
   const mimeType = lookup(processedFileName) || "application/octet-stream";
-  const titleFromFilename = basename(
-    processedFileName,
-    extname(processedFileName),
-  );
+  const titleFromFilename = basename(processedFileName, extname(processedFileName));
 
   // For large files, save immediately with basic info and process in background
   if (processedBuffer.length > BACKGROUND_PROCESSING_THRESHOLD) {
@@ -148,11 +128,7 @@ export async function processBook(
         error.code === "SQLITE_CONSTRAINT_UNIQUE"
       ) {
         // Another concurrent upload of the same file succeeded first
-        const existing = await db
-          .select()
-          .from(books)
-          .where(eq(books.fileHash, fileHash))
-          .get();
+        const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
         return {
           success: false,
           error: "duplicate",
@@ -175,11 +151,8 @@ export async function processBook(
   // For smaller files, do full processing synchronously (original behavior)
   let metadata: BookMetadata | AudioMetadata;
   try {
-    metadata = await runInWorker<BookMetadata>(
-      "extractMetadata",
-      processedBuffer,
-      format,
-      () => suppressConsole(() => extractMetadata(processedBuffer, format)),
+    metadata = await runInWorker<BookMetadata>("extractMetadata", processedBuffer, format, () =>
+      suppressConsole(() => extractMetadata(processedBuffer, format)),
     );
   } catch {
     metadata = {
@@ -205,9 +178,7 @@ export async function processBook(
         thumbnail: Buffer.from(coverResultRaw.thumbnail),
       }
     : null;
-  const coverPath = coverResult
-    ? storeCoverImage(coverResult.buffer, bookId)
-    : null;
+  const coverPath = coverResult ? storeCoverImage(coverResult.buffer, bookId) : null;
   if (coverResult) storeCoverThumbnail(coverResult.thumbnail, bookId);
 
   // Merge extracted metadata with overrides (overrides take precedence)
@@ -241,9 +212,7 @@ export async function processBook(
       // Audio-specific fields
       duration: audioMetadata.duration,
       narrator: audioMetadata.narrator,
-      chapters: audioMetadata.chapters
-        ? JSON.stringify(audioMetadata.chapters)
-        : null,
+      chapters: audioMetadata.chapters ? JSON.stringify(audioMetadata.chapters) : null,
     });
   } catch (error: unknown) {
     // Handle UNIQUE constraint violation (race condition with duplicate upload)
@@ -253,11 +222,7 @@ export async function processBook(
       "code" in error &&
       error.code === "SQLITE_CONSTRAINT_UNIQUE"
     ) {
-      const existing = await db
-        .select()
-        .from(books)
-        .where(eq(books.fileHash, fileHash))
-        .get();
+      const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
       return {
         success: false,
         error: "duplicate",
@@ -293,12 +258,7 @@ function detectFormat(fileName: string, buffer: Buffer): BookFormat | null {
   const header = buffer.subarray(0, 8);
 
   // PDF: %PDF
-  if (
-    header[0] === 0x25 &&
-    header[1] === 0x50 &&
-    header[2] === 0x44 &&
-    header[3] === 0x46
-  ) {
+  if (header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46) {
     return "pdf";
   }
 
@@ -313,12 +273,7 @@ function detectFormat(fileName: string, buffer: Buffer): BookFormat | null {
   }
 
   // CBR: RAR archive (Rar!)
-  if (
-    header[0] === 0x52 &&
-    header[1] === 0x61 &&
-    header[2] === 0x72 &&
-    header[3] === 0x21
-  ) {
+  if (header[0] === 0x52 && header[1] === 0x61 && header[2] === 0x72 && header[3] === 0x21) {
     return "cbr";
   }
 
@@ -337,12 +292,7 @@ function detectFormat(fileName: string, buffer: Buffer): BookFormat | null {
   }
 
   // M4B/M4A: MP4 container with 'ftyp' atom
-  if (
-    header[4] === 0x66 &&
-    header[5] === 0x74 &&
-    header[6] === 0x79 &&
-    header[7] === 0x70
-  ) {
+  if (header[4] === 0x66 && header[5] === 0x74 && header[6] === 0x79 && header[7] === 0x70) {
     // Check brand type to distinguish M4B from M4A
     const brand = buffer.subarray(8, 12).toString();
     if (brand === "M4B " || brand === "isom") {
@@ -354,10 +304,7 @@ function detectFormat(fileName: string, buffer: Buffer): BookFormat | null {
   return null;
 }
 
-async function extractMetadata(
-  buffer: Buffer,
-  format: BookFormat,
-): Promise<BookMetadata> {
+async function extractMetadata(buffer: Buffer, format: BookFormat): Promise<BookMetadata> {
   switch (format) {
     case "pdf":
       return extractPdfMetadata(buffer);
@@ -381,20 +328,13 @@ async function extractMetadata(
 }
 
 // Background processing for large files - extracts metadata, cover, and indexes content
-function queueBackgroundProcessing(
-  bookId: string,
-  buffer: Buffer,
-  format: BookFormat,
-) {
+function queueBackgroundProcessing(bookId: string, buffer: Buffer, format: BookFormat) {
   scheduleBackground(async () => {
     // Extract metadata in worker thread (falls back to main thread)
     let metadata: BookMetadata | AudioMetadata;
     try {
-      metadata = await runInWorker<BookMetadata>(
-        "extractMetadata",
-        buffer,
-        format,
-        () => suppressConsole(() => extractMetadata(buffer, format)),
+      metadata = await runInWorker<BookMetadata>("extractMetadata", buffer, format, () =>
+        suppressConsole(() => extractMetadata(buffer, format)),
       );
     } catch {
       metadata = { title: null, authors: [] };
@@ -418,9 +358,7 @@ function queueBackgroundProcessing(
           thumbnail: Buffer.from(coverResultRaw.thumbnail),
         }
       : null;
-    const coverPath = coverResult
-      ? storeCoverImage(coverResult.buffer, bookId)
-      : null;
+    const coverPath = coverResult ? storeCoverImage(coverResult.buffer, bookId) : null;
     if (coverResult) storeCoverThumbnail(coverResult.thumbnail, bookId);
 
     // Yield again before database operations
@@ -437,8 +375,7 @@ function queueBackgroundProcessing(
       updateData.authors = JSON.stringify(metadata.authors);
     }
     if (metadata.publisher) updateData.publisher = metadata.publisher;
-    if (metadata.publishedDate)
-      updateData.publishedDate = metadata.publishedDate;
+    if (metadata.publishedDate) updateData.publishedDate = metadata.publishedDate;
     if (metadata.description) updateData.description = metadata.description;
     if (metadata.isbn) updateData.isbn = metadata.isbn;
     if (metadata.isbn13) updateData.isbn13 = metadata.isbn13;
@@ -475,9 +412,7 @@ export async function processMultiFileAudiobookWithProgress(
   const startTime = Date.now();
 
   // Use existing job ID or create a new one
-  const jobId =
-    existingJobId ||
-    `merge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const jobId = existingJobId || `merge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // Only create job if we don't have an existing one
   if (!existingJobId) {
@@ -550,16 +485,10 @@ export async function processMultiFileAudiobookWithProgress(
   });
 
   // Compute hash of merged file for deduplication
-  const fileHash = createHash("sha256")
-    .update(mergeResult.outputBuffer!)
-    .digest("hex");
+  const fileHash = createHash("sha256").update(mergeResult.outputBuffer!).digest("hex");
 
   // Check for duplicates
-  const existing = await db
-    .select()
-    .from(books)
-    .where(eq(books.fileHash, fileHash))
-    .get();
+  const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
   if (existing && !options.overwriteExisting) {
     // Clean up the merged file since it's a duplicate
     const { deleteBookFile } = await import("../storage");
@@ -579,27 +508,19 @@ export async function processMultiFileAudiobookWithProgress(
   // Extract metadata from first file
   let metadata: AudioMetadata;
   try {
-    metadata = await suppressConsole(() =>
-      extractAudioMetadata(sortedFiles[0].buffer),
-    );
+    metadata = await suppressConsole(() => extractAudioMetadata(sortedFiles[0].buffer));
   } catch {
     metadata = { title: null, authors: [] };
   }
 
   // Extract cover from first file (or try all files until we find one)
-  let rawCover = await suppressConsole(() =>
-    extractAudioCover(sortedFiles[0].buffer),
-  );
+  let rawCover = await suppressConsole(() => extractAudioCover(sortedFiles[0].buffer));
   if (!rawCover) {
     for (let i = 1; i < sortedFiles.length && !rawCover; i++) {
-      rawCover = await suppressConsole(() =>
-        extractAudioCover(sortedFiles[i].buffer),
-      );
+      rawCover = await suppressConsole(() => extractAudioCover(sortedFiles[i].buffer));
     }
   }
-  const coverResult = rawCover
-    ? await processAndStoreCover(rawCover.buffer, bookId)
-    : null;
+  const coverResult = rawCover ? await processAndStoreCover(rawCover.buffer, bookId) : null;
   const coverPath = coverResult?.path || null;
 
   // Merge metadata with overrides
@@ -626,9 +547,7 @@ export async function processMultiFileAudiobookWithProgress(
       coverColor: coverResult?.dominantColor,
       duration: mergeResult.duration,
       narrator: metadata.narrator,
-      chapters: mergeResult.chapters
-        ? JSON.stringify(mergeResult.chapters)
-        : null,
+      chapters: mergeResult.chapters ? JSON.stringify(mergeResult.chapters) : null,
     });
   } catch (error: unknown) {
     // Handle UNIQUE constraint violation
@@ -638,11 +557,7 @@ export async function processMultiFileAudiobookWithProgress(
       "code" in error &&
       error.code === "SQLITE_CONSTRAINT_UNIQUE"
     ) {
-      const existing = await db
-        .select()
-        .from(books)
-        .where(eq(books.fileHash, fileHash))
-        .get();
+      const existing = await db.select().from(books).where(eq(books.fileHash, fileHash)).get();
       updateJobProgress(jobId, {
         status: "error",
         result: { error: "duplicate" },

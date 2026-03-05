@@ -4,9 +4,7 @@ export default function GettingStarted() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Getting Started
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Getting Started</h1>
         <p className="text-foreground-muted">
           Set up Compendus on your local machine or deploy with Docker.
         </p>
@@ -14,9 +12,7 @@ export default function GettingStarted() {
 
       {/* Prerequisites */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Prerequisites
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Prerequisites</h2>
         <ul className="list-disc list-inside space-y-2 text-foreground">
           <li>
             <strong>Node.js 20+</strong> — Required runtime
@@ -29,20 +25,15 @@ export default function GettingStarted() {
             )
           </li>
           <li>
-            <strong>Git LFS</strong> — Required for cloning (large binary
-            tracking)
+            <strong>Git LFS</strong> — Required for cloning (large binary tracking)
           </li>
         </ul>
       </section>
 
       {/* Clone and Install */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Installation
-        </h2>
-        <p className="text-foreground mb-3">
-          Clone the repository and install dependencies:
-        </p>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Installation</h2>
+        <p className="text-foreground mb-3">Clone the repository and install dependencies:</p>
         <CodeBlock language="bash">{`# Install Git LFS (if not already installed)
 git lfs install
 
@@ -56,9 +47,7 @@ pnpm install`}</CodeBlock>
 
       {/* Database Setup */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Database Setup
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Database Setup</h2>
         <p className="text-foreground mb-3">
           Compendus uses SQLite with Drizzle ORM. Initialize the database:
         </p>
@@ -73,9 +62,7 @@ pnpm db:migrate`}</CodeBlock>
             data/compendus.db
           </code>
           . Book files are stored in{" "}
-          <code className="bg-surface-elevated px-1 rounded border border-border">
-            data/books/
-          </code>{" "}
+          <code className="bg-surface-elevated px-1 rounded border border-border">data/books/</code>{" "}
           and covers in{" "}
           <code className="bg-surface-elevated px-1 rounded border border-border">
             data/covers/
@@ -86,64 +73,52 @@ pnpm db:migrate`}</CodeBlock>
 
       {/* Environment Variables */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Environment Variables
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Environment Variables</h2>
         <p className="text-foreground mb-3">
           Create a{" "}
-          <code className="bg-surface-elevated px-1 rounded border border-border">
-            .env
-          </code>{" "}
-          file in the project root:
+          <code className="bg-surface-elevated px-1 rounded border border-border">.env</code> file
+          in the project root:
         </p>
         <CodeBlock language="bash">{`# Google Books API key (for metadata fetching)
 GOOGLE_BOOKS_API_KEY=your_api_key_here`}</CodeBlock>
         <p className="text-sm text-foreground-muted mt-2">
-          The Google Books API key is optional but recommended for automatic
-          metadata fetching. Without it, metadata must be entered manually.
+          The Google Books API key is optional but recommended for automatic metadata fetching.
+          Without it, metadata must be entered manually.
         </p>
       </section>
 
       {/* Running the Dev Server */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Development Server
-        </h2>
-        <p className="text-foreground mb-3">
-          Start the development server:
-        </p>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Development Server</h2>
+        <p className="text-foreground mb-3">Start the development server:</p>
         <CodeBlock language="bash">{`pnpm dev`}</CodeBlock>
         <p className="text-foreground mt-3">
           The app will be available at{" "}
           <code className="bg-surface-elevated px-1 rounded border border-border">
             http://localhost:3000
           </code>
-          . The dev server includes hot module reloading, API routes, and React
-          Server Components support.
+          . The dev server includes hot module reloading, API routes, and React Server Components
+          support.
         </p>
       </section>
 
       {/* Production Build */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Production Build
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Production Build</h2>
         <CodeBlock language="bash">{`# Build the application
 pnpm build
 
 # Start the production server
 pnpm start`}</CodeBlock>
         <p className="text-sm text-foreground-muted mt-2">
-          The build process compiles worker threads, bundles React Server
-          Components, and copies database migrations.
+          The build process compiles worker threads, bundles React Server Components, and copies
+          database migrations.
         </p>
       </section>
 
       {/* Docker */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Docker Deployment
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Docker Deployment</h2>
         <p className="text-foreground mb-3">
           Compendus includes Docker support for easy deployment:
         </p>
@@ -155,19 +130,14 @@ docker build -t compendus .
 docker run -p 3000:3000 -v ./data:/app/data compendus`}</CodeBlock>
         <p className="text-sm text-foreground-muted mt-2">
           Mount the{" "}
-          <code className="bg-surface-elevated px-1 rounded border border-border">
-            data/
-          </code>{" "}
-          directory as a volume to persist your library across container
-          restarts.
+          <code className="bg-surface-elevated px-1 rounded border border-border">data/</code>{" "}
+          directory as a volume to persist your library across container restarts.
         </p>
       </section>
 
       {/* Available Scripts */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Available Scripts
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Available Scripts</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>

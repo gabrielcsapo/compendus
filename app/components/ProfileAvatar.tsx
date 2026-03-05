@@ -20,11 +20,7 @@ const sizeMap = {
   xl: { container: "w-28 h-28", text: "text-5xl", fallback: "text-2xl" },
 };
 
-export function ProfileAvatar({
-  profile,
-  size = "md",
-  className = "",
-}: ProfileAvatarProps) {
+export function ProfileAvatar({ profile, size = "md", className = "" }: ProfileAvatarProps) {
   const avatarUrl = getAvatarUrl(profile);
   const s = sizeMap[size];
 
@@ -33,11 +29,7 @@ export function ProfileAvatar({
       className={`${s.container} rounded-full bg-surface-elevated border border-border flex items-center justify-center flex-shrink-0 overflow-hidden ${className}`}
     >
       {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt={profile.name}
-          className="w-full h-full object-cover"
-        />
+        <img src={avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
       ) : profile.avatar ? (
         <span className={s.text}>{profile.avatar}</span>
       ) : (

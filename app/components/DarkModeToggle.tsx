@@ -28,7 +28,10 @@ export function DarkModeToggle() {
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <button className={`${buttonStyles.base} ${buttonStyles.ghost} p-2 rounded-lg w-10 h-10`} aria-label="Toggle theme">
+      <button
+        className={`${buttonStyles.base} ${buttonStyles.ghost} p-2 rounded-lg w-10 h-10`}
+        aria-label="Toggle theme"
+      >
         <span className="w-5 h-5" />
       </button>
     );

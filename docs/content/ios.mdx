@@ -98,13 +98,13 @@ The iOS app uses a custom-built reader engine with native iOS rendering.
 
 The iOS app communicates with the Compendus server through the REST API. Key interactions:
 
-| Operation | Endpoint |
-|---|---|
-| Browse library | `GET /api/library` |
-| Search books | `GET /api/search?q=...` |
-| Get book details | `GET /api/books/:id` |
-| Download book file | `GET /books/:id.:format` |
-| Download cover | `GET /covers/:id.jpg` |
-| Update book metadata | `PUT /api/books/:id` |
-| Upload transcript | `PUT /api/books/:id/transcript` |
-| Get EPUB resources | `GET /api/reader/:id/resource/*` |
+| Operation            | Endpoint                         |
+| -------------------- | -------------------------------- |
+| Browse library       | `GET /api/library`               |
+| Search books         | `GET /api/search?q=...`          |
+| Get book details     | `GET /api/books/:id`             |
+| Download book file   | `GET /books/:id.:format`         |
+| Download cover       | `GET /covers/:id.jpg`            |
+| Update book metadata | `PUT /api/books/:id`             |
+| Upload transcript    | `PUT /api/books/:id/transcript`  |
+| Get EPUB resources   | `GET /api/reader/:id/resource/*` |

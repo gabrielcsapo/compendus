@@ -216,7 +216,8 @@ export function GlobalUploadDropzone() {
         toastTimeoutRef.current = setTimeout(() => {
           setUploads((prev) => {
             const hasActive = prev.some(
-              (u) => u.status === "uploading" || u.status === "processing" || u.status === "merging",
+              (u) =>
+                u.status === "uploading" || u.status === "processing" || u.status === "merging",
             );
             if (!hasActive) {
               const successCount = prev.filter((u) => u.status === "done").length;
@@ -316,7 +317,12 @@ export function GlobalUploadDropzone() {
           };
         } else if (result.success && result.book) {
           // Immediate success (no background job)
-          updateUpload(uploadId, { status: "done", progress: 100, mergeProgress: 100, bookId: result.book.id });
+          updateUpload(uploadId, {
+            status: "done",
+            progress: 100,
+            mergeProgress: 100,
+            bookId: result.book.id,
+          });
           scheduleAutoHide();
         }
       } catch {
@@ -486,9 +492,7 @@ export function GlobalUploadDropzone() {
         for (const item of Array.from(items)) {
           const entry = item.webkitGetAsEntry?.();
           if (entry?.isDirectory) {
-            const audioFiles = await getAudioFilesFromDirectory(
-              entry as FileSystemDirectoryEntry,
-            );
+            const audioFiles = await getAudioFilesFromDirectory(entry as FileSystemDirectoryEntry);
             if (audioFiles.length > 1) {
               // Multi-file audiobook - merge and upload
               handleMultiFileAudiobook(audioFiles, entry.name);
@@ -575,7 +579,9 @@ export function GlobalUploadDropzone() {
               </div>
               <p className="text-xl font-semibold text-foreground">Drop files to upload</p>
               <p className="text-foreground-muted mt-1">PDF, EPUB, CBZ, M4B, MP3</p>
-              <p className="text-foreground-muted/60 text-sm mt-0.5">Also accepts MOBI, AZW, CBR (auto-converted)</p>
+              <p className="text-foreground-muted/60 text-sm mt-0.5">
+                Also accepts MOBI, AZW, CBR (auto-converted)
+              </p>
             </div>
           </div>
         </div>

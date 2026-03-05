@@ -195,7 +195,12 @@ export function EpubEditorShell({ bookId, bookTitle, returnUrl }: EpubEditorShel
       <div className="h-screen flex flex-col bg-background">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 text-error mx-auto mb-3">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-10 h-10 text-error mx-auto mb-3"
+            >
               <path
                 fillRule="evenodd"
                 d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"

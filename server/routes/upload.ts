@@ -70,9 +70,13 @@ function parseMultipartToDisk(c: Context): Promise<ParsedMultipart> {
           fields,
           cleanup: () => {
             for (const f of files) {
-              try { unlinkSync(f.tempPath); } catch {}
+              try {
+                unlinkSync(f.tempPath);
+              } catch {}
             }
-            try { rmdirSync(tmpDir); } catch {}
+            try {
+              rmdirSync(tmpDir);
+            } catch {}
           },
         });
       } catch (err) {
@@ -238,10 +242,9 @@ app.post("/api/upload-multifile", async (c) => {
     createJob(jobId);
 
     // Start processing in the background (don't await)
-    processMultiFileAudiobookWithProgress(files, folderName, {}, jobId)
-      .catch((error) => {
-        console.error("Background merge error:", error);
-      });
+    processMultiFileAudiobookWithProgress(files, folderName, {}, jobId).catch((error) => {
+      console.error("Background merge error:", error);
+    });
 
     // Return immediately with jobId so client can subscribe to SSE
     return c.json({
@@ -277,11 +280,14 @@ app.post("/api/books/:id/file", async (c) => {
     // Validate the uploaded file's extension matches the book's format
     const expectedExt = `.${book.format}`;
     if (!fileEntry.fileName.toLowerCase().endsWith(expectedExt)) {
-      return c.json({
-        success: false,
-        error: "format_mismatch",
-        message: `Expected a ${book.format.toUpperCase()} file`,
-      }, 400);
+      return c.json(
+        {
+          success: false,
+          error: "format_mismatch",
+          message: `Expected a ${book.format.toUpperCase()} file`,
+        },
+        400,
+      );
     }
 
     // Read file and compute hash

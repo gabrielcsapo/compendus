@@ -63,7 +63,7 @@ interface ApiSearchResponse {
   success: true;
   query: string;
   total: number;
-  totalCount?: number;  // Total items in database (for pagination)
+  totalCount?: number; // Total items in database (for pagination)
   limit: number;
   offset: number;
   results: ApiSearchResult[];
@@ -86,7 +86,14 @@ interface ApiErrorResponse {
  * When userState is provided, reading state fields (isRead, rating, review)
  * come from userBookState instead of the deprecated columns on books.
  */
-function toApiBook(book: Book, baseUrl: string, userState?: Pick<UserBookState, "isRead" | "rating" | "review" | "readingProgress" | "lastReadAt" | "lastPosition"> | null): ApiBook {
+function toApiBook(
+  book: Book,
+  baseUrl: string,
+  userState?: Pick<
+    UserBookState,
+    "isRead" | "rating" | "review" | "readingProgress" | "lastReadAt" | "lastPosition"
+  > | null,
+): ApiBook {
   // Parse chapters JSON if present
   let chapters: ApiChapter[] | null = null;
   if (book.chapters) {
@@ -113,8 +120,12 @@ function toApiBook(book: Book, baseUrl: string, userState?: Pick<UserBookState, 
     series: book.series,
     seriesNumber: book.seriesNumber,
     format: book.format,
-    coverUrl: book.coverPath ? `${baseUrl}/covers/${book.id}.jpg?v=${book.updatedAt?.getTime() || ""}` : null,
-    coverThumbnailUrl: book.coverPath ? `${baseUrl}/covers/${book.id}.thumb.jpg?v=${book.updatedAt?.getTime() || ""}` : null,
+    coverUrl: book.coverPath
+      ? `${baseUrl}/covers/${book.id}.jpg?v=${book.updatedAt?.getTime() || ""}`
+      : null,
+    coverThumbnailUrl: book.coverPath
+      ? `${baseUrl}/covers/${book.id}.thumb.jpg?v=${book.updatedAt?.getTime() || ""}`
+      : null,
     addedAt: book.importedAt?.toISOString() || new Date().toISOString(),
     fileSize: book.fileSize,
     duration: book.duration,
@@ -137,7 +148,15 @@ function toApiBook(book: Book, baseUrl: string, userState?: Pick<UserBookState, 
 async function getUserBookStates(
   bookIds: string[],
   profileId: string,
-): Promise<Map<string, Pick<UserBookState, "isRead" | "rating" | "review" | "readingProgress" | "lastReadAt" | "lastPosition">>> {
+): Promise<
+  Map<
+    string,
+    Pick<
+      UserBookState,
+      "isRead" | "rating" | "review" | "readingProgress" | "lastReadAt" | "lastPosition"
+    >
+  >
+> {
   if (bookIds.length === 0) return new Map();
 
   const states = await db
@@ -151,12 +170,7 @@ async function getUserBookStates(
       lastPosition: userBookState.lastPosition,
     })
     .from(userBookState)
-    .where(
-      and(
-        eq(userBookState.profileId, profileId),
-        inArray(userBookState.bookId, bookIds),
-      ),
-    );
+    .where(and(eq(userBookState.profileId, profileId), inArray(userBookState.bookId, bookIds)));
 
   return new Map(states.map((s) => [s.bookId, s]));
 }
@@ -200,7 +214,10 @@ export async function apiSearchBooks(
 
     // Batch-fetch user book states when profileId is available
     const stateMap = profileId
-      ? await getUserBookStates(results.map((r) => r.book.id), profileId)
+      ? await getUserBookStates(
+          results.map((r) => r.book.id),
+          profileId,
+        )
       : null;
 
     return {
@@ -269,9 +286,7 @@ export async function apiLookupByIsbn(
 
     // Batch-fetch user book states when profileId is available
     const allBookIds = [result.id, ...related.map((b) => b.id)];
-    const stateMap = profileId
-      ? await getUserBookStates(allBookIds, profileId)
-      : null;
+    const stateMap = profileId ? await getUserBookStates(allBookIds, profileId) : null;
 
     return {
       success: true,
@@ -311,9 +326,7 @@ export async function apiGetBook(
 
     // Batch-fetch user book states when profileId is available
     const allBookIds = [result.id, ...related.map((b) => b.id)];
-    const stateMap = profileId
-      ? await getUserBookStates(allBookIds, profileId)
-      : null;
+    const stateMap = profileId ? await getUserBookStates(allBookIds, profileId) : null;
 
     return {
       success: true,
@@ -357,7 +370,10 @@ export async function apiListBooks(
 
   try {
     let query = db.select().from(books).$dynamic();
-    let countQuery = db.select({ count: sql<number>`count(*)` }).from(books).$dynamic();
+    let countQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(books)
+      .$dynamic();
 
     // Filter by type if specified
     if (type) {
@@ -398,7 +414,10 @@ export async function apiListBooks(
 
     // Batch-fetch user book states when profileId is available
     const stateMap = profileId
-      ? await getUserBookStates(results.map((b) => b.id), profileId)
+      ? await getUserBookStates(
+          results.map((b) => b.id),
+          profileId,
+        )
       : null;
 
     return {

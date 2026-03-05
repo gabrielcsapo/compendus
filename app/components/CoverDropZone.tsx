@@ -72,7 +72,7 @@ export function CoverDropZone({
           setError(
             result.error === "processing_failed"
               ? "Failed to process image. Make sure it's a valid book cover (portrait orientation)."
-              : "Failed to upload cover"
+              : "Failed to upload cover",
           );
         }
       } catch {
@@ -81,7 +81,7 @@ export function CoverDropZone({
         setIsUploading(false);
       }
     },
-    [bookId, previewUrl, onSuccess]
+    [bookId, previewUrl, onSuccess],
   );
 
   const showConfirmation = useCallback(
@@ -109,7 +109,7 @@ export function CoverDropZone({
       setPendingFile(file);
       setError(null);
     },
-    [previewUrl]
+    [previewUrl],
   );
 
   const cancelUpload = useCallback(() => {
@@ -167,7 +167,7 @@ export function CoverDropZone({
         }
       }
     },
-    [showConfirmation]
+    [showConfirmation],
   );
 
   // Handle paste events (global when component is mounted)
@@ -175,11 +175,7 @@ export function CoverDropZone({
     const handlePaste = (e: ClipboardEvent) => {
       // Check if the paste target is an input/textarea - if so, don't intercept
       const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
         return;
       }
 
@@ -235,9 +231,7 @@ export function CoverDropZone({
           size="full"
           fallback={
             <div className="w-full h-full flex items-center justify-center p-8 bg-gradient-to-br from-primary-light to-accent-light">
-              <span className="text-center text-foreground-muted text-lg font-medium">
-                {title}
-              </span>
+              <span className="text-center text-foreground-muted text-lg font-medium">{title}</span>
             </div>
           }
         />
@@ -245,12 +239,7 @@ export function CoverDropZone({
         {/* Drag overlay */}
         {isDragging && (
           <div className="absolute inset-0 bg-primary/80 flex flex-col items-center justify-center text-white">
-            <svg
-              className="w-12 h-12 mb-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -285,10 +274,7 @@ export function CoverDropZone({
         {error && (
           <div className="absolute bottom-0 left-0 right-0 bg-error/90 text-white text-xs p-2 text-center">
             {error}
-            <button
-              onClick={() => setError(null)}
-              className="ml-2 underline hover:no-underline"
-            >
+            <button onClick={() => setError(null)} className="ml-2 underline hover:no-underline">
               Dismiss
             </button>
           </div>
@@ -305,9 +291,7 @@ export function CoverDropZone({
             className="bg-surface border border-border rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Update Book Cover
-            </h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Update Book Cover</h3>
 
             <p className="text-sm text-foreground-muted mb-4">
               Are you sure you want to use this image as the cover for "{title}"?
@@ -316,11 +300,7 @@ export function CoverDropZone({
             {/* Preview */}
             <div className="flex justify-center mb-4">
               <div className="aspect-[2/3] h-64 overflow-hidden rounded-lg border border-border">
-                <img
-                  src={previewUrl}
-                  alt="Cover preview"
-                  className="w-full h-full object-cover"
-                />
+                <img src={previewUrl} alt="Cover preview" className="w-full h-full object-cover" />
               </div>
             </div>
 

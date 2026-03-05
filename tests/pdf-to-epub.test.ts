@@ -181,9 +181,7 @@ describe("convertPdfToEpub", () => {
       const chapterFiles = Object.keys(zip.files).filter(
         (f) => f.startsWith("OEBPS/chapter-") && f.endsWith(".xhtml"),
       );
-      const allContent = await Promise.all(
-        chapterFiles.map((f) => zip.file(f)!.async("string")),
-      );
+      const allContent = await Promise.all(chapterFiles.map((f) => zip.file(f)!.async("string")));
       const combined = allContent.join("\n");
 
       // 15-page illustrated children's book — should extract story text
@@ -200,9 +198,7 @@ describe("convertPdfToEpub", () => {
       const chapterFiles = Object.keys(zip.files).filter(
         (f) => f.startsWith("OEBPS/chapter-") && f.endsWith(".xhtml"),
       );
-      const allContent = await Promise.all(
-        chapterFiles.map((f) => zip.file(f)!.async("string")),
-      );
+      const allContent = await Promise.all(chapterFiles.map((f) => zip.file(f)!.async("string")));
       const combined = allContent.join("\n");
 
       expect(combined).toContain("The Beginning");
@@ -277,11 +273,15 @@ describe("convertPdfToEpub", () => {
     it("should call onProgress with increasing percentages", async () => {
       const calls: { percent: number; message: string }[] = [];
 
-      await convertPdfToEpub(simpleTextPdf, { title: "Progress" }, {
-        onProgress: (percent, message) => {
-          calls.push({ percent, message });
+      await convertPdfToEpub(
+        simpleTextPdf,
+        { title: "Progress" },
+        {
+          onProgress: (percent, message) => {
+            calls.push({ percent, message });
+          },
         },
-      });
+      );
 
       expect(calls.length).toBeGreaterThan(0);
 

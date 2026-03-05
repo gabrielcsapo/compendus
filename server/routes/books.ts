@@ -24,7 +24,14 @@ app.get("/api/books", async (c) => {
 
   const baseUrl = new URL(c.req.url).origin;
   const result = await apiListBooks(
-    { limit, offset, type: type || undefined, orderBy: orderBy || undefined, order: order || undefined, series: series || undefined },
+    {
+      limit,
+      offset,
+      type: type || undefined,
+      orderBy: orderBy || undefined,
+      order: order || undefined,
+      series: series || undefined,
+    },
     baseUrl,
     profileId,
   );
@@ -66,9 +73,21 @@ app.put("/api/books/:id", async (c) => {
   }
 
   const editableFields = [
-    "title", "subtitle", "authors", "publisher", "publishedDate",
-    "description", "isbn", "language", "pageCount", "series",
-    "seriesNumber", "bookTypeOverride", "isRead", "rating", "review",
+    "title",
+    "subtitle",
+    "authors",
+    "publisher",
+    "publishedDate",
+    "description",
+    "isbn",
+    "language",
+    "pageCount",
+    "series",
+    "seriesNumber",
+    "bookTypeOverride",
+    "isRead",
+    "rating",
+    "review",
   ];
   const updates: Record<string, unknown> = {};
 

@@ -20,13 +20,15 @@ export default function Tags() {
   // Load tags once on mount (not on every tag selection)
   useEffect(() => {
     let cancelled = false;
-    getTagsWithCounts().then(result => {
+    getTagsWithCounts().then((result) => {
       if (!cancelled) {
         setTags(result);
         setTagsLoading(false);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load books only when selected tag changes
@@ -37,13 +39,15 @@ export default function Tags() {
     }
     let cancelled = false;
     setBooksLoading(true);
-    getBooksWithTag(selectedTagId).then(result => {
+    getBooksWithTag(selectedTagId).then((result) => {
       if (!cancelled) {
         setBooks(result);
         setBooksLoading(false);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedTagId, tags]);
 
   if (tagsLoading || !tags) {

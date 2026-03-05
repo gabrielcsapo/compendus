@@ -19,7 +19,15 @@ async function BatchEditData() {
     getDistinctAuthors(),
   ]);
 
-  return <BatchEditClient books={books} bookTags={bookTags} allTags={allTags} seriesNames={seriesNames} authorNames={authorNames} />;
+  return (
+    <BatchEditClient
+      books={books}
+      bookTags={bookTags}
+      allTags={allTags}
+      seriesNames={seriesNames}
+      authorNames={authorNames}
+    />
+  );
 }
 
 function BatchEditSkeleton() {

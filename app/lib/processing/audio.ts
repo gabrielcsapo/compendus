@@ -122,7 +122,9 @@ function extractChapters(metadata: mm.IAudioMetadata): AudioChapter[] {
   return chapters;
 }
 
-export async function extractAudioCover(buffer: Buffer): Promise<{ buffer: Buffer; mimeType: string } | null> {
+export async function extractAudioCover(
+  buffer: Buffer,
+): Promise<{ buffer: Buffer; mimeType: string } | null> {
   try {
     const metadata = await mm.parseBuffer(buffer);
     const picture = metadata.common.picture?.[0];
@@ -290,22 +292,31 @@ export async function mergeAudioFiles(
     // Stream copy is ~10-100x faster but only works if source is already AAC
     // Use -map 0:a to only process audio streams (some files have video streams for album art)
     const ffmpegArgs = [
-      "-f", "concat",
-      "-safe", "0",
-      "-i", concatFile,
-      "-i", metadataFile,
-      "-map", "0:a", // Only map audio streams, ignore video (album art)
-      "-map_metadata", "1",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      concatFile,
+      "-i",
+      metadataFile,
+      "-map",
+      "0:a", // Only map audio streams, ignore video (album art)
+      "-map_metadata",
+      "1",
       ...(allAac
         ? ["-c:a", "copy"] // Stream copy - very fast, preserves quality
         : ["-c:a", "aac", "-b:a", "128k"]), // Re-encode MP3 to AAC at good quality
       "-vn", // Explicitly disable video output
-      "-f", "mp4",
+      "-f",
+      "mp4",
       "-y",
       outputPath,
     ];
 
-    console.log(`[Merge] Using ${allAac ? "stream copy (fast)" : "re-encoding"} for ${sorted.length} files`);
+    console.log(
+      `[Merge] Using ${allAac ? "stream copy (fast)" : "re-encoding"} for ${sorted.length} files`,
+    );
 
     // Run ffmpeg to merge using spawn for real-time progress
     await new Promise<void>((resolve, reject) => {

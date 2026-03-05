@@ -59,9 +59,16 @@ export default async function BookDetail({ params }: { params?: Record<string, s
         >
           <svg
             className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
           Back to Library
         </Link>
@@ -82,7 +89,9 @@ export default async function BookDetail({ params }: { params?: Record<string, s
               />
             </div>
             <p className="text-xs text-foreground-muted text-center mt-2">
-              Drop image or <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">⌘/Ctrl</kbd>+<kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">V</kbd> to paste
+              Drop image or{" "}
+              <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">⌘/Ctrl</kbd>+
+              <kbd className="px-1 py-0.5 bg-surface-elevated rounded text-[10px]">V</kbd> to paste
             </p>
           </div>
 
@@ -105,7 +114,11 @@ export default async function BookDetail({ params }: { params?: Record<string, s
           {/* Primary Actions */}
           <div className="space-y-2">
             {["pdf", "mobi", "azw3"].includes(book.format) ? (
-              <ConvertToEpubButton bookId={book.id} hasEpub={!!book.convertedEpubPath} progressPercent={progressPercent} />
+              <ConvertToEpubButton
+                bookId={book.id}
+                hasEpub={!!book.convertedEpubPath}
+                progressPercent={progressPercent}
+              />
             ) : (
               <Link
                 to={`/book/${book.id}/read`}
@@ -113,16 +126,30 @@ export default async function BookDetail({ params }: { params?: Record<string, s
               >
                 {["m4b", "m4a", "mp3"].includes(book.format) ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z"
+                    />
                   </svg>
                 ) : (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                    />
                   </svg>
                 )}
                 {["m4b", "m4a", "mp3"].includes(book.format)
-                  ? progressPercent > 0 ? "Continue Listening" : "Start Listening"
-                  : progressPercent > 0 ? "Continue Reading" : "Start Reading"}
+                  ? progressPercent > 0
+                    ? "Continue Listening"
+                    : "Start Listening"
+                  : progressPercent > 0
+                    ? "Continue Reading"
+                    : "Start Reading"}
               </Link>
             )}
             <a
@@ -131,7 +158,12 @@ export default async function BookDetail({ params }: { params?: Record<string, s
               className={`${buttonStyles.base} ${buttonStyles.secondary} w-full text-center justify-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
               Download {book.format.toUpperCase()}
             </a>
@@ -147,7 +179,6 @@ export default async function BookDetail({ params }: { params?: Record<string, s
           <Suspense>
             <LinkedFormatsSection bookId={id} />
           </Suspense>
-
         </aside>
 
         {/* Content */}
@@ -183,7 +214,12 @@ export default async function BookDetail({ params }: { params?: Record<string, s
                     title="Edit EPUB Content"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                      />
                     </svg>
                   </Link>
                 )}
@@ -191,20 +227,24 @@ export default async function BookDetail({ params }: { params?: Record<string, s
             </div>
 
             {book.subtitle && (
-              <p className="text-lg sm:text-xl text-foreground-muted font-light break-words">{book.subtitle}</p>
+              <p className="text-lg sm:text-xl text-foreground-muted font-light break-words">
+                {book.subtitle}
+              </p>
             )}
 
             {authors.length > 0 && (
               <p className="text-lg text-foreground-muted">
-                by <AuthorLinks authors={authors} className="text-primary hover:text-primary-hover font-medium" />
+                by{" "}
+                <AuthorLinks
+                  authors={authors}
+                  className="text-primary hover:text-primary-hover font-medium"
+                />
               </p>
             )}
 
             {book.series && (
               <p className="text-base text-foreground-muted">
-                {book.seriesNumber && (
-                  <span>Book {book.seriesNumber} in </span>
-                )}
+                {book.seriesNumber && <span>Book {book.seriesNumber} in </span>}
                 <Link
                   to={`/library?series=${encodeURIComponent(book.series)}`}
                   className="text-primary hover:text-primary-hover font-medium"
@@ -216,9 +256,7 @@ export default async function BookDetail({ params }: { params?: Record<string, s
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
               {book.isRead && (
-                <span className={`${badgeStyles.base} ${badgeStyles.success}`}>
-                  Completed
-                </span>
+                <span className={`${badgeStyles.base} ${badgeStyles.success}`}>Completed</span>
               )}
               <span className={`${badgeStyles.base} ${badgeStyles.primary} uppercase`}>
                 {book.format}
@@ -276,7 +314,9 @@ export default async function BookDetail({ params }: { params?: Record<string, s
               {book.publisher && (
                 <div className="flex justify-between gap-4 py-3">
                   <dt className="text-foreground-muted shrink-0">Publisher</dt>
-                  <dd className="font-medium text-foreground text-right truncate">{book.publisher}</dd>
+                  <dd className="font-medium text-foreground text-right truncate">
+                    {book.publisher}
+                  </dd>
                 </div>
               )}
               {book.publishedDate && (
@@ -288,24 +328,34 @@ export default async function BookDetail({ params }: { params?: Record<string, s
               {book.isbn && (
                 <div className="flex justify-between gap-4 py-3">
                   <dt className="text-foreground-muted shrink-0">ISBN</dt>
-                  <dd className="font-medium text-foreground font-mono text-right break-all">{book.isbn}</dd>
+                  <dd className="font-medium text-foreground font-mono text-right break-all">
+                    {book.isbn}
+                  </dd>
                 </div>
               )}
               <div className="flex justify-between gap-4 py-3">
                 <dt className="text-foreground-muted shrink-0">File Size</dt>
-                <dd className="font-medium text-foreground text-right">{formatFileSize(book.fileSize)}</dd>
+                <dd className="font-medium text-foreground text-right">
+                  {formatFileSize(book.fileSize)}
+                </dd>
               </div>
               <div className="flex justify-between gap-4 py-3">
                 <dt className="text-foreground-muted shrink-0">Added</dt>
-                <dd className="font-medium text-foreground text-right">{book.importedAt?.toLocaleDateString()}</dd>
+                <dd className="font-medium text-foreground text-right">
+                  {book.importedAt?.toLocaleDateString()}
+                </dd>
               </div>
               <div className="flex justify-between gap-4 py-3">
                 <dt className="text-foreground-muted shrink-0">Filename</dt>
-                <dd className="font-medium text-foreground break-all text-right min-w-0">{book.fileName}</dd>
+                <dd className="font-medium text-foreground break-all text-right min-w-0">
+                  {book.fileName}
+                </dd>
               </div>
               <div className="flex justify-between gap-4 py-3">
                 <dt className="text-foreground-muted shrink-0">Location</dt>
-                <dd className="text-foreground break-all font-mono text-xs text-right min-w-0">{book.filePath}</dd>
+                <dd className="text-foreground break-all font-mono text-xs text-right min-w-0">
+                  {book.filePath}
+                </dd>
               </div>
               {book.convertedEpubPath && (
                 <div className="flex justify-between items-center gap-4 py-3">
@@ -323,7 +373,6 @@ export default async function BookDetail({ params }: { params?: Record<string, s
                 </div>
               )}
             </dl>
-
           </section>
 
           {/* Related Books — streamed via Suspense */}
@@ -351,15 +400,23 @@ async function LinkedFormatsSection({ bookId }: { bookId: string }) {
             to={`/book/${linked.id}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full bg-primary-light text-primary hover:bg-primary hover:text-white transition-colors"
           >
-            {linked.format === "m4b" ||
-            linked.format === "mp3" ||
-            linked.format === "m4a" ? (
+            {linked.format === "m4b" || linked.format === "mp3" || linked.format === "m4a" ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z"
+                />
               </svg>
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
               </svg>
             )}
             {linked.format.toUpperCase()}
@@ -371,7 +428,13 @@ async function LinkedFormatsSection({ bookId }: { bookId: string }) {
 }
 
 // Async server component — streams organization section (collections require DB query)
-async function OrganizationSection({ bookId, tags }: { bookId: string; tags: Awaited<ReturnType<typeof getTagsForBook>> }) {
+async function OrganizationSection({
+  bookId,
+  tags,
+}: {
+  bookId: string;
+  tags: Awaited<ReturnType<typeof getTagsForBook>>;
+}) {
   const collections = await getCollectionsForBook(bookId);
 
   return (
@@ -426,7 +489,9 @@ async function RelatedBooksSection({ book }: { book: Awaited<ReturnType<typeof g
           const relatedAuthors = (() => {
             try {
               const parsed = related.authors ? JSON.parse(related.authors) : [];
-              return Array.isArray(parsed) ? parsed.filter((a: unknown): a is string => typeof a === "string") : [];
+              return Array.isArray(parsed)
+                ? parsed.filter((a: unknown): a is string => typeof a === "string")
+                : [];
             } catch {
               return [];
             }
@@ -442,8 +507,18 @@ async function RelatedBooksSection({ book }: { book: Awaited<ReturnType<typeof g
                   book={related}
                   fallback={
                     <div className="w-full h-full bg-surface-elevated border border-border flex items-center justify-center">
-                      <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      <svg
+                        className="w-8 h-8 text-foreground-muted"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                        />
                       </svg>
                     </div>
                   }

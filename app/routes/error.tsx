@@ -1,4 +1,9 @@
-export default function ErrorBoundary({ error }: { error?: unknown; params?: Record<string, string> }) {
+export default function ErrorBoundary({
+  error,
+}: {
+  error?: unknown;
+  params?: Record<string, string>;
+}) {
   const message =
     error instanceof Error ? (
       <div>
@@ -13,7 +18,11 @@ export default function ErrorBoundary({ error }: { error?: unknown; params?: Rec
             2,
           )}
         </pre>
-        {error.stack && <pre className="whitespace-pre-wrap text-xs mt-4 text-foreground-muted">{error.stack}</pre>}
+        {error.stack && (
+          <pre className="whitespace-pre-wrap text-xs mt-4 text-foreground-muted">
+            {error.stack}
+          </pre>
+        )}
       </div>
     ) : (
       <div>Unknown Error</div>

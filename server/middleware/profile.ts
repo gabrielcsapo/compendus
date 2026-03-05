@@ -22,15 +22,10 @@ declare module "hono" {
  */
 export const profileMiddleware = createMiddleware(async (c, next) => {
   // Try header first (iOS), then cookie (web)
-  const profileId =
-    c.req.header("X-Profile-Id") || getCookie(c, "compendus-profile");
+  const profileId = c.req.header("X-Profile-Id") || getCookie(c, "compendus-profile");
 
   if (profileId) {
-    const profile = db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, profileId))
-      .get();
+    const profile = db.select().from(profiles).where(eq(profiles.id, profileId)).get();
     if (profile) {
       c.set("profileId", profile.id);
       c.set("profileName", profile.name);
@@ -58,10 +53,7 @@ export const profileMiddleware = createMiddleware(async (c, next) => {
  */
 export const requireProfile = createMiddleware(async (c, next) => {
   if (!c.get("profileId")) {
-    return c.json(
-      { success: false, error: "Profile required", code: "NO_PROFILE" },
-      401,
-    );
+    return c.json({ success: false, error: "Profile required", code: "NO_PROFILE" }, 401);
   }
   await next();
 });
@@ -72,16 +64,10 @@ export const requireProfile = createMiddleware(async (c, next) => {
  */
 export const requireAdmin = createMiddleware(async (c, next) => {
   if (!c.get("profileId")) {
-    return c.json(
-      { success: false, error: "Profile required", code: "NO_PROFILE" },
-      401,
-    );
+    return c.json({ success: false, error: "Profile required", code: "NO_PROFILE" }, 401);
   }
   if (!c.get("isAdmin")) {
-    return c.json(
-      { success: false, error: "Admin access required", code: "FORBIDDEN" },
-      403,
-    );
+    return c.json({ success: false, error: "Admin access required", code: "FORBIDDEN" }, 403);
   }
   await next();
 });

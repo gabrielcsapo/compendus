@@ -74,10 +74,11 @@ export function SearchCommandPalette() {
 
   // Pre-parse authors for all results (once per result set, not per render)
   const resultsWithAuthors = useMemo(
-    () => results.map(book => ({
-      ...book,
-      parsedAuthors: book.authors ? JSON.parse(book.authors) as string[] : [],
-    })),
+    () =>
+      results.map((book) => ({
+        ...book,
+        parsedAuthors: book.authors ? (JSON.parse(book.authors) as string[]) : [],
+      })),
     [results],
   );
 
@@ -179,41 +180,39 @@ export function SearchCommandPalette() {
               <>
                 <ul className="py-2">
                   {resultsWithAuthors.map((book, index) => (
-                      <li key={book.id}>
-                        <button
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                            index === selectedIndex
-                              ? "bg-primary-light"
-                              : "hover:bg-surface-elevated"
-                          }`}
-                          onClick={() => navigateToBook(book.id)}
-                          onMouseEnter={() => setSelectedIndex(index)}
+                    <li key={book.id}>
+                      <button
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                          index === selectedIndex ? "bg-primary-light" : "hover:bg-surface-elevated"
+                        }`}
+                        onClick={() => navigateToBook(book.id)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                      >
+                        {/* Cover thumbnail */}
+                        <div
+                          className="w-10 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-surface-elevated"
+                          style={{
+                            backgroundColor: book.coverColor || undefined,
+                          }}
                         >
-                          {/* Cover thumbnail */}
-                          <div
-                            className="w-10 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-surface-elevated"
-                            style={{
-                              backgroundColor: book.coverColor || undefined,
-                            }}
-                          >
-                            <BookCover book={book} alt="" fallback={null} />
-                          </div>
-                          {/* Book info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate text-foreground">{book.title}</div>
-                            {book.parsedAuthors.length > 0 && (
-                              <div className="text-sm text-foreground-muted truncate">
-                                {book.parsedAuthors.join(", ")}
-                              </div>
-                            )}
-                          </div>
-                          {/* Format badge */}
-                          <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-primary-light text-primary uppercase flex-shrink-0">
-                            {book.format}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                          <BookCover book={book} alt="" fallback={null} />
+                        </div>
+                        {/* Book info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate text-foreground">{book.title}</div>
+                          {book.parsedAuthors.length > 0 && (
+                            <div className="text-sm text-foreground-muted truncate">
+                              {book.parsedAuthors.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                        {/* Format badge */}
+                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-primary-light text-primary uppercase flex-shrink-0">
+                          {book.format}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
                 </ul>
                 {/* View all results link */}
                 <div className="border-t border-border px-4 py-3">

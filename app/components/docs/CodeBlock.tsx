@@ -16,13 +16,7 @@ const HIGHLIGHT_LANGS = new Set([
   "swift",
 ]);
 
-export function CodeBlock({
-  children,
-  language,
-}: {
-  children: ReactNode;
-  language?: string;
-}) {
+export function CodeBlock({ children, language }: { children: ReactNode; language?: string }) {
   const [copied, setCopied] = useState(false);
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);

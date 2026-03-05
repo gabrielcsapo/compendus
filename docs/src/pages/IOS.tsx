@@ -6,16 +6,14 @@ export default function IOS() {
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">iOS App</h1>
         <p className="text-foreground-muted">
-          Compendus includes a native iOS app built with SwiftUI and SwiftData
-          that connects to the server for library management and book downloads.
+          Compendus includes a native iOS app built with SwiftUI and SwiftData that connects to the
+          server for library management and book downloads.
         </p>
       </div>
 
       {/* Prerequisites */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Prerequisites
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Prerequisites</h2>
         <ul className="list-disc list-inside space-y-2 text-foreground">
           <li>
             <strong>Xcode 15+</strong> — Required for building the iOS app
@@ -24,8 +22,8 @@ export default function IOS() {
             <strong>iOS 17+</strong> — Minimum deployment target
           </li>
           <li>
-            <strong>Compendus server</strong> — Running locally or on the
-            network for the iOS app to connect to
+            <strong>Compendus server</strong> — Running locally or on the network for the iOS app to
+            connect to
           </li>
         </ul>
       </section>
@@ -41,12 +39,11 @@ export default function IOS() {
             </code>
           </li>
           <li>
-            Swift Package Manager dependencies (ZIPFoundation, SwiftSoup) will
-            resolve automatically
+            Swift Package Manager dependencies (ZIPFoundation, SwiftSoup) will resolve automatically
           </li>
           <li>
-            Configure the server URL in the app&apos;s settings screen to point
-            to your Compendus server
+            Configure the server URL in the app&apos;s settings screen to point to your Compendus
+            server
           </li>
           <li>Build and run on a device or simulator</li>
         </ol>
@@ -113,13 +110,8 @@ export default function IOS() {
               desc: "Full dark mode support with customizable reading themes (font, size, line height).",
             },
           ].map((feature) => (
-            <div
-              key={feature.title}
-              className="p-4 border border-border rounded-lg"
-            >
-              <h3 className="font-medium text-foreground text-sm mb-1">
-                {feature.title}
-              </h3>
+            <div key={feature.title} className="p-4 border border-border rounded-lg">
+              <h3 className="font-medium text-foreground text-sm mb-1">{feature.title}</h3>
               <p className="text-xs text-foreground-muted">{feature.desc}</p>
             </div>
           ))}
@@ -128,9 +120,7 @@ export default function IOS() {
 
       {/* Architecture */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Project Structure
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Project Structure</h2>
         <CodeBlock language="text">{`Compendus/
 ├── Models/               # SwiftData models
 │   ├── DownloadedBook    # Local book storage
@@ -165,52 +155,41 @@ export default function IOS() {
 
       {/* Reader Engine Details */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Reader Engine
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Reader Engine</h2>
         <p className="text-foreground mb-4">
-          The iOS app uses a custom-built reader engine with native iOS
-          rendering:
+          The iOS app uses a custom-built reader engine with native iOS rendering:
         </p>
         <div className="space-y-4">
           <div className="border border-border rounded-lg p-4">
-            <h3 className="font-medium text-foreground mb-2">
-              EPUB Rendering Pipeline
-            </h3>
+            <h3 className="font-medium text-foreground mb-2">EPUB Rendering Pipeline</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm text-foreground-muted">
               <li>
-                <strong>EPUBParser</strong> — Extracts ZIP, parses OPF metadata
-                and spine order
+                <strong>EPUBParser</strong> — Extracts ZIP, parses OPF metadata and spine order
               </li>
               <li>
-                <strong>XHTMLContentParser</strong> — Parses XHTML into
-                ContentNode AST (headings, paragraphs, images, lists)
+                <strong>XHTMLContentParser</strong> — Parses XHTML into ContentNode AST (headings,
+                paragraphs, images, lists)
               </li>
               <li>
-                <strong>AttributedStringBuilder</strong> — Converts ContentNode
-                AST into NSAttributedString with styles
+                <strong>AttributedStringBuilder</strong> — Converts ContentNode AST into
+                NSAttributedString with styles
               </li>
               <li>
-                <strong>NativePaginationEngine</strong> — Uses CoreText
-                CTFramesetter to paginate text
+                <strong>NativePaginationEngine</strong> — Uses CoreText CTFramesetter to paginate
+                text
               </li>
               <li>
-                <strong>NativePageViewController</strong> — Hosts UITextView for
-                each page with gesture handling
+                <strong>NativePageViewController</strong> — Hosts UITextView for each page with
+                gesture handling
               </li>
             </ol>
           </div>
           <div className="border border-border rounded-lg p-4">
-            <h3 className="font-medium text-foreground mb-2">
-              Reader Features
-            </h3>
+            <h3 className="font-medium text-foreground mb-2">Reader Features</h3>
             <ul className="list-disc list-inside space-y-1 text-sm text-foreground-muted">
               <li>Text highlights with XPath-based range serialization</li>
               <li>epub:type footnote detection with popover presentation</li>
-              <li>
-                Fixed-layout (FXL) rendering with rendition:spread blank page
-                detection
-              </li>
+              <li>Fixed-layout (FXL) rendering with rendition:spread blank page detection</li>
               <li>SVG cover detection and rendering</li>
               <li>Background chapter parsing with async image pre-loading</li>
               <li>Session-scoped NSCache-based image caching</li>
@@ -221,12 +200,9 @@ export default function IOS() {
 
       {/* Server Communication */}
       <section>
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          Server Communication
-        </h2>
+        <h2 className="text-xl font-semibold text-foreground mb-3">Server Communication</h2>
         <p className="text-foreground mb-3">
-          The iOS app communicates with the Compendus server through the REST
-          API. Key interactions:
+          The iOS app communicates with the Compendus server through the REST API. Key interactions:
         </p>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">

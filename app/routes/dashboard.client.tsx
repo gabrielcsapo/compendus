@@ -15,7 +15,13 @@ type StatsResponse = {
   todayMinutes: number;
   last7Days: { date: string; minutes: number }[];
   last30Days: { date: string; minutes: number }[];
-  topBooks: { bookId: string; minutes: number; title: string; authors: string | null; coverUrl: string | null }[];
+  topBooks: {
+    bookId: string;
+    minutes: number;
+    title: string;
+    authors: string | null;
+    coverUrl: string | null;
+  }[];
 };
 
 type DashboardData = {
@@ -66,7 +72,11 @@ export default function DashboardPage() {
               <div className="h-4 bg-surface-elevated rounded w-20 mb-4" />
               <div className="flex items-end gap-2 h-24">
                 {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="flex-1 bg-surface-elevated rounded-t" style={{ height: `${20 + Math.random() * 60}%` }} />
+                  <div
+                    key={i}
+                    className="flex-1 bg-surface-elevated rounded-t"
+                    style={{ height: `${20 + Math.random() * 60}%` }}
+                  />
                 ))}
               </div>
             </div>
@@ -112,9 +122,7 @@ export default function DashboardPage() {
       )}
 
       {/* Row 2: Continue Reading */}
-      {continueReading.length > 0 && (
-        <ContinueReadingCarousel books={continueReading} />
-      )}
+      {continueReading.length > 0 && <ContinueReadingCarousel books={continueReading} />}
 
       {/* Row 3: Monthly heatmap */}
       {stats && <MonthlyHeatmap dailyData={stats.last30Days} />}

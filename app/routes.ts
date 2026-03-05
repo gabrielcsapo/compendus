@@ -16,8 +16,16 @@ export const routes: RouteConfig[] = [
       { id: "book-edit", path: "book/:id/edit", component: () => import("./routes/book-edit.js") },
       { id: "highlights", path: "highlights", component: () => import("./routes/highlights.js") },
       { id: "author", path: "author/:name", component: () => import("./routes/author.js") },
-      { id: "collections", path: "collections", component: () => import("./routes/collections.js") },
-      { id: "collection-detail", path: "collection/:id", component: () => import("./routes/collection-detail.js") },
+      {
+        id: "collections",
+        path: "collections",
+        component: () => import("./routes/collections.js"),
+      },
+      {
+        id: "collection-detail",
+        path: "collection/:id",
+        component: () => import("./routes/collection-detail.js"),
+      },
       { id: "tags", path: "tags", component: () => import("./routes/tags.js") },
       {
         id: "admin",
@@ -25,9 +33,21 @@ export const routes: RouteConfig[] = [
         component: () => import("./routes/admin.js"),
         children: [
           { id: "admin-data", index: true, component: () => import("./routes/admin-data.js") },
-          { id: "admin-batch-edit", path: "batch-edit", component: () => import("./routes/batch-edit.js") },
-          { id: "admin-unmatched", path: "unmatched", component: () => import("./routes/unmatched.js") },
-          { id: "admin-profiles", path: "profiles", component: () => import("./routes/admin-profiles.js") },
+          {
+            id: "admin-batch-edit",
+            path: "batch-edit",
+            component: () => import("./routes/batch-edit.js"),
+          },
+          {
+            id: "admin-unmatched",
+            path: "unmatched",
+            component: () => import("./routes/unmatched.js"),
+          },
+          {
+            id: "admin-profiles",
+            path: "profiles",
+            component: () => import("./routes/admin-profiles.js"),
+          },
         ],
       },
       {
@@ -35,9 +55,21 @@ export const routes: RouteConfig[] = [
         path: "discover",
         component: () => import("./routes/discover.js"),
         children: [
-          { id: "discover-index", index: true, component: () => import("./routes/discover-index.js") },
-          { id: "discover-wishlist", path: "wishlist", component: () => import("./routes/discover-wishlist.js") },
-          { id: "discover-series", path: "series", component: () => import("./routes/discover-series.js") },
+          {
+            id: "discover-index",
+            index: true,
+            component: () => import("./routes/discover-index.js"),
+          },
+          {
+            id: "discover-wishlist",
+            path: "wishlist",
+            component: () => import("./routes/discover-wishlist.js"),
+          },
+          {
+            id: "discover-series",
+            path: "series",
+            component: () => import("./routes/discover-series.js"),
+          },
         ],
       },
       { id: "profile", path: "profile", component: () => import("./routes/profile.js") },

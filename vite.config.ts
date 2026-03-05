@@ -8,12 +8,7 @@ import { apiPlugin } from "./vite-plugins/api.js";
 export default defineConfig({
   clearScreen: false,
   build: {},
-  plugins: [
-    tailwindcss(),
-    react(),
-    apiPlugin(),
-    flightRouter({ routesFile: "./app/routes.ts" }),
-  ],
+  plugins: [tailwindcss(), react(), apiPlugin(), flightRouter({ routesFile: "./app/routes.ts" })],
   resolve: {
     alias: {
       "@": resolve(__dirname, "./app"),

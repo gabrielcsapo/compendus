@@ -44,7 +44,7 @@ export default function Component() {
       if (results.length === 0) {
         setMessage({ type: "error", text: "No results found. Try different search terms." });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Search failed. Please try again." });
     } finally {
       setSearching(false);

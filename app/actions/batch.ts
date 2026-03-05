@@ -53,9 +53,7 @@ export async function batchUpdateBooks(
 
       updated++;
     } catch (error) {
-      errors.push(
-        `Book ${update.id}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      errors.push(`Book ${update.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -103,10 +101,7 @@ export async function getAllBooksWithTags(): Promise<{
   bookTags: Record<string, Tag[]>;
 }> {
   // Load all books ordered by title
-  const allBooks = await db
-    .select()
-    .from(books)
-    .orderBy(asc(books.title));
+  const allBooks = await db.select().from(books).orderBy(asc(books.title));
 
   // Load all book-tag associations joined with tags
   const allBookTags = await db

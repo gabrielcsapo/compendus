@@ -61,7 +61,7 @@ export function AuthorLinks({
 
   // Filter to only valid string authors (handles corrupted data gracefully)
   const validAuthors = authors.filter(
-    (author): author is string => typeof author === "string" && author.length > 0
+    (author): author is string => typeof author === "string" && author.length > 0,
   );
 
   if (validAuthors.length === 0) return null;

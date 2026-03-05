@@ -133,9 +133,7 @@ async function extractPageContent(
     const imgIds = new Set<string>();
 
     for (let i = 0; i < operatorList.fnArray.length; i++) {
-      if (
-        operatorList.fnArray[i] === OPS.paintImageXObject
-      ) {
+      if (operatorList.fnArray[i] === OPS.paintImageXObject) {
         const imgName = operatorList.argsArray[i]?.[0] as string;
         if (imgName && !imgIds.has(imgName)) {
           imgIds.add(imgName);
@@ -148,9 +146,7 @@ async function extractPageContent(
             }>((resolve, reject) => {
               page.objs.get(imgName, (obj: unknown) => {
                 if (obj && typeof obj === "object" && "data" in obj) {
-                  resolve(
-                    obj as { data: Uint8Array; width: number; height: number; kind: number },
-                  );
+                  resolve(obj as { data: Uint8Array; width: number; height: number; kind: number });
                 } else {
                   reject(new Error("No image data"));
                 }
@@ -307,12 +303,14 @@ function pageToHtml(page: PageData): string {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const lineText = line.map((t) => {
-      let text = escapeHtml(t.text);
-      if (t.bold) text = `<strong>${text}</strong>`;
-      if (t.italic) text = `<em>${text}</em>`;
-      return text;
-    }).join(" ");
+    const lineText = line
+      .map((t) => {
+        let text = escapeHtml(t.text);
+        if (t.bold) text = `<strong>${text}</strong>`;
+        if (t.italic) text = `<em>${text}</em>`;
+        return text;
+      })
+      .join(" ");
 
     if (i > 0) {
       const prevLine = lines[i - 1];
@@ -383,7 +381,10 @@ async function assembleEpub(
     const chapterId = `chapter-${i + 1}`;
     const chapterHref = `${chapterId}.xhtml`;
 
-    progress(72 + Math.round((i / chapters.length) * 20), `Writing chapter ${i + 1}/${chapters.length}...`);
+    progress(
+      72 + Math.round((i / chapters.length) * 20),
+      `Writing chapter ${i + 1}/${chapters.length}...`,
+    );
 
     // Add images from all pages in this chapter to the ZIP
     for (const page of chapter.pages) {
@@ -395,7 +396,10 @@ async function assembleEpub(
     }
 
     // Generate chapter content
-    const bodyContent = chapter.pages.map((page) => pageToHtml(page)).filter(Boolean).join("\n\n    <hr/>\n\n");
+    const bodyContent = chapter.pages
+      .map((page) => pageToHtml(page))
+      .filter(Boolean)
+      .join("\n\n    <hr/>\n\n");
 
     const chapterXhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -458,9 +462,7 @@ img {
     ),
   ].join("\n");
 
-  const spineItems = chapterFiles
-    .map((ch) => `    <itemref idref="${ch.id}"/>`)
-    .join("\n");
+  const spineItems = chapterFiles.map((ch) => `    <itemref idref="${ch.id}"/>`).join("\n");
 
   zip.file(
     "OEBPS/content.opf",

@@ -188,16 +188,36 @@ export default function ProfilePickerClient() {
                 {/* Lock icon for PIN-protected profiles */}
                 {profile.hasPin && (
                   <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface border-2 border-border flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    <svg
+                      className="w-3.5 h-3.5 text-foreground-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
                     </svg>
                   </div>
                 )}
                 {/* Admin badge */}
                 {profile.isAdmin && (
                   <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <svg
+                      className="w-3.5 h-3.5 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
                     </svg>
                   </div>
                 )}
@@ -215,8 +235,18 @@ export default function ProfilePickerClient() {
             className="group flex flex-col items-center gap-3 focus:outline-none"
           >
             <div className="w-28 h-28 rounded-full border-2 border-dashed border-border group-hover:border-primary group-focus-visible:border-primary transition-all duration-200 flex items-center justify-center group-hover:scale-105">
-              <svg className="w-10 h-10 text-foreground-muted group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              <svg
+                className="w-10 h-10 text-foreground-muted group-hover:text-primary transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
             </div>
             <span className="text-sm font-medium text-foreground-muted group-hover:text-foreground transition-colors">
@@ -260,9 +290,7 @@ export default function ProfilePickerClient() {
                 className={`${inputStyles} text-center text-2xl tracking-[0.5em] mb-3`}
               />
 
-              {pinError && (
-                <p className="text-sm text-danger text-center mb-3">{pinError}</p>
-              )}
+              {pinError && <p className="text-sm text-danger text-center mb-3">{pinError}</p>}
 
               <div className="flex gap-3">
                 <button
@@ -311,8 +339,18 @@ export default function ProfilePickerClient() {
                       {createName.charAt(0).toUpperCase()}
                     </span>
                   ) : (
-                    <svg className="w-8 h-8 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <svg
+                      className="w-8 h-8 text-foreground-muted"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                   )}
                 </div>
@@ -320,9 +358,7 @@ export default function ProfilePickerClient() {
 
               {/* Name */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Name
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Name</label>
                 <input
                   type="text"
                   value={createName}
@@ -346,7 +382,7 @@ export default function ProfilePickerClient() {
                   onChange={(e) => {
                     // Take only the last character/emoji entered
                     const val = e.target.value;
-                    const segments = [...new Intl.Segmenter().segment(val)].map(s => s.segment);
+                    const segments = [...new Intl.Segmenter().segment(val)].map((s) => s.segment);
                     setCreateAvatar(segments.length > 0 ? segments[segments.length - 1] : "");
                   }}
                   placeholder="e.g. a book or face emoji"
@@ -375,9 +411,7 @@ export default function ProfilePickerClient() {
                 </p>
               </div>
 
-              {createError && (
-                <p className="text-sm text-danger mb-4">{createError}</p>
-              )}
+              {createError && <p className="text-sm text-danger mb-4">{createError}</p>}
 
               <div className="flex gap-3">
                 <button

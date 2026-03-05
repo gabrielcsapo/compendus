@@ -10,12 +10,7 @@ const features = [
     description:
       "Read and manage EPUB, PDF, MOBI, and AZW3 ebooks; CBZ and CBR comic archives; and M4B, M4A, and MP3 audiobooks.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -30,12 +25,7 @@ const features = [
     description:
       "Fetch book metadata, covers, and descriptions from Google Books and Open Library automatically.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -50,12 +40,7 @@ const features = [
     description:
       "Track reading progress, create highlights with notes, bookmark pages, and log reading sessions.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -70,12 +55,7 @@ const features = [
     description:
       "Native iOS app with custom EPUB/PDF/CBZ comic reader engine plus a full-featured responsive web interface.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -90,12 +70,7 @@ const features = [
     description:
       "Support multiple readers on one server with PIN-protected profiles, per-user reading progress, and easy account switching on web and iOS.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -110,12 +85,7 @@ const features = [
     description:
       "Search across titles, authors, descriptions, and optionally within book content itself.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -130,12 +100,7 @@ const features = [
     description:
       "Organize your library with hierarchical collections, color-coded tags, and series tracking.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -150,12 +115,7 @@ const features = [
     description:
       "Transcribe audiobooks to searchable text with word-level timestamps using whisper.cpp — on the server or on-device on iOS.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -170,12 +130,7 @@ const features = [
     description:
       "Read EPUBs aloud with sentence highlighting on the web or neural TTS with karaoke-style word tracking on iOS.",
     icon: (
-      <svg
-        className="w-6 h-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -208,7 +163,12 @@ const typeTabs = [
     label: "Ebooks",
     icon: (
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+        />
       </svg>
     ),
   },
@@ -216,8 +176,18 @@ const typeTabs = [
     label: "Audiobooks",
     icon: (
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828-2.828" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828-2.828"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 18.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"
+        />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5V9" />
       </svg>
     ),
@@ -226,19 +196,18 @@ const typeTabs = [
     label: "Comics",
     icon: (
       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
       </svg>
     ),
   },
 ];
 
-const fakeNavItems = [
-  "Library",
-  "Collections",
-  "Tags",
-  "Highlights",
-  "Discover",
-];
+const fakeNavItems = ["Library", "Collections", "Tags", "Highlights", "Discover"];
 
 export default function Landing() {
   return (
@@ -252,9 +221,9 @@ export default function Landing() {
             <span className="text-primary">digital library</span>
           </h1>
           <p className="text-lg sm:text-xl text-foreground-muted max-w-2xl mx-auto mb-10">
-            A self-hosted library manager for ebooks, audiobooks, and comics.
-            Upload, organize, and read across web and iOS with automatic
-            metadata, full-text search, and reading progress tracking.
+            A self-hosted library manager for ebooks, audiobooks, and comics. Upload, organize, and
+            read across web and iOS with automatic metadata, full-text search, and reading progress
+            tracking.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
@@ -269,11 +238,7 @@ export default function Landing() {
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Link>
             <Link
@@ -304,9 +269,8 @@ export default function Landing() {
             Multi-User Profiles
           </h2>
           <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
-            Share one server with the whole family. Each reader gets their own
-            library, reading progress, and highlights — with optional PIN
-            protection.
+            Share one server with the whole family. Each reader gets their own library, reading
+            progress, and highlights — with optional PIN protection.
           </p>
 
           {/* Mock profile picker window */}
@@ -320,9 +284,7 @@ export default function Landing() {
               </div>
               <div className="flex items-center gap-0.5 ml-4">
                 <CompendusLogo className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold text-primary ml-1.5">
-                  Compendus
-                </span>
+                <span className="text-sm font-bold text-primary ml-1.5">Compendus</span>
               </div>
             </div>
 
@@ -331,9 +293,7 @@ export default function Landing() {
               <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
                 Who&apos;s reading?
               </h3>
-              <p className="text-sm text-foreground-muted mb-10">
-                Select your profile to continue
-              </p>
+              <p className="text-sm text-foreground-muted mb-10">Select your profile to continue</p>
 
               {/* Profile cards */}
               <div className="flex flex-wrap justify-center gap-8">
@@ -358,9 +318,7 @@ export default function Landing() {
                       </svg>
                     </div>
                   </div>
-                  <span className="text-sm font-medium text-foreground">
-                    Bob
-                  </span>
+                  <span className="text-sm font-medium text-foreground">Bob</span>
                 </div>
 
                 {/* Profile 2 — PIN-protected */}
@@ -384,9 +342,7 @@ export default function Landing() {
                       </svg>
                     </div>
                   </div>
-                  <span className="text-sm font-medium text-foreground-muted">
-                    Sarah
-                  </span>
+                  <span className="text-sm font-medium text-foreground-muted">Sarah</span>
                 </div>
 
                 {/* Profile 3 — plain */}
@@ -394,9 +350,7 @@ export default function Landing() {
                   <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-surface-elevated border-2 border-border flex items-center justify-center text-4xl transition-transform hover:scale-105 hover:border-primary hover:shadow-lg">
                     <span>🚀</span>
                   </div>
-                  <span className="text-sm font-medium text-foreground-muted">
-                    Alex
-                  </span>
+                  <span className="text-sm font-medium text-foreground-muted">Alex</span>
                 </div>
 
                 {/* Add Profile */}
@@ -416,9 +370,7 @@ export default function Landing() {
                       />
                     </svg>
                   </div>
-                  <span className="text-sm font-medium text-foreground-muted">
-                    Add Profile
-                  </span>
+                  <span className="text-sm font-medium text-foreground-muted">Add Profile</span>
                 </div>
               </div>
             </div>
@@ -433,8 +385,8 @@ export default function Landing() {
             Your Library, Your Way
           </h2>
           <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
-            Browse and organize your personal library with filtering, sorting,
-            and multiple view modes.
+            Browse and organize your personal library with filtering, sorting, and multiple view
+            modes.
           </p>
 
           {/* Mock app window */}
@@ -451,16 +403,12 @@ export default function Landing() {
               {/* Faux nav */}
               <div className="flex items-center gap-0.5 ml-4">
                 <CompendusLogo className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold text-primary ml-1.5 mr-3">
-                  Compendus
-                </span>
+                <span className="text-sm font-bold text-primary ml-1.5 mr-3">Compendus</span>
                 {fakeNavItems.map((item, i) => (
                   <span
                     key={item}
                     className={`hidden sm:inline px-2.5 py-1.5 text-xs rounded-lg font-medium ${
-                      i === 0
-                        ? "text-foreground"
-                        : "text-foreground-muted hover:text-foreground"
+                      i === 0 ? "text-foreground" : "text-foreground-muted hover:text-foreground"
                     }`}
                   >
                     {item}
@@ -472,8 +420,18 @@ export default function Landing() {
 
               {/* Faux search */}
               <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 bg-surface-elevated border border-border rounded-lg text-xs text-foreground-muted">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
                 Search
                 <kbd className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-mono bg-background rounded border border-border">
@@ -484,15 +442,30 @@ export default function Landing() {
               {/* Faux dark mode toggle */}
               <span className="hidden sm:flex p-1.5 rounded-lg text-foreground-muted">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                  />
                 </svg>
               </span>
 
               {/* Faux admin icon */}
               <span className="hidden sm:flex p-1.5 rounded-lg text-foreground-muted">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
               </span>
             </div>
@@ -504,14 +477,34 @@ export default function Landing() {
                 {/* View mode toggle */}
                 <div className="inline-flex gap-0.5 p-0.5 bg-surface-elevated rounded-lg">
                   <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md bg-primary text-white shadow-sm">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                      />
                     </svg>
                     Books
                   </span>
                   <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md text-foreground-muted">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
                     </svg>
                     Series
                   </span>
@@ -523,9 +516,7 @@ export default function Landing() {
                     <span
                       key={tab.label}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                        i === 0
-                          ? "bg-primary text-white shadow-sm"
-                          : "text-foreground-muted"
+                        i === 0 ? "bg-primary text-white shadow-sm" : "text-foreground-muted"
                       }`}
                     >
                       {tab.icon}
@@ -536,12 +527,27 @@ export default function Landing() {
 
                 {/* Sort dropdown (faux) */}
                 <div className="ml-auto hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-lg text-[11px] text-foreground-muted bg-surface">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                    />
                   </svg>
                   Recent
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </div>
               </div>
@@ -558,10 +564,7 @@ export default function Landing() {
       </section>
 
       {/* Features */}
-      <section
-        id="features"
-        className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50"
-      >
+      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
             Everything you need
@@ -571,16 +574,11 @@ export default function Landing() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="p-6 bg-surface border border-border rounded-xl"
-              >
+              <div key={feature.title} className="p-6 bg-surface border border-border rounded-xl">
                 <div className="w-10 h-10 bg-primary-light text-primary rounded-lg flex items-center justify-center mb-4">
                   {feature.icon}
                 </div>
-                <h3 className="font-semibold text-foreground mb-2">
-                  {feature.title}
-                </h3>
+                <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
                 <p className="text-sm text-foreground-muted leading-relaxed">
                   {feature.description}
                 </p>
@@ -597,8 +595,7 @@ export default function Landing() {
             Beautiful Reading Experience
           </h2>
           <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
-            A custom-built reader with themes, highlights, bookmarks, and
-            progress tracking.
+            A custom-built reader with themes, highlights, bookmarks, and progress tracking.
           </p>
 
           {/* Mock reader window */}
@@ -613,11 +610,7 @@ export default function Landing() {
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </span>
               <span className="p-1 text-foreground-muted">
@@ -628,11 +621,7 @@ export default function Landing() {
                   stroke="currentColor"
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </span>
               <div className="flex-1 text-center">
@@ -684,34 +673,29 @@ export default function Landing() {
                 <span className="text-5xl font-bold float-left mr-3 mt-1 leading-none text-primary">
                   I
                 </span>
-                t was a bright cold day in April, and the clocks were striking
-                thirteen. Winston Smith, his chin nuzzled into his breast in an
-                effort to escape the vile wind, slipped quickly through the
-                glass doors of Victory Mansions, though not quickly enough to
-                prevent a swirl of gritty dust from entering along with him.
+                t was a bright cold day in April, and the clocks were striking thirteen. Winston
+                Smith, his chin nuzzled into his breast in an effort to escape the vile wind,
+                slipped quickly through the glass doors of Victory Mansions, though not quickly
+                enough to prevent a swirl of gritty dust from entering along with him.
               </p>
               <p className="text-foreground leading-[1.8] text-base sm:text-lg font-serif max-w-prose mx-auto mt-6">
-                The hallway smelt of boiled cabbage and old rag mats. At one end
-                of it a coloured poster, too large for indoor display, had been
-                tacked to the wall. It depicted simply an enormous face, more
-                than a metre wide: the face of a man of about forty-five, with a
-                heavy black moustache and ruggedly handsome features.
+                The hallway smelt of boiled cabbage and old rag mats. At one end of it a coloured
+                poster, too large for indoor display, had been tacked to the wall. It depicted
+                simply an enormous face, more than a metre wide: the face of a man of about
+                forty-five, with a heavy black moustache and ruggedly handsome features.
               </p>
               {/* Simulated highlight */}
               <p className="text-foreground leading-[1.8] text-base sm:text-lg font-serif max-w-prose mx-auto mt-6">
                 <span className="bg-yellow-200/40 dark:bg-yellow-500/20 rounded px-0.5">
-                  The telescreen received and transmitted simultaneously. Any
-                  sound that Winston made, above the level of a very low
-                  whisper, would be picked up by it.
+                  The telescreen received and transmitted simultaneously. Any sound that Winston
+                  made, above the level of a very low whisper, would be picked up by it.
                 </span>
               </p>
             </div>
 
             {/* Reader footer */}
             <div className="bg-surface border-t border-border px-4 py-3 flex items-center gap-3">
-              <span className="text-xs text-foreground-muted shrink-0">
-                Ch 1
-              </span>
+              <span className="text-xs text-foreground-muted shrink-0">Ch 1</span>
               <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
@@ -731,8 +715,8 @@ export default function Landing() {
             Listen, Read Along, Transcribe
           </h2>
           <p className="text-foreground-muted text-center mb-8 max-w-xl mx-auto">
-            Turn audiobooks into searchable text with word-level timestamps, or
-            have your EPUBs read aloud with synchronized highlighting.
+            Turn audiobooks into searchable text with word-level timestamps, or have your EPUBs read
+            aloud with synchronized highlighting.
           </p>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -752,9 +736,7 @@ export default function Landing() {
                   &ldquo;Arrakis, dune, desert planet.&rdquo;
                 </p>
                 <p className="text-sm leading-relaxed">
-                  <span className="text-white font-semibold">
-                    Paul fell asleep , to dream of
-                  </span>{" "}
+                  <span className="text-white font-semibold">Paul fell asleep , to dream of</span>{" "}
                   <span className="text-white/50">
                     an Ar ach ene cavern , silent people all around him moving
                   </span>
@@ -763,33 +745,44 @@ export default function Landing() {
                   in the dim light of glow-globes.
                 </p>
                 <p className="text-sm leading-relaxed text-white/30">
-                  It was solemn there, and like a cathedral, as he listened to a
-                  faint sound, the drip,
+                  It was solemn there, and like a cathedral, as he listened to a faint sound, the
+                  drip,
                 </p>
-                <p className="text-sm leading-relaxed text-white/30">
-                  drip, drip of water.
-                </p>
+                <p className="text-sm leading-relaxed text-white/30">drip, drip of water.</p>
                 <p className="text-sm leading-relaxed text-white/25">
-                  While he remained in the dream Paul knew he would remember it
-                  upon awakening.
+                  While he remained in the dream Paul knew he would remember it upon awakening.
                 </p>
                 <p className="text-sm leading-relaxed text-white/20">
                   He always remembered the dreams that were predictions.
                 </p>
-                <p className="text-sm leading-relaxed text-white/15">
-                  The dream faded.
-                </p>
+                <p className="text-sm leading-relaxed text-white/15">The dream faded.</p>
               </div>
 
               {/* Floating transcription pill */}
               <div className="px-5 pb-3 flex justify-center">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 backdrop-blur rounded-full text-xs text-white/70">
-                  <svg className="w-3.5 h-3.5 text-white/50 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  <svg
+                    className="w-3.5 h-3.5 text-white/50 animate-pulse"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
                   </svg>
                   Transcribing
                   <span className="text-white/40">0% complete</span>
-                  <svg className="w-3 h-3 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg
+                    className="w-3 h-3 text-white/40"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </span>
@@ -800,10 +793,7 @@ export default function Landing() {
                 {/* Scrubber */}
                 <div className="mb-2">
                   <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white/50 rounded-full"
-                      style={{ width: "2%" }}
-                    />
+                    <div className="h-full bg-white/50 rounded-full" style={{ width: "2%" }} />
                   </div>
                   <div className="flex justify-between text-[10px] text-white/40 font-mono mt-1">
                     <span>6:13</span>
@@ -813,19 +803,31 @@ export default function Landing() {
 
                 {/* Transport controls */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 font-mono w-8">
-                    1x
-                  </span>
+                  <span className="text-[10px] text-white/40 font-mono w-8">1x</span>
                   <div className="flex items-center gap-4">
                     {/* Skip back 15s */}
                     <span className="text-white/50">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"
+                        />
                       </svg>
                     </span>
                     {/* Stop */}
                     <span className="w-8 h-8 bg-white/15 rounded-full flex items-center justify-center">
-                      <svg className="w-3.5 h-3.5 text-white/70" fill="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-3.5 h-3.5 text-white/70"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <rect x="6" y="6" width="12" height="12" rx="1" />
                       </svg>
                     </span>
@@ -839,8 +841,18 @@ export default function Landing() {
                   </div>
                   {/* Mic / transcript toggle */}
                   <span className="text-white/50">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                      />
                     </svg>
                   </span>
                 </div>
@@ -852,25 +864,53 @@ export default function Landing() {
               {/* Reader header */}
               <div className="bg-surface border-b border-border px-4 py-2.5 flex items-center gap-3">
                 <span className="p-1 text-foreground-muted">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </span>
                 <span className="p-1 text-foreground-muted">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   </svg>
                 </span>
                 <div className="flex-1 text-center">
-                  <span className="text-sm font-medium text-foreground">
-                    Chapter 1
-                  </span>
+                  <span className="text-sm font-medium text-foreground">Chapter 1</span>
                 </div>
                 <span className="text-xs text-foreground-muted">3 / 180</span>
                 <span className="p-1 text-foreground-muted">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
                   </svg>
                 </span>
               </div>
@@ -881,21 +921,19 @@ export default function Landing() {
                   <span className="text-4xl font-bold float-left mr-2.5 mt-0.5 leading-none text-primary">
                     I
                   </span>
-                  n my younger and more vulnerable years my father gave me some
-                  advice that I&apos;ve been turning over in my mind ever since.
+                  n my younger and more vulnerable years my father gave me some advice that
+                  I&apos;ve been turning over in my mind ever since.
                 </p>
                 <p className="text-foreground leading-[1.8] text-sm sm:text-base font-serif max-w-prose mx-auto mt-4">
                   <span className="bg-accent/15 rounded px-0.5 py-0.5">
-                    &ldquo;Whenever you feel like criticizing anyone,&rdquo; he
-                    told me, &ldquo;just remember that all the people in this
-                    world haven&apos;t had the advantages that you&apos;ve
-                    had.&rdquo;
+                    &ldquo;Whenever you feel like criticizing anyone,&rdquo; he told me, &ldquo;just
+                    remember that all the people in this world haven&apos;t had the advantages that
+                    you&apos;ve had.&rdquo;
                   </span>
                 </p>
                 <p className="text-foreground leading-[1.8] text-sm sm:text-base font-serif max-w-prose mx-auto mt-4">
-                  He didn&apos;t say any more, but we&apos;ve always been
-                  unusually communicative in a reserved way, and I understood
-                  that he meant a great deal more than that.
+                  He didn&apos;t say any more, but we&apos;ve always been unusually communicative in
+                  a reserved way, and I understood that he meant a great deal more than that.
                 </p>
               </div>
 
@@ -904,10 +942,7 @@ export default function Landing() {
                 {/* Scrubber */}
                 <div className="mb-2">
                   <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-white/50 rounded-full"
-                      style={{ width: "14%" }}
-                    />
+                    <div className="h-full bg-white/50 rounded-full" style={{ width: "14%" }} />
                   </div>
                   <div className="flex justify-between text-[10px] text-white/40 font-mono mt-1">
                     <span>0:34</span>
@@ -917,25 +952,48 @@ export default function Landing() {
 
                 {/* Transport controls */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 font-mono w-8">
-                    1x
-                  </span>
+                  <span className="text-[10px] text-white/40 font-mono w-8">1x</span>
                   <div className="flex items-center gap-4">
                     {/* Skip back */}
                     <span className="text-white/50">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"
+                        />
                       </svg>
                     </span>
                     {/* Circular progress + sentence count */}
                     <span className="relative w-10 h-10 flex items-center justify-center">
                       <svg className="absolute inset-0 w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeDasharray="100.53" strokeDashoffset={100.53 * (1 - 2 / 14)} strokeLinecap="round" />
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="16"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth="2"
+                        />
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="16"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.5)"
+                          strokeWidth="2"
+                          strokeDasharray="100.53"
+                          strokeDashoffset={100.53 * (1 - 2 / 14)}
+                          strokeLinecap="round"
+                        />
                       </svg>
-                      <span className="text-[9px] font-mono text-white/70 font-semibold">
-                        2/14
-                      </span>
+                      <span className="text-[9px] font-mono text-white/70 font-semibold">2/14</span>
                     </span>
                     {/* Pause */}
                     <span className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -945,15 +1003,23 @@ export default function Landing() {
                     </span>
                     {/* Skip forward */}
                     <span className="text-white/50">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z"
+                        />
                       </svg>
                     </span>
                   </div>
                   {/* Voice label */}
-                  <span className="text-[10px] text-white/40 w-8 text-right truncate">
-                    Voice 3
-                  </span>
+                  <span className="text-[10px] text-white/40 w-8 text-right truncate">Voice 3</span>
                 </div>
               </div>
             </div>
@@ -962,17 +1028,38 @@ export default function Landing() {
           {/* Capability pills */}
           <div className="flex flex-wrap justify-center gap-3 mt-8">
             {[
-              { label: "Whisper.cpp Transcription", icon: "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" },
-              { label: "Word-Level Timestamps", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-              { label: "On-Device Processing", icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" },
-              { label: "8 Neural Voices", icon: "M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" },
-              { label: "Background Pre-Generation", icon: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" },
+              {
+                label: "Whisper.cpp Transcription",
+                icon: "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z",
+              },
+              {
+                label: "Word-Level Timestamps",
+                icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+              },
+              {
+                label: "On-Device Processing",
+                icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z",
+              },
+              {
+                label: "8 Neural Voices",
+                icon: "M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z",
+              },
+              {
+                label: "Background Pre-Generation",
+                icon: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+              },
             ].map((pill) => (
               <span
                 key={pill.label}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-medium text-foreground-muted"
               >
-                <svg className="w-3.5 h-3.5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg
+                  className="w-3.5 h-3.5 text-accent"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d={pill.icon} />
                 </svg>
                 {pill.label}
@@ -985,12 +1072,8 @@ export default function Landing() {
       {/* Supported Formats */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2">
-            Supported Formats
-          </h2>
-          <p className="text-foreground-muted mb-8">
-            Access anything in your digital collection.
-          </p>
+          <h2 className="text-2xl font-semibold text-foreground mb-2">Supported Formats</h2>
+          <p className="text-foreground-muted mb-8">Access anything in your digital collection.</p>
           <div className="flex flex-wrap justify-center gap-3">
             {formats.map((f) => (
               <span
@@ -1013,12 +1096,9 @@ export default function Landing() {
       {/* Developer Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-elevated/50">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">
-            Easy to Query
-          </h2>
+          <h2 className="text-2xl font-semibold text-foreground text-center mb-2">Easy to Query</h2>
           <p className="text-foreground-muted text-center mb-8">
-            A clean REST API you can query from anywhere — scripts, automations,
-            or your own tools.
+            A clean REST API you can query from anywhere — scripts, automations, or your own tools.
           </p>
           <CodeBlock language="bash">{`# List all books in your library
 curl http://localhost:3000/api/books | jq
@@ -1038,12 +1118,9 @@ curl http://localhost:3000/api/books/42`}</CodeBlock>
       {/* CTA */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-foreground mb-4">
-            Ready to build your library?
-          </h2>
+          <h2 className="text-3xl font-bold text-foreground mb-4">Ready to build your library?</h2>
           <p className="text-foreground-muted mb-8">
-            Get Compendus running locally in minutes. Self-hosted, open source,
-            and completely free.
+            Get Compendus running locally in minutes. Self-hosted, open source, and completely free.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
@@ -1058,11 +1135,7 @@ curl http://localhost:3000/api/books/42`}</CodeBlock>
                 stroke="currentColor"
                 strokeWidth={2}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Link>
             <a

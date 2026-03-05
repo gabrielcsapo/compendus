@@ -33,7 +33,8 @@ function getWorkerPath(): string | null {
 
 class WorkerPool {
   private workers: WorkerState[] = [];
-  private pendingTasks: Map<string, { resolve: (r: unknown) => void; reject: (e: Error) => void }> = new Map();
+  private pendingTasks: Map<string, { resolve: (r: unknown) => void; reject: (e: Error) => void }> =
+    new Map();
   private taskQueue: PendingTask[] = [];
   private poolSize: number;
   private workerPath: string;
@@ -119,10 +120,7 @@ class WorkerPool {
 
     // Transfer buffer as Transferable for zero-copy
     const bufferCopy = Buffer.from(pending.task.buffer);
-    state.worker.postMessage(
-      { ...pending.task, buffer: bufferCopy },
-      [bufferCopy.buffer],
-    );
+    state.worker.postMessage({ ...pending.task, buffer: bufferCopy }, [bufferCopy.buffer]);
   }
 
   async runTask(type: WorkerTaskType, buffer: Buffer, format: BookFormat): Promise<unknown> {
@@ -142,9 +140,7 @@ class WorkerPool {
   }
 
   async shutdown(): Promise<void> {
-    const terminations = this.workers.map((state) =>
-      state.worker.terminate(),
-    );
+    const terminations = this.workers.map((state) => state.worker.terminate());
     await Promise.all(terminations);
     this.workers = [];
     this.taskQueue = [];

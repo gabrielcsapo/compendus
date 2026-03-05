@@ -31,13 +31,10 @@ export function PageJumpSlider({
   const [isDragging, setIsDragging] = useState(false);
   const [previewPage, setPreviewPage] = useState(currentPage);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const page = parseInt(e.target.value, 10);
-      setPreviewPage(page);
-    },
-    [],
-  );
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const page = parseInt(e.target.value, 10);
+    setPreviewPage(page);
+  }, []);
 
   const handleDragStart = useCallback(() => {
     setIsDragging(true);
@@ -59,10 +56,7 @@ export function PageJumpSlider({
       style={{ backgroundColor: `${theme.background}F0` }}
     >
       {isDragging && (
-        <div
-          className="text-center text-sm mb-1 font-medium"
-          style={{ color: theme.foreground }}
-        >
+        <div className="text-center text-sm mb-1 font-medium" style={{ color: theme.foreground }}>
           Page {previewPage} of {totalPages}
         </div>
       )}
@@ -82,16 +76,9 @@ export function PageJumpSlider({
           background: `linear-gradient(to right, ${theme.accent} ${((displayPage - 1) / Math.max(1, totalPages - 1)) * 100}%, ${theme.foreground}20 0%)`,
         }}
       />
-      <div
-        className="flex justify-between text-xs mt-1"
-        style={{ color: theme.muted }}
-      >
+      <div className="flex justify-between text-xs mt-1" style={{ color: theme.muted }}>
         <span>Page {currentPage}</span>
-        {chapterTitle && (
-          <span className="truncate mx-4 text-center flex-1">
-            {chapterTitle}
-          </span>
-        )}
+        {chapterTitle && <span className="truncate mx-4 text-center flex-1">{chapterTitle}</span>}
         <span>{totalPages}</span>
       </div>
     </div>

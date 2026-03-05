@@ -46,11 +46,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           stroke="currentColor"
           strokeWidth={2}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M10 19l-7-7m0 0l7-7m-7 7h18"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
         </svg>
         Home
       </Link>
@@ -63,11 +59,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <ul className="space-y-1">
             {group.links.map((link) => (
               <li key={link.to}>
-                <NavLink
-                  to={link.to}
-                  className={linkClass}
-                  onClick={onNavigate}
-                >
+                <NavLink to={link.to} className={linkClass} onClick={onNavigate}>
                   {link.label}
                 </NavLink>
               </li>

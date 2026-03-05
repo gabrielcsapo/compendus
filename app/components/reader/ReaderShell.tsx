@@ -21,7 +21,12 @@ interface ReaderShellProps {
 /**
  * Main reader shell that orchestrates all reader components
  */
-export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/", formatOverride: formatOverrideProp }: ReaderShellProps) {
+export function ReaderShell({
+  bookId,
+  initialPosition = 0,
+  returnUrl = "/",
+  formatOverride: formatOverrideProp,
+}: ReaderShellProps) {
   const { navigate } = useRouter();
   const [searchParams] = useSearchParams();
   const formatOverride = formatOverrideProp || searchParams.get("format") || undefined;
@@ -32,7 +37,9 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/", form
 
   const reader = useReader({ bookId, initialPosition, formatOverride });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"toc" | "bookmarks" | "highlights" | "search">("toc");
+  const [sidebarTab, setSidebarTab] = useState<"toc" | "bookmarks" | "highlights" | "search">(
+    "toc",
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Immersive mode: auto-hiding overlay
@@ -144,7 +151,11 @@ export function ReaderShell({ bookId, initialPosition = 0, returnUrl = "/", form
 
       // Don't handle shortcuts when typing in input
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      ) {
         return;
       }
 

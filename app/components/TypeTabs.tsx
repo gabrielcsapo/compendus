@@ -60,7 +60,12 @@ const TYPE_OPTIONS: { value: TypeFilter; label: string; icon: React.ReactNode }[
   },
 ];
 
-function buildUrl(type: TypeFilter, currentSort: string, currentView?: "series" | "books", basePath = "/library"): string {
+function buildUrl(
+  type: TypeFilter,
+  currentSort: string,
+  currentView?: "series" | "books",
+  basePath = "/library",
+): string {
   const params = new URLSearchParams();
   if (currentView === "series") {
     params.set("view", "series");

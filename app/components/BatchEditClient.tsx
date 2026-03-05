@@ -13,15 +13,61 @@ import type { Book, Tag } from "../lib/db/schema";
 import type { BookType } from "../lib/book-types";
 
 const LANGUAGES = [
-  "", "English", "Spanish", "French", "German", "Italian", "Portuguese",
-  "Russian", "Chinese", "Japanese", "Korean", "Arabic", "Hindi", "Dutch",
-  "Swedish", "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Turkish",
-  "Greek", "Hebrew", "Thai", "Vietnamese", "Indonesian", "Malay", "Romanian",
-  "Hungarian", "Bulgarian", "Croatian", "Serbian", "Slovak", "Slovenian",
-  "Ukrainian", "Lithuanian", "Latvian", "Estonian", "Catalan", "Basque",
-  "Galician", "Welsh", "Irish", "Scottish Gaelic", "Icelandic", "Farsi",
-  "Urdu", "Bengali", "Tamil", "Telugu", "Kannada", "Malayalam", "Swahili",
-  "Afrikaans", "Latin",
+  "",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Arabic",
+  "Hindi",
+  "Dutch",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Polish",
+  "Czech",
+  "Turkish",
+  "Greek",
+  "Hebrew",
+  "Thai",
+  "Vietnamese",
+  "Indonesian",
+  "Malay",
+  "Romanian",
+  "Hungarian",
+  "Bulgarian",
+  "Croatian",
+  "Serbian",
+  "Slovak",
+  "Slovenian",
+  "Ukrainian",
+  "Lithuanian",
+  "Latvian",
+  "Estonian",
+  "Catalan",
+  "Basque",
+  "Galician",
+  "Welsh",
+  "Irish",
+  "Scottish Gaelic",
+  "Icelandic",
+  "Farsi",
+  "Urdu",
+  "Bengali",
+  "Tamil",
+  "Telugu",
+  "Kannada",
+  "Malayalam",
+  "Swahili",
+  "Afrikaans",
+  "Latin",
 ];
 
 const ROW_HEIGHT = 52;
@@ -94,7 +140,13 @@ interface BatchEditClientProps {
   authorNames: string[];
 }
 
-export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags, allTags, seriesNames, authorNames }: BatchEditClientProps) {
+export function BatchEditClient({
+  books: initialBooks,
+  bookTags: initialBookTags,
+  allTags,
+  seriesNames,
+  authorNames,
+}: BatchEditClientProps) {
   const allBooks = initialBooks;
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -144,7 +196,11 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   // Tag input state per book (search text + dropdown visibility)
   const [tagInputState, setTagInputState] = useState<Record<string, string>>({});
   const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   // Virtualization
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +214,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   // Prevent body scroll while batch edit is mounted
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, []);
 
   // Close tag dropdown when clicking outside
@@ -199,7 +257,11 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         // Also search tags
         const tagNames = (bookTagsState[book.id] || []).map((t) => t.name).join(" ");
         fields.push(tagNames);
-        const haystack = fields.filter(Boolean).join(" ").toLowerCase().replace(/[^\w\s]/g, "");
+        const haystack = fields
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .replace(/[^\w\s]/g, "");
         if (!haystack.includes(q)) return false;
       }
       // Apply column filters
@@ -222,10 +284,17 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             cellValue = (bookEditsForFilter?.seriesNumber ?? book.seriesNumber ?? "").toLowerCase();
             break;
           case "tags":
-            cellValue = (bookTagsState[book.id] || []).map((t) => t.name).join(" ").toLowerCase();
+            cellValue = (bookTagsState[book.id] || [])
+              .map((t) => t.name)
+              .join(" ")
+              .toLowerCase();
             break;
           case "category":
-            cellValue = (bookEditsForFilter?.bookTypeOverride ?? book.bookTypeOverride ?? "").toLowerCase();
+            cellValue = (
+              bookEditsForFilter?.bookTypeOverride ??
+              book.bookTypeOverride ??
+              ""
+            ).toLowerCase();
             break;
           case "language":
             cellValue = (bookEditsForFilter?.language ?? book.language ?? "").toLowerCase();
@@ -300,7 +369,17 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
     });
 
     return filtered;
-  }, [allBooks, searchQuery, typeFilter, selectedIds, edits, bookTagsState, fieldFilters, sortBy, columnFilters]);
+  }, [
+    allBooks,
+    searchQuery,
+    typeFilter,
+    selectedIds,
+    edits,
+    bookTagsState,
+    fieldFilters,
+    sortBy,
+    columnFilters,
+  ]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredBooks.length,
@@ -343,7 +422,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
 
   const isBookTagsModified = useCallback(
     (bookId: string): boolean => {
-      return (tagAdditions.get(bookId)?.length ?? 0) > 0 || (tagRemovals.get(bookId)?.length ?? 0) > 0;
+      return (
+        (tagAdditions.get(bookId)?.length ?? 0) > 0 || (tagRemovals.get(bookId)?.length ?? 0) > 0
+      );
     },
     [tagAdditions, tagRemovals],
   );
@@ -384,31 +465,31 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
     return filteredBooks.every((b) => selectedIds.has(b.id));
   }, [filteredBooks, selectedIds]);
 
-  const addTagToBook = useCallback(
-    (bookId: string, tag: Tag) => {
-      setBookTagsState((prev) => {
-        const current = prev[bookId] || [];
-        if (current.some((t) => t.id === tag.id)) return prev;
-        return { ...prev, [bookId]: [...current, tag] };
-      });
-      setTagAdditions((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(bookId) || [];
-        if (!existing.includes(tag.name)) {
-          next.set(bookId, [...existing, tag.name]);
-        }
-        return next;
-      });
-      setTagRemovals((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(bookId) || [];
-        next.set(bookId, existing.filter((id) => id !== tag.id));
-        return next;
-      });
-      setOpenTagDropdown(null);
-    },
-    [],
-  );
+  const addTagToBook = useCallback((bookId: string, tag: Tag) => {
+    setBookTagsState((prev) => {
+      const current = prev[bookId] || [];
+      if (current.some((t) => t.id === tag.id)) return prev;
+      return { ...prev, [bookId]: [...current, tag] };
+    });
+    setTagAdditions((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(bookId) || [];
+      if (!existing.includes(tag.name)) {
+        next.set(bookId, [...existing, tag.name]);
+      }
+      return next;
+    });
+    setTagRemovals((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(bookId) || [];
+      next.set(
+        bookId,
+        existing.filter((id) => id !== tag.id),
+      );
+      return next;
+    });
+    setOpenTagDropdown(null);
+  }, []);
 
   const removeTagFromBookLocal = useCallback(
     (bookId: string, tagId: string) => {
@@ -429,7 +510,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         setTagAdditions((prev) => {
           const next = new Map(prev);
           const existing = next.get(bookId) || [];
-          next.set(bookId, existing.filter((name) => name !== tag.name));
+          next.set(
+            bookId,
+            existing.filter((name) => name !== tag.name),
+          );
           return next;
         });
       }
@@ -501,7 +585,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       const next = new Map(prev);
       for (const id of selectedIds) {
         const existing = next.get(id) || {};
-        next.set(id, { ...existing, bookTypeOverride: bulkCategory === "auto" ? null : bulkCategory });
+        next.set(id, {
+          ...existing,
+          bookTypeOverride: bulkCategory === "auto" ? null : bulkCategory,
+        });
       }
       return next;
     });
@@ -559,8 +646,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   const dirtyCount = useMemo(() => {
     const ids = new Set<string>();
     for (const [id] of edits) ids.add(id);
-    for (const [id, a] of tagAdditions) { if (a.length > 0) ids.add(id); }
-    for (const [id, r] of tagRemovals) { if (r.length > 0) ids.add(id); }
+    for (const [id, a] of tagAdditions) {
+      if (a.length > 0) ids.add(id);
+    }
+    for (const [id, r] of tagRemovals) {
+      if (r.length > 0) ids.add(id);
+    }
     return ids.size;
   }, [edits, tagAdditions, tagRemovals]);
 
@@ -605,7 +696,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           for (const [key, value] of Object.entries(bookEdits)) {
             if (key === "authors" && typeof value === "string") {
               data[key] = JSON.stringify(
-                value.split(",").map((a) => a.trim()).filter(Boolean),
+                value
+                  .split(",")
+                  .map((a) => a.trim())
+                  .filter(Boolean),
               );
             } else {
               data[key] = value as string | null;
@@ -647,7 +741,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           text: `Updated ${totalUpdated} books. ${allErrors.length} error(s): ${allErrors.slice(0, 3).join("; ")}${allErrors.length > 3 ? "..." : ""}`,
         });
       } else {
-        setMessage({ type: "success", text: `Successfully updated ${totalUpdated} book${totalUpdated !== 1 ? "s" : ""}.` });
+        setMessage({
+          type: "success",
+          text: `Successfully updated ${totalUpdated} book${totalUpdated !== 1 ? "s" : ""}.`,
+        });
         setEdits(new Map());
         setTagAdditions(new Map());
         setTagRemovals(new Map());
@@ -672,7 +769,20 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       return val;
     };
 
-    const headers = ["Title", "Authors", "Series", "Series #", "Tags", "Category", "Language", "Format", "Publisher", "ISBN", "Description", "File Name"];
+    const headers = [
+      "Title",
+      "Authors",
+      "Series",
+      "Series #",
+      "Tags",
+      "Category",
+      "Language",
+      "Format",
+      "Publisher",
+      "ISBN",
+      "Description",
+      "File Name",
+    ];
     const rows = filteredBooks.map((book) => {
       const bookEdits = edits.get(book.id);
       const tags = (bookTagsState[book.id] || []).map((t) => t.name).join("; ");
@@ -703,8 +813,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
   }, [filteredBooks, edits, bookTagsState]);
 
   const modifiedCellClass = "bg-amber-50 dark:bg-amber-900/20";
-  const cellInputClass = "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
-  const cellSelectClass = "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
+  const cellInputClass =
+    "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
+  const cellSelectClass =
+    "w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary-light";
 
   // Loading state
   if (isLoading) {
@@ -712,7 +824,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden">
         <header className="bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <Link to="/admin" className="text-primary hover:text-primary-hover transition-colors text-sm">&larr; Admin</Link>
+            <Link
+              to="/admin"
+              className="text-primary hover:text-primary-hover transition-colors text-sm"
+            >
+              &larr; Admin
+            </Link>
             <h1 className="text-xl font-bold text-foreground">Batch Edit</h1>
           </div>
         </header>
@@ -743,7 +860,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       {/* Header */}
       <header className="bg-surface border-b border-border px-6 py-3 flex items-center gap-4 shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="text-primary hover:text-primary-hover transition-colors text-sm">&larr; Admin</Link>
+          <Link
+            to="/admin"
+            className="text-primary hover:text-primary-hover transition-colors text-sm"
+          >
+            &larr; Admin
+          </Link>
           <h1 className="text-xl font-bold text-foreground">Batch Edit</h1>
           <span className="text-sm text-foreground-muted">
             {filteredBooks.length === allBooks.length
@@ -763,12 +885,14 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         </div>
 
         <div className="flex items-center gap-1 p-1 bg-surface-elevated rounded-lg">
-          {([
-            { value: "all", label: "All" },
-            { value: "ebook", label: "eBooks" },
-            { value: "comic", label: "Comics" },
-            { value: "audiobook", label: "Audio" },
-          ] as const).map((option) => (
+          {(
+            [
+              { value: "all", label: "All" },
+              { value: "ebook", label: "eBooks" },
+              { value: "comic", label: "Comics" },
+              { value: "audiobook", label: "Audio" },
+            ] as const
+          ).map((option) => (
             <button
               key={option.value}
               onClick={() => setTypeFilter(option.value)}
@@ -799,7 +923,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           className={`${buttonStyles.base} ${fieldFilters.size > 0 ? buttonStyles.secondary : buttonStyles.ghost} shrink-0 relative`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+            />
           </svg>
           Filter
           {fieldFilters.size > 0 && (
@@ -814,7 +943,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           className={`${buttonStyles.base} ${buttonStyles.ghost} shrink-0`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
           </svg>
           Export CSV
         </button>
@@ -844,7 +978,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
         <div className="bg-surface border-b border-border px-6 py-3 shrink-0">
           <div className="flex items-start gap-6">
             <div>
-              <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider block mb-2">Missing</span>
+              <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider block mb-2">
+                Missing
+              </span>
               <div className="flex flex-wrap gap-1.5">
                 {FIELD_FILTER_OPTIONS.filter((f) => f.group === "missing").map((opt) => (
                   <button
@@ -862,7 +998,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
               </div>
             </div>
             <div>
-              <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider block mb-2">Has</span>
+              <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider block mb-2">
+                Has
+              </span>
               <div className="flex flex-wrap gap-1.5">
                 {FIELD_FILTER_OPTIONS.filter((f) => f.group === "has").map((opt) => (
                   <button
@@ -958,12 +1096,14 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
           }`}
         >
           <span>{message.text}</span>
-          <button
-            onClick={() => setMessage(null)}
-            className="ml-4 opacity-60 hover:opacity-100"
-          >
+          <button onClick={() => setMessage(null)} className="ml-4 opacity-60 hover:opacity-100">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -1024,7 +1164,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             <input
               type="text"
               value={columnFilters.seriesNumber || ""}
-              onChange={(e) => setColumnFilters((prev) => ({ ...prev, seriesNumber: e.target.value }))}
+              onChange={(e) =>
+                setColumnFilters((prev) => ({ ...prev, seriesNumber: e.target.value }))
+              }
               placeholder="#"
               className="w-full px-1.5 py-0.5 text-xs border border-border/60 rounded bg-background text-foreground placeholder:text-foreground-muted/50 focus:border-primary focus:outline-none"
             />
@@ -1134,7 +1276,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             >
               <option value="">Select...</option>
               {allTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
               ))}
             </select>
             <button
@@ -1158,7 +1302,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             >
               <option value="">Select...</option>
               {allTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
               ))}
             </select>
             <button
@@ -1182,7 +1328,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             >
               <option value="">Select...</option>
               {LANGUAGES.filter(Boolean).map((lang) => (
-                <option key={lang} value={lang}>{lang}</option>
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
               ))}
             </select>
             <button
@@ -1226,7 +1374,12 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
             className={`${buttonStyles.base} !px-3 !py-1 text-xs text-danger border border-danger/30 bg-danger-light hover:bg-danger hover:text-white transition-colors`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             Delete Selected
           </button>
@@ -1234,217 +1387,261 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       )}
 
       {/* Book Preview Modal */}
-      {previewBookId && (() => {
-        const book = allBooks.find((b) => b.id === previewBookId);
-        if (!book) return null;
-        const authors = (() => {
-          try {
-            const parsed = book.authors ? JSON.parse(book.authors) : [];
-            return Array.isArray(parsed) ? parsed.filter((a: unknown): a is string => typeof a === "string") : [];
-          } catch { return []; }
-        })();
-        const tags = bookTagsState[book.id] || [];
-        const progressPercent = Math.round((book.readingProgress || 0) * 100);
-        const formatFileSize = (bytes: number) => {
-          if (bytes < 1024) return bytes + " B";
-          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-          return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-        };
+      {previewBookId &&
+        (() => {
+          const book = allBooks.find((b) => b.id === previewBookId);
+          if (!book) return null;
+          const authors = (() => {
+            try {
+              const parsed = book.authors ? JSON.parse(book.authors) : [];
+              return Array.isArray(parsed)
+                ? parsed.filter((a: unknown): a is string => typeof a === "string")
+                : [];
+            } catch {
+              return [];
+            }
+          })();
+          const tags = bookTagsState[book.id] || [];
+          const progressPercent = Math.round((book.readingProgress || 0) * 100);
+          const formatFileSize = (bytes: number) => {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+            return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+          };
 
-        return (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
-            onClick={(e) => { if (e.target === e.currentTarget) setPreviewBookId(null); }}
-          >
-            <div className="bg-surface rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-surface border-b border-border px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
-                <h3 className="text-lg font-semibold text-foreground truncate pr-4">{book.title}</h3>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    to={`/book/${book.id}`}
-                    className={`${buttonStyles.base} ${buttonStyles.ghost} !px-3 !py-1.5 text-sm`}
-                  >
-                    Open Full Page
-                  </Link>
-                  <button
-                    onClick={() => setPreviewBookId(null)}
-                    className="p-1.5 rounded-lg hover:bg-surface-elevated transition-colors text-foreground-muted hover:text-foreground"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="flex gap-6">
-                  {/* Cover */}
-                  <div className="shrink-0">
-                    <div
-                      className="w-36 aspect-[2/3] rounded-lg overflow-hidden shadow-md"
-                      style={{ backgroundColor: book.coverColor || undefined }}
+          return (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setPreviewBookId(null);
+              }}
+            >
+              <div className="bg-surface rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+                {/* Modal Header */}
+                <div className="sticky top-0 bg-surface border-b border-border px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
+                  <h3 className="text-lg font-semibold text-foreground truncate pr-4">
+                    {book.title}
+                  </h3>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      to={`/book/${book.id}`}
+                      className={`${buttonStyles.base} ${buttonStyles.ghost} !px-3 !py-1.5 text-sm`}
                     >
-                      <BookCover
-                        book={book}
-                        fallback={
-                          <div className="w-full h-full bg-surface-elevated border border-border flex items-center justify-center">
-                            <svg className="w-10 h-10 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                          </div>
-                        }
-                      />
-                    </div>
-
-                    {/* Progress */}
-                    {progressPercent > 0 && (
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs text-foreground-muted mb-1">
-                          <span>Progress</span>
-                          <span className="font-medium text-foreground">{progressPercent}%</span>
-                        </div>
-                        <div className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="mt-3 space-y-1.5">
-                      <Link
-                        to={`/book/${book.id}/read`}
-                        className={`${buttonStyles.base} ${buttonStyles.primary} w-full text-center justify-center !py-2 !text-xs`}
+                      Open Full Page
+                    </Link>
+                    <button
+                      onClick={() => setPreviewBookId(null)}
+                      className="p-1.5 rounded-lg hover:bg-surface-elevated transition-colors text-foreground-muted hover:text-foreground"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        {progressPercent > 0 ? "Continue Reading" : "Start Reading"}
-                      </Link>
-                      <a
-                        href={`/books/${book.id}.${book.format}`}
-                        download={book.fileName}
-                        className={`${buttonStyles.base} ${buttonStyles.secondary} w-full text-center justify-center !py-2 !text-xs`}
-                      >
-                        Download {book.format.toUpperCase()}
-                      </a>
-                    </div>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
                   </div>
+                </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0 space-y-4">
-                    {/* Title & Authors */}
-                    <div>
-                      {book.subtitle && (
-                        <p className="text-sm text-foreground-muted mb-1">{book.subtitle}</p>
+                <div className="p-6">
+                  <div className="flex gap-6">
+                    {/* Cover */}
+                    <div className="shrink-0">
+                      <div
+                        className="w-36 aspect-[2/3] rounded-lg overflow-hidden shadow-md"
+                        style={{ backgroundColor: book.coverColor || undefined }}
+                      >
+                        <BookCover
+                          book={book}
+                          fallback={
+                            <div className="w-full h-full bg-surface-elevated border border-border flex items-center justify-center">
+                              <svg
+                                className="w-10 h-10 text-foreground-muted"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1.5}
+                                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                />
+                              </svg>
+                            </div>
+                          }
+                        />
+                      </div>
+
+                      {/* Progress */}
+                      {progressPercent > 0 && (
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs text-foreground-muted mb-1">
+                            <span>Progress</span>
+                            <span className="font-medium text-foreground">{progressPercent}%</span>
+                          </div>
+                          <div className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
                       )}
-                      {authors.length > 0 && (
-                        <p className="text-sm text-foreground-muted">
-                          by <span className="text-primary font-medium">{authors.join(", ")}</span>
-                        </p>
-                      )}
-                      {book.series && (
-                        <p className="text-sm text-foreground-muted mt-1">
-                          {book.seriesNumber && <span>Book {book.seriesNumber} in </span>}
-                          <span className="text-primary font-medium">{book.series}</span>
-                        </p>
-                      )}
+
+                      {/* Actions */}
+                      <div className="mt-3 space-y-1.5">
+                        <Link
+                          to={`/book/${book.id}/read`}
+                          className={`${buttonStyles.base} ${buttonStyles.primary} w-full text-center justify-center !py-2 !text-xs`}
+                        >
+                          {progressPercent > 0 ? "Continue Reading" : "Start Reading"}
+                        </Link>
+                        <a
+                          href={`/books/${book.id}.${book.format}`}
+                          download={book.fileName}
+                          className={`${buttonStyles.base} ${buttonStyles.secondary} w-full text-center justify-center !py-2 !text-xs`}
+                        >
+                          Download {book.format.toUpperCase()}
+                        </a>
+                      </div>
                     </div>
 
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-light text-primary border border-primary/20 uppercase">
-                        {book.format}
-                      </span>
-                      {book.language && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-elevated text-foreground-muted border border-border">
-                          {book.language}
-                        </span>
-                      )}
-                      {book.pageCount && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-elevated text-foreground-muted border border-border">
-                          {book.pageCount} pages
-                        </span>
-                      )}
-                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 space-y-4">
+                      {/* Title & Authors */}
+                      <div>
+                        {book.subtitle && (
+                          <p className="text-sm text-foreground-muted mb-1">{book.subtitle}</p>
+                        )}
+                        {authors.length > 0 && (
+                          <p className="text-sm text-foreground-muted">
+                            by{" "}
+                            <span className="text-primary font-medium">{authors.join(", ")}</span>
+                          </p>
+                        )}
+                        {book.series && (
+                          <p className="text-sm text-foreground-muted mt-1">
+                            {book.seriesNumber && <span>Book {book.seriesNumber} in </span>}
+                            <span className="text-primary font-medium">{book.series}</span>
+                          </p>
+                        )}
+                      </div>
 
-                    {/* Tags */}
-                    {tags.length > 0 && (
+                      {/* Badges */}
                       <div className="flex flex-wrap gap-1.5">
-                        {tags.map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="inline-block px-2 py-0.5 text-xs rounded-full"
-                            style={
-                              tag.color
-                                ? { backgroundColor: tag.color + "20", color: tag.color }
-                                : { backgroundColor: "var(--color-surface-elevated)", color: "var(--color-foreground-muted)" }
-                            }
-                          >
-                            {tag.name}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-light text-primary border border-primary/20 uppercase">
+                          {book.format}
+                        </span>
+                        {book.language && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-elevated text-foreground-muted border border-border">
+                            {book.language}
                           </span>
-                        ))}
+                        )}
+                        {book.pageCount && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-elevated text-foreground-muted border border-border">
+                            {book.pageCount} pages
+                          </span>
+                        )}
                       </div>
-                    )}
 
-                    {/* Description */}
-                    {book.description && (
-                      <p className="text-sm text-foreground leading-relaxed line-clamp-4">
-                        {book.description}
-                      </p>
-                    )}
+                      {/* Tags */}
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-block px-2 py-0.5 text-xs rounded-full"
+                              style={
+                                tag.color
+                                  ? { backgroundColor: tag.color + "20", color: tag.color }
+                                  : {
+                                      backgroundColor: "var(--color-surface-elevated)",
+                                      color: "var(--color-foreground-muted)",
+                                    }
+                              }
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
-                    {/* Details */}
-                    <dl className="text-xs divide-y divide-border">
-                      {book.publisher && (
-                        <div className="flex justify-between py-2">
-                          <dt className="text-foreground-muted">Publisher</dt>
-                          <dd className="font-medium text-foreground">{book.publisher}</dd>
-                        </div>
+                      {/* Description */}
+                      {book.description && (
+                        <p className="text-sm text-foreground leading-relaxed line-clamp-4">
+                          {book.description}
+                        </p>
                       )}
-                      {book.publishedDate && (
+
+                      {/* Details */}
+                      <dl className="text-xs divide-y divide-border">
+                        {book.publisher && (
+                          <div className="flex justify-between py-2">
+                            <dt className="text-foreground-muted">Publisher</dt>
+                            <dd className="font-medium text-foreground">{book.publisher}</dd>
+                          </div>
+                        )}
+                        {book.publishedDate && (
+                          <div className="flex justify-between py-2">
+                            <dt className="text-foreground-muted">Published</dt>
+                            <dd className="font-medium text-foreground">{book.publishedDate}</dd>
+                          </div>
+                        )}
+                        {(book.isbn13 || book.isbn10 || book.isbn) && (
+                          <div className="flex justify-between py-2">
+                            <dt className="text-foreground-muted">ISBN</dt>
+                            <dd className="font-medium text-foreground font-mono">
+                              {book.isbn13 || book.isbn10 || book.isbn}
+                            </dd>
+                          </div>
+                        )}
                         <div className="flex justify-between py-2">
-                          <dt className="text-foreground-muted">Published</dt>
-                          <dd className="font-medium text-foreground">{book.publishedDate}</dd>
+                          <dt className="text-foreground-muted">File Size</dt>
+                          <dd className="font-medium text-foreground">
+                            {formatFileSize(book.fileSize)}
+                          </dd>
                         </div>
-                      )}
-                      {(book.isbn13 || book.isbn10 || book.isbn) && (
-                        <div className="flex justify-between py-2">
-                          <dt className="text-foreground-muted">ISBN</dt>
-                          <dd className="font-medium text-foreground font-mono">{book.isbn13 || book.isbn10 || book.isbn}</dd>
+                        {book.importedAt && (
+                          <div className="flex justify-between py-2">
+                            <dt className="text-foreground-muted">Added</dt>
+                            <dd className="font-medium text-foreground">
+                              {book.importedAt.toLocaleDateString()}
+                            </dd>
+                          </div>
+                        )}
+                        <div className="flex justify-between gap-4 py-2">
+                          <dt className="text-foreground-muted shrink-0">Filename</dt>
+                          <dd className="font-medium text-foreground break-all text-right">
+                            {book.fileName}
+                          </dd>
                         </div>
-                      )}
-                      <div className="flex justify-between py-2">
-                        <dt className="text-foreground-muted">File Size</dt>
-                        <dd className="font-medium text-foreground">{formatFileSize(book.fileSize)}</dd>
-                      </div>
-                      {book.importedAt && (
-                        <div className="flex justify-between py-2">
-                          <dt className="text-foreground-muted">Added</dt>
-                          <dd className="font-medium text-foreground">{book.importedAt.toLocaleDateString()}</dd>
-                        </div>
-                      )}
-                      <div className="flex justify-between gap-4 py-2">
-                        <dt className="text-foreground-muted shrink-0">Filename</dt>
-                        <dd className="font-medium text-foreground break-all text-right">{book.fileName}</dd>
-                      </div>
-                    </dl>
+                      </dl>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
           <div className="bg-surface rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Delete {selectedIds.size} Book{selectedIds.size !== 1 ? "s" : ""}?</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Delete {selectedIds.size} Book{selectedIds.size !== 1 ? "s" : ""}?
+            </h3>
             <p className="text-sm text-foreground-muted mb-4">
-              This will permanently delete the selected book{selectedIds.size !== 1 ? "s" : ""} and their files from your library. This action cannot be undone.
+              This will permanently delete the selected book{selectedIds.size !== 1 ? "s" : ""} and
+              their files from your library. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -1476,14 +1673,20 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       {/* Virtualized Table Body */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <div
-          style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
         >
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const book = filteredBooks[virtualRow.index];
             const currentAuthors = getEditValue(book.id, "authors") ?? parseAuthors(book.authors);
             const currentSeries = getEditValue(book.id, "series") ?? (book.series || "");
-            const currentSeriesNumber = getEditValue(book.id, "seriesNumber") ?? (book.seriesNumber || "");
-            const currentCategory = getEditValue(book.id, "bookTypeOverride") ?? (book.bookTypeOverride || "");
+            const currentSeriesNumber =
+              getEditValue(book.id, "seriesNumber") ?? (book.seriesNumber || "");
+            const currentCategory =
+              getEditValue(book.id, "bookTypeOverride") ?? (book.bookTypeOverride || "");
             const currentLanguage = getEditValue(book.id, "language") ?? (book.language || "");
             const currentTags = bookTagsState[book.id] || [];
 
@@ -1530,8 +1733,18 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                         alt=""
                         fallback={
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            <svg
+                              className="w-4 h-4 text-foreground-muted"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                              />
                             </svg>
                           </div>
                         }
@@ -1541,7 +1754,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Title */}
-                <div className={`px-2 min-w-[200px] flex-[2] ${isFieldModified(book.id, "title") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 min-w-[200px] flex-[2] ${isFieldModified(book.id, "title") ? modifiedCellClass : ""}`}
+                >
                   <input
                     type="text"
                     value={getEditValue(book.id, "title") ?? book.title}
@@ -1549,15 +1764,21 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                     className={cellInputClass}
                   />
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-foreground-muted uppercase">{book.format}</span>
+                    <span className="text-[10px] text-foreground-muted uppercase">
+                      {book.format}
+                    </span>
                     {book.description && (
-                      <span className="text-[10px] text-foreground-muted line-clamp-1">{book.description}</span>
+                      <span className="text-[10px] text-foreground-muted line-clamp-1">
+                        {book.description}
+                      </span>
                     )}
                   </div>
                 </div>
 
                 {/* Authors */}
-                <div className={`px-2 min-w-[160px] flex-[1.5] ${isFieldModified(book.id, "authors") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 min-w-[160px] flex-[1.5] ${isFieldModified(book.id, "authors") ? modifiedCellClass : ""}`}
+                >
                   <input
                     list="shared-authors-datalist"
                     type="text"
@@ -1569,7 +1790,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Series */}
-                <div className={`px-2 min-w-[140px] flex-1 ${isFieldModified(book.id, "series") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 min-w-[140px] flex-1 ${isFieldModified(book.id, "series") ? modifiedCellClass : ""}`}
+                >
                   <input
                     list="shared-series-datalist"
                     type="text"
@@ -1581,7 +1804,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Series # */}
-                <div className={`px-2 w-20 shrink-0 ${isFieldModified(book.id, "seriesNumber") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 w-20 shrink-0 ${isFieldModified(book.id, "seriesNumber") ? modifiedCellClass : ""}`}
+                >
                   <input
                     type="text"
                     value={currentSeriesNumber}
@@ -1604,7 +1829,10 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                         style={
                           tag.color
                             ? { backgroundColor: tag.color + "20", color: tag.color }
-                            : { backgroundColor: "var(--color-surface-elevated)", color: "var(--color-foreground-muted)" }
+                            : {
+                                backgroundColor: "var(--color-surface-elevated)",
+                                color: "var(--color-foreground-muted)",
+                              }
                         }
                       >
                         {tag.name}
@@ -1625,7 +1853,11 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                         const cellEl = e.currentTarget.closest("[data-tag-cell]");
                         if (cellEl) {
                           const rect = cellEl.getBoundingClientRect();
-                          setDropdownPos({ top: rect.bottom + 2, left: rect.left, width: Math.max(rect.width, 180) });
+                          setDropdownPos({
+                            top: rect.bottom + 2,
+                            left: rect.left,
+                            width: Math.max(rect.width, 180),
+                          });
                         }
                       }}
                       onFocus={(e) => {
@@ -1633,12 +1865,20 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                         const cellEl = e.currentTarget.closest("[data-tag-cell]");
                         if (cellEl) {
                           const rect = cellEl.getBoundingClientRect();
-                          setDropdownPos({ top: rect.bottom + 2, left: rect.left, width: Math.max(rect.width, 180) });
+                          setDropdownPos({
+                            top: rect.bottom + 2,
+                            left: rect.left,
+                            width: Math.max(rect.width, 180),
+                          });
                         }
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") setOpenTagDropdown(null);
-                        if (e.key === "Backspace" && !tagInputState[book.id] && currentTags.length > 0) {
+                        if (
+                          e.key === "Backspace" &&
+                          !tagInputState[book.id] &&
+                          currentTags.length > 0
+                        ) {
                           removeTagFromBookLocal(book.id, currentTags[currentTags.length - 1].id);
                         }
                       }}
@@ -1649,10 +1889,14 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Category */}
-                <div className={`px-2 w-28 shrink-0 ${isFieldModified(book.id, "bookTypeOverride") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 w-28 shrink-0 ${isFieldModified(book.id, "bookTypeOverride") ? modifiedCellClass : ""}`}
+                >
                   <select
                     value={currentCategory}
-                    onChange={(e) => setEditValue(book.id, "bookTypeOverride", e.target.value || null)}
+                    onChange={(e) =>
+                      setEditValue(book.id, "bookTypeOverride", e.target.value || null)
+                    }
                     className={cellSelectClass}
                   >
                     <option value="">Auto</option>
@@ -1663,7 +1907,9 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
                 </div>
 
                 {/* Language */}
-                <div className={`px-2 w-28 shrink-0 ${isFieldModified(book.id, "language") ? modifiedCellClass : ""}`}>
+                <div
+                  className={`px-2 w-28 shrink-0 ${isFieldModified(book.id, "language") ? modifiedCellClass : ""}`}
+                >
                   <select
                     value={currentLanguage}
                     onChange={(e) => setEditValue(book.id, "language", e.target.value)}
@@ -1689,49 +1935,55 @@ export function BatchEditClient({ books: initialBooks, bookTags: initialBookTags
       </div>
 
       {/* Tag dropdown portal — rendered outside scroll container to avoid clipping */}
-      {openTagDropdown && dropdownPos && (() => {
-        const bookId = openTagDropdown;
-        const currentTags = bookTagsState[bookId] || [];
-        const query = (tagInputState[bookId] || "").toLowerCase();
-        const available = allTags
-          .filter((tag) => !currentTags.some((t) => t.id === tag.id))
-          .filter((tag) => !query || tag.name.toLowerCase().includes(query));
-        if (available.length === 0 && !query) return null;
-        return createPortal(
-          <div
-            data-tag-cell={bookId}
-            className="fixed bg-surface border border-border rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto"
-            style={{
-              top: dropdownPos.top,
-              left: dropdownPos.left,
-              width: dropdownPos.width,
-              zIndex: 9999,
-            }}
-          >
-            {available.map((tag) => (
-              <button
-                key={tag.id}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  addTagToBook(bookId, tag);
-                  setTagInputState((prev) => ({ ...prev, [bookId]: "" }));
-                }}
-                className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-2"
-              >
-                {tag.color && (
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                )}
-                {tag.name}
-              </button>
-            ))}
-            {available.length === 0 && (
-              <span className="block px-3 py-1.5 text-sm text-foreground-muted">No matching tags</span>
-            )}
-          </div>,
-          document.body,
-        );
-      })()}
-
+      {openTagDropdown &&
+        dropdownPos &&
+        (() => {
+          const bookId = openTagDropdown;
+          const currentTags = bookTagsState[bookId] || [];
+          const query = (tagInputState[bookId] || "").toLowerCase();
+          const available = allTags
+            .filter((tag) => !currentTags.some((t) => t.id === tag.id))
+            .filter((tag) => !query || tag.name.toLowerCase().includes(query));
+          if (available.length === 0 && !query) return null;
+          return createPortal(
+            <div
+              data-tag-cell={bookId}
+              className="fixed bg-surface border border-border rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto"
+              style={{
+                top: dropdownPos.top,
+                left: dropdownPos.left,
+                width: dropdownPos.width,
+                zIndex: 9999,
+              }}
+            >
+              {available.map((tag) => (
+                <button
+                  key={tag.id}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    addTagToBook(bookId, tag);
+                    setTagInputState((prev) => ({ ...prev, [bookId]: "" }));
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-2"
+                >
+                  {tag.color && (
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                  )}
+                  {tag.name}
+                </button>
+              ))}
+              {available.length === 0 && (
+                <span className="block px-3 py-1.5 text-sm text-foreground-muted">
+                  No matching tags
+                </span>
+              )}
+            </div>,
+            document.body,
+          );
+        })()}
     </div>
   );
 }

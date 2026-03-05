@@ -10,12 +10,14 @@ app.get("/api/series", async (c) => {
     const seriesList = await getSeriesWithCovers();
 
     // Transform cover paths to URLs
-    const series = seriesList.map(s => ({
+    const series = seriesList.map((s) => ({
       name: s.name,
       bookCount: s.bookCount,
-      coverBooks: s.coverBooks.map(book => ({
+      coverBooks: s.coverBooks.map((book) => ({
         id: book.id,
-        coverUrl: book.coverPath ? `${baseUrl}/covers/${book.id}.thumb.jpg?v=${book.updatedAt?.getTime() || ""}` : null,
+        coverUrl: book.coverPath
+          ? `${baseUrl}/covers/${book.id}.thumb.jpg?v=${book.updatedAt?.getTime() || ""}`
+          : null,
       })),
     }));
 

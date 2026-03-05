@@ -7,7 +7,6 @@
  * - Potentially for runtime validation
  */
 
-
 export interface ParamSpec {
   name: string;
   type: "string" | "integer" | "boolean" | "uuid" | "file";

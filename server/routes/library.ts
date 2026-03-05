@@ -30,7 +30,8 @@ libraryRoutes.get("/api/library", async (c) => {
   const offset = parseInt(c.req.query("offset") || "0", 10);
   const sort = (c.req.query("sort") as SortOption) || "recent";
   const typeParam = c.req.query("type") as BookType | null;
-  const type = typeParam && ["audiobook", "ebook", "comic"].includes(typeParam) ? typeParam : undefined;
+  const type =
+    typeParam && ["audiobook", "ebook", "comic"].includes(typeParam) ? typeParam : undefined;
   const formatParam = c.req.query("format");
   const format = formatParam ? formatParam.split(",").filter(Boolean) : undefined;
   const series = c.req.query("series") || undefined;

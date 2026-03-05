@@ -22,14 +22,18 @@ try {
 }
 
 // Look up by ID first, then by name (case-insensitive)
-const profile = sqlite.prepare(
-  "SELECT id, name, is_admin FROM profiles WHERE id = ? OR name = ? COLLATE NOCASE"
-).get(identifier, identifier) as { id: string; name: string; is_admin: number } | undefined;
+const profile = sqlite
+  .prepare("SELECT id, name, is_admin FROM profiles WHERE id = ? OR name = ? COLLATE NOCASE")
+  .get(identifier, identifier) as { id: string; name: string; is_admin: number } | undefined;
 
 if (!profile) {
   console.error(`Profile not found: "${identifier}"`);
   console.error("");
-  const all = sqlite.prepare("SELECT id, name, is_admin FROM profiles").all() as Array<{ id: string; name: string; is_admin: number }>;
+  const all = sqlite.prepare("SELECT id, name, is_admin FROM profiles").all() as Array<{
+    id: string;
+    name: string;
+    is_admin: number;
+  }>;
   if (all.length === 0) {
     console.error("No profiles exist yet. Start the server and create a profile first.");
   } else {
@@ -46,6 +50,8 @@ if (profile.is_admin) {
   process.exit(0);
 }
 
-sqlite.prepare("UPDATE profiles SET is_admin = 1, updated_at = unixepoch() WHERE id = ?").run(profile.id);
+sqlite
+  .prepare("UPDATE profiles SET is_admin = 1, updated_at = unixepoch() WHERE id = ?")
+  .run(profile.id);
 console.log(`"${profile.name}" (${profile.id}) is now an admin.`);
 sqlite.close();

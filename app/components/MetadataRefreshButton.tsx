@@ -89,7 +89,7 @@ export function MetadataRefreshButton({
         // Reload to show updated data
         window.location.reload();
       }
-    } catch (error) {
+    } catch {
       setMessage("Failed to apply metadata");
     } finally {
       setLoading(false);
@@ -106,7 +106,10 @@ export function MetadataRefreshButton({
         >
           {loading ? "Loading..." : "Auto-Refresh Metadata"}
         </button>
-        <button onClick={() => setShowSearch(!showSearch)} className={`${buttonStyles.base} ${buttonStyles.secondary} text-sm`}>
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          className={`${buttonStyles.base} ${buttonStyles.secondary} text-sm`}
+        >
           {showSearch ? "Hide Search" : "Search Metadata"}
         </button>
       </div>
@@ -216,7 +219,8 @@ export function MetadataRefreshButton({
           <div className="bg-surface border border-border rounded-xl p-6 max-w-lg w-full">
             <h3 className="text-lg font-semibold text-foreground mb-2">Update Cover Image?</h3>
             <p className="text-foreground-muted mb-4">
-              This book already has a cover. Would you like to replace it with the one from the metadata source?
+              This book already has a cover. Would you like to replace it with the one from the
+              metadata source?
             </p>
 
             <div className="flex gap-4 justify-center mb-6">

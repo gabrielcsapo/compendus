@@ -76,13 +76,13 @@ export function HighlightToolbar({
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(selectedText);
     } else {
-      const ta = document.createElement('textarea');
+      const ta = document.createElement("textarea");
       ta.value = selectedText;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      document.execCommand("copy");
       document.body.removeChild(ta);
     }
     onDismiss();
@@ -104,22 +104,21 @@ export function HighlightToolbar({
       {!showNoteInput ? (
         /* Default toolbar: Colors | Note | Copy */
         <div className="flex items-center gap-2 px-3 py-2">
-          {(customColors
-            ? customColors.map((c) => ({ name: c, value: c }))
-            : HIGHLIGHT_COLORS
-          ).map((color) => (
-            <button
-              key={color.value}
-              onClick={(e) => {
-                e.stopPropagation();
-                onHighlight(color.value);
-              }}
-              className="w-7 h-7 rounded-full border-2 border-transparent hover:border-current hover:scale-110 transition-all"
-              style={{ backgroundColor: color.value }}
-              aria-label={`Highlight ${color.name}`}
-              title={color.name}
-            />
-          ))}
+          {(customColors ? customColors.map((c) => ({ name: c, value: c })) : HIGHLIGHT_COLORS).map(
+            (color) => (
+              <button
+                key={color.value}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onHighlight(color.value);
+                }}
+                className="w-7 h-7 rounded-full border-2 border-transparent hover:border-current hover:scale-110 transition-all"
+                style={{ backgroundColor: color.value }}
+                aria-label={`Highlight ${color.name}`}
+                title={color.name}
+              />
+            ),
+          )}
 
           <div className="w-px h-5 mx-0.5" style={{ backgroundColor: `${theme.foreground}20` }} />
 

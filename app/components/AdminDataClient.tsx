@@ -134,9 +134,7 @@ function OrphanedFilePreview({ file }: { file: FileInfo }) {
   // Fallback for unknown types
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-foreground-muted">
-      <p className="text-sm mb-3">
-        No preview available for .{ext} files.
-      </p>
+      <p className="text-sm mb-3">No preview available for .{ext} files.</p>
       <a
         href={previewUrl}
         download={file.name}
@@ -185,19 +183,21 @@ export function AdminDataClient({
     const search = matchedSearch.toLowerCase().replace(/[^\w\s]/g, "");
     const matchesSearch =
       !search ||
-      file.book.title.toLowerCase().replace(/[^\w\s]/g, "").includes(search) ||
-      file.name.toLowerCase().replace(/[^\w\s]/g, "").includes(search) ||
+      file.book.title
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "")
+        .includes(search) ||
+      file.name
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "")
+        .includes(search) ||
       file.book.format.toLowerCase().includes(search);
     const matchesFormat =
-      matchedFormatFilter === "all" ||
-      file.book.format.toLowerCase() === matchedFormatFilter;
+      matchedFormatFilter === "all" || file.book.format.toLowerCase() === matchedFormatFilter;
     return matchesSearch && matchesFormat;
   });
 
-  const matchedTotalPages = Math.max(
-    1,
-    Math.ceil(filteredMatchedFiles.length / matchedPageSize),
-  );
+  const matchedTotalPages = Math.max(1, Math.ceil(filteredMatchedFiles.length / matchedPageSize));
   const clampedPage = Math.min(matchedPage, matchedTotalPages);
   const paginatedMatchedFiles = filteredMatchedFiles.slice(
     (clampedPage - 1) * matchedPageSize,
@@ -205,11 +205,8 @@ export function AdminDataClient({
   );
 
   const handleCancelJob = async (job: JobRecord) => {
-    const action = job.status === "running"
-      ? "Cancel"
-      : job.status === "pending"
-        ? "Cancel"
-        : "Clear";
+    const action =
+      job.status === "running" ? "Cancel" : job.status === "pending" ? "Cancel" : "Clear";
     if (!confirm(`${action} job "${job.id}"?`)) return;
 
     setDeleting(job.id);
@@ -232,8 +229,7 @@ export function AdminDataClient({
   };
 
   const handleDeleteOrphanedFile = async (file: FileInfo) => {
-    if (!confirm(`Delete orphaned file "${file.name}"? This cannot be undone.`))
-      return;
+    if (!confirm(`Delete orphaned file "${file.name}"? This cannot be undone.`)) return;
 
     setDeleting(file.path);
     const result = await deleteOrphanedFile(file.path);
@@ -276,16 +272,18 @@ export function AdminDataClient({
         const book = missingFiles.find((b) => b.id === bookId);
         if (book) {
           setMissingFiles((prev) => prev.filter((b) => b.id !== bookId));
-          setMatchedFiles((prev) => [
-            ...prev,
-            {
-              name: `${bookId}.${book.format}`,
-              size: result.book.fileSize,
-              path: `data/books/${bookId}.${book.format}`,
-              bookId,
-              book: { ...book, fileSize: result.book.fileSize },
-            },
-          ].sort((a, b) => a.name.localeCompare(b.name)));
+          setMatchedFiles((prev) =>
+            [
+              ...prev,
+              {
+                name: `${bookId}.${book.format}`,
+                size: result.book.fileSize,
+                path: `data/books/${bookId}.${book.format}`,
+                bookId,
+                book: { ...book, fileSize: result.book.fileSize },
+              },
+            ].sort((a, b) => a.name.localeCompare(b.name)),
+          );
         }
       } else {
         alert(result.message || result.error || "Upload failed");
@@ -299,12 +297,7 @@ export function AdminDataClient({
   };
 
   const handleDeleteMissingRecord = async (book: BookRecord) => {
-    if (
-      !confirm(
-        `Delete database record for "${book.title}"? This cannot be undone.`,
-      )
-    )
-      return;
+    if (!confirm(`Delete database record for "${book.title}"? This cannot be undone.`)) return;
 
     setDeleting(book.id);
     const result = await deleteMissingFileRecord(book.id);
@@ -317,15 +310,8 @@ export function AdminDataClient({
     }
   };
 
-  const handleDeleteMatchedBook = async (
-    file: FileInfo & { book: BookRecord },
-  ) => {
-    if (
-      !confirm(
-        `Delete "${file.book.title}" and its file? This cannot be undone.`,
-      )
-    )
-      return;
+  const handleDeleteMatchedBook = async (file: FileInfo & { book: BookRecord }) => {
+    if (!confirm(`Delete "${file.book.title}" and its file? This cannot be undone.`)) return;
 
     setDeleting(file.book.id);
     const success = await deleteBook(file.book.id);
@@ -340,16 +326,10 @@ export function AdminDataClient({
 
   return (
     <div>
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelected}
-        className="hidden"
-      />
+      <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
       <p className="text-foreground-muted text-sm mb-8">
-        Comparing files in{" "}
-        <code className="bg-surface-elevated px-1 rounded">{booksDir}</code>{" "}
-        with database records
+        Comparing files in <code className="bg-surface-elevated px-1 rounded">{booksDir}</code> with
+        database records
       </p>
 
       {/* Summary Stats */}
@@ -363,18 +343,12 @@ export function AdminDataClient({
           <div className="text-sm text-foreground-muted">Database Records</div>
         </div>
         <div className="bg-surface-elevated rounded-lg p-4">
-          <div className="text-2xl font-bold text-warning">
-            {orphanedFiles.length}
-          </div>
+          <div className="text-2xl font-bold text-warning">{orphanedFiles.length}</div>
           <div className="text-sm text-foreground-muted">Orphaned Files</div>
-          <div className="text-xs text-foreground-muted">
-            {formatBytes(orphanedSize)}
-          </div>
+          <div className="text-xs text-foreground-muted">{formatBytes(orphanedSize)}</div>
         </div>
         <div className="bg-surface-elevated rounded-lg p-4">
-          <div className="text-2xl font-bold text-error">
-            {missingFiles.length}
-          </div>
+          <div className="text-2xl font-bold text-error">{missingFiles.length}</div>
           <div className="text-sm text-foreground-muted">Missing Files</div>
         </div>
       </div>
@@ -397,27 +371,13 @@ export function AdminDataClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Job ID
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Type
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Status
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Progress
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Message
-                  </th>
-                  <th className="text-right p-3 text-foreground-muted font-medium">
-                    Updated
-                  </th>
-                  <th className="text-right p-3 text-foreground-muted font-medium">
-                    Actions
-                  </th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Job ID</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Type</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Status</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Progress</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Message</th>
+                  <th className="text-right p-3 text-foreground-muted font-medium">Updated</th>
+                  <th className="text-right p-3 text-foreground-muted font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,9 +393,7 @@ export function AdminDataClient({
                         </span>
                         {job.id}
                       </td>
-                      <td className="p-3 text-foreground-muted capitalize">
-                        {job.type}
-                      </td>
+                      <td className="p-3 text-foreground-muted capitalize">{job.type}</td>
                       <td className="p-3">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -472,10 +430,11 @@ export function AdminDataClient({
                       <td className="p-3 text-foreground-muted text-xs max-w-[200px] truncate">
                         {job.message || "—"}
                       </td>
-                      <td className="p-3 text-foreground-muted text-xs text-right whitespace-nowrap" suppressHydrationWarning>
-                        {job.updatedAt
-                          ? new Date(job.updatedAt).toLocaleString()
-                          : "—"}
+                      <td
+                        className="p-3 text-foreground-muted text-xs text-right whitespace-nowrap"
+                        suppressHydrationWarning
+                      >
+                        {job.updatedAt ? new Date(job.updatedAt).toLocaleString() : "—"}
                       </td>
                       <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -515,8 +474,8 @@ export function AdminDataClient({
           Orphaned Files ({orphanedFiles.length})
         </h2>
         <p className="text-sm text-foreground-muted mb-4">
-          These files exist on disk but have no corresponding database entry.
-          They can potentially be deleted.
+          These files exist on disk but have no corresponding database entry. They can potentially
+          be deleted.
         </p>
         {orphanedFiles.length === 0 ? (
           <div className="bg-surface-elevated rounded-lg p-4 text-foreground-muted">
@@ -527,15 +486,9 @@ export function AdminDataClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Filename
-                  </th>
-                  <th className="text-right p-3 text-foreground-muted font-medium">
-                    Size
-                  </th>
-                  <th className="text-right p-3 text-foreground-muted font-medium">
-                    Actions
-                  </th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Filename</th>
+                  <th className="text-right p-3 text-foreground-muted font-medium">Size</th>
+                  <th className="text-right p-3 text-foreground-muted font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -544,9 +497,7 @@ export function AdminDataClient({
                     key={file.name}
                     className="border-b border-border last:border-0 hover:bg-surface"
                   >
-                    <td className="p-3 text-foreground font-mono text-xs">
-                      {file.name}
-                    </td>
+                    <td className="p-3 text-foreground font-mono text-xs">{file.name}</td>
                     <td className="p-3 text-foreground-muted text-right">
                       {formatBytes(file.size)}
                     </td>
@@ -576,16 +527,11 @@ export function AdminDataClient({
       {/* Orphaned File Preview Modal */}
       {previewFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setPreviewFile(null)}
-          />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setPreviewFile(null)} />
           <div className="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {previewFile.name}
-                </h3>
+                <h3 className="text-lg font-semibold text-foreground">{previewFile.name}</h3>
                 <p className="text-sm text-foreground-muted">
                   {formatBytes(previewFile.size)} &middot;{" "}
                   {previewFile.name.split(".").pop()?.toUpperCase()}
@@ -612,8 +558,8 @@ export function AdminDataClient({
           Missing Files ({missingFiles.length})
         </h2>
         <p className="text-sm text-foreground-muted mb-4">
-          These database entries have no corresponding file on disk. The books
-          may need to be re-imported or the records deleted.
+          These database entries have no corresponding file on disk. The books may need to be
+          re-imported or the records deleted.
         </p>
         {missingFiles.length === 0 ? (
           <div className="bg-surface-elevated rounded-lg p-4 text-foreground-muted">
@@ -624,21 +570,13 @@ export function AdminDataClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Title
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    Format
-                  </th>
-                  <th className="text-left p-3 text-foreground-muted font-medium">
-                    ID
-                  </th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Title</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">Format</th>
+                  <th className="text-left p-3 text-foreground-muted font-medium">ID</th>
                   <th className="text-right p-3 text-foreground-muted font-medium">
                     Expected Size
                   </th>
-                  <th className="text-right p-3 text-foreground-muted font-medium">
-                    Actions
-                  </th>
+                  <th className="text-right p-3 text-foreground-muted font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -648,19 +586,12 @@ export function AdminDataClient({
                     className="border-b border-border last:border-0 hover:bg-surface"
                   >
                     <td className="p-3 text-foreground">
-                      <Link
-                        to={`/book/${book.id}`}
-                        className="hover:text-primary"
-                      >
+                      <Link to={`/book/${book.id}`} className="hover:text-primary">
                         {book.title}
                       </Link>
                     </td>
-                    <td className="p-3 text-foreground-muted uppercase">
-                      {book.format}
-                    </td>
-                    <td className="p-3 text-foreground-muted font-mono text-xs">
-                      {book.id}
-                    </td>
+                    <td className="p-3 text-foreground-muted uppercase">{book.format}</td>
+                    <td className="p-3 text-foreground-muted font-mono text-xs">{book.id}</td>
                     <td className="p-3 text-foreground-muted text-right">
                       {formatBytes(book.fileSize)}
                     </td>
@@ -760,21 +691,11 @@ export function AdminDataClient({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 text-foreground-muted font-medium">
-                      Title
-                    </th>
-                    <th className="text-left p-3 text-foreground-muted font-medium">
-                      Filename
-                    </th>
-                    <th className="text-left p-3 text-foreground-muted font-medium">
-                      Format
-                    </th>
-                    <th className="text-right p-3 text-foreground-muted font-medium">
-                      Size
-                    </th>
-                    <th className="text-right p-3 text-foreground-muted font-medium">
-                      Actions
-                    </th>
+                    <th className="text-left p-3 text-foreground-muted font-medium">Title</th>
+                    <th className="text-left p-3 text-foreground-muted font-medium">Filename</th>
+                    <th className="text-left p-3 text-foreground-muted font-medium">Format</th>
+                    <th className="text-right p-3 text-foreground-muted font-medium">Size</th>
+                    <th className="text-right p-3 text-foreground-muted font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -784,19 +705,12 @@ export function AdminDataClient({
                       className="border-b border-border last:border-0 hover:bg-surface"
                     >
                       <td className="p-3 text-foreground">
-                        <Link
-                          to={`/book/${file.book.id}`}
-                          className="hover:text-primary"
-                        >
+                        <Link to={`/book/${file.book.id}`} className="hover:text-primary">
                           {file.book.title}
                         </Link>
                       </td>
-                      <td className="p-3 text-foreground-muted font-mono text-xs">
-                        {file.name}
-                      </td>
-                      <td className="p-3 text-foreground-muted uppercase">
-                        {file.book.format}
-                      </td>
+                      <td className="p-3 text-foreground-muted font-mono text-xs">{file.name}</td>
+                      <td className="p-3 text-foreground-muted uppercase">{file.book.format}</td>
                       <td className="p-3 text-foreground-muted text-right">
                         {formatBytes(file.size)}
                       </td>
@@ -838,23 +752,16 @@ export function AdminDataClient({
                   </button>
                   {Array.from({ length: matchedTotalPages }, (_, i) => i + 1)
                     .filter(
-                      (p) =>
-                        p === 1 ||
-                        p === matchedTotalPages ||
-                        Math.abs(p - clampedPage) <= 2,
+                      (p) => p === 1 || p === matchedTotalPages || Math.abs(p - clampedPage) <= 2,
                     )
                     .reduce<(number | "ellipsis")[]>((acc, p, i, arr) => {
-                      if (i > 0 && p - (arr[i - 1] as number) > 1)
-                        acc.push("ellipsis");
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("ellipsis");
                       acc.push(p);
                       return acc;
                     }, [])
                     .map((p, i) =>
                       p === "ellipsis" ? (
-                        <span
-                          key={`ellipsis-${i}`}
-                          className="px-1 text-xs text-foreground-muted"
-                        >
+                        <span key={`ellipsis-${i}`} className="px-1 text-xs text-foreground-muted">
                           ...
                         </span>
                       ) : (

@@ -64,10 +64,7 @@ export function LandingLayout() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground-muted">
           <p>Compendus — Self-hosted personal digital library</p>
           <div className="flex items-center gap-6">
-            <Link
-              to="/docs/getting-started"
-              className="hover:text-foreground transition-colors"
-            >
+            <Link to="/docs/getting-started" className="hover:text-foreground transition-colors">
               Documentation
             </Link>
             <a

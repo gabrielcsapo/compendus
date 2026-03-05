@@ -242,10 +242,7 @@ export function ReadAloudBar({
 
       {/* Sentence progress */}
       {sentencesRef.current.length > 1 && (
-        <span
-          className="text-xs tabular-nums whitespace-nowrap"
-          style={{ color: theme.muted }}
-        >
+        <span className="text-xs tabular-nums whitespace-nowrap" style={{ color: theme.muted }}>
           {currentSentenceIndex + 1}/{sentencesRef.current.length}
         </span>
       )}
@@ -276,7 +273,27 @@ function splitIntoSentences(text: string): string[] {
   const sentences: string[] = [];
   let current = "";
   // Common abbreviations that don't end a sentence
-  const abbrevs = new Set(["mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "inc", "ltd", "corp", "vol", "dept", "est", "approx", "fig", "no"]);
+  const abbrevs = new Set([
+    "mr",
+    "mrs",
+    "ms",
+    "dr",
+    "prof",
+    "sr",
+    "jr",
+    "st",
+    "vs",
+    "etc",
+    "inc",
+    "ltd",
+    "corp",
+    "vol",
+    "dept",
+    "est",
+    "approx",
+    "fig",
+    "no",
+  ]);
 
   for (let i = 0; i < text.length; i++) {
     current += text[i];
@@ -327,11 +344,7 @@ function removeTTSHighlights(container: HTMLElement) {
   });
 }
 
-function highlightSentenceInDOM(
-  container: HTMLElement,
-  sentence: string,
-  accentColor: string,
-) {
+function highlightSentenceInDOM(container: HTMLElement, sentence: string, accentColor: string) {
   const trimmed = sentence.trim();
   if (!trimmed) return;
 

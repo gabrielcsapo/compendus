@@ -59,7 +59,7 @@ export default function Component() {
           text: `${result.removed} book${result.removed > 1 ? "s" : ""} removed from wishlist (now in library)`,
         });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to load wanted list" });
     } finally {
       setLoading(false);
@@ -71,7 +71,7 @@ export default function Component() {
       await removeFromWantedList(id);
       setWantedBooksState((prev) => prev.filter((b) => b.id !== id));
       setMessage({ type: "success", text: "Removed from wanted list" });
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to remove book" });
     }
   };
@@ -80,7 +80,7 @@ export default function Component() {
     try {
       await updateWantedBook(id, { status });
       setWantedBooksState((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to update status" });
     }
   };
@@ -94,7 +94,7 @@ export default function Component() {
         type: "success",
         text: `Removed ${count} book${count !== 1 ? "s" : ""} from wishlist`,
       });
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to clear wishlist" });
     }
   };
@@ -116,7 +116,7 @@ export default function Component() {
       } else {
         setMessage({ type: "error", text: `Failed to upload: ${result.error}` });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Upload failed" });
     } finally {
       setUploadingId(null);

@@ -39,6 +39,5 @@ if (migrationsFolder) {
   console.warn("[DB] No migrations folder found, tried:", migrationsPaths);
 }
 
-
 // Export types
 export * from "./schema";

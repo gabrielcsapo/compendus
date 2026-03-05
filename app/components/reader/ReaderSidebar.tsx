@@ -386,8 +386,7 @@ function HighlightList({
     <ul className="py-2">
       {sortedHighlights.map((highlight) => {
         const isNearCurrent =
-          highlight.startPosition <= currentPosition &&
-          highlight.endPosition >= currentPosition;
+          highlight.startPosition <= currentPosition && highlight.endPosition >= currentPosition;
         const isEditing = editingId === highlight.id;
 
         return (
@@ -404,9 +403,7 @@ function HighlightList({
               />
 
               {/* Highlighted text preview */}
-              <div className="text-sm line-clamp-3 pl-2 italic">
-                &ldquo;{highlight.text}&rdquo;
-              </div>
+              <div className="text-sm line-clamp-3 pl-2 italic">&ldquo;{highlight.text}&rdquo;</div>
 
               {/* Note display or editor */}
               {isEditing ? (

@@ -38,9 +38,7 @@ export function EditorSidebar({
     (m) => m.mediaType === "text/css" && !m.isSpineItem,
   );
 
-  const images = structure.manifest.filter((m) =>
-    m.mediaType.startsWith("image/"),
-  );
+  const images = structure.manifest.filter((m) => m.mediaType.startsWith("image/"));
 
   const otherFiles = structure.manifest.filter(
     (m) =>
@@ -203,7 +201,12 @@ export function EditorSidebar({
                 className="opacity-0 group-hover:opacity-50 hover:!opacity-100 hover:text-error transition-opacity"
                 title="Delete chapter"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                  className="w-3 h-3"
+                >
                   <path
                     fillRule="evenodd"
                     d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5A.75.75 0 0 1 9.95 6Z"
@@ -255,7 +258,12 @@ export function EditorSidebar({
             onClick={() => setShowAddChapter(true)}
             className="flex items-center gap-1 px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground hover:bg-background w-full"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className="w-3 h-3"
+            >
               <path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5v-3.5Z" />
             </svg>
             Add chapter
@@ -319,7 +327,12 @@ export function EditorSidebar({
             }`}
             onClick={() => onFileSelect(f.path)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 shrink-0 text-foreground-muted">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className="w-3 h-3 shrink-0 text-foreground-muted"
+            >
               <path d="M3.5 2A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 12.5 5H7.621a1.5 1.5 0 0 1-1.06-.44L5.439 3.44A1.5 1.5 0 0 0 4.378 3H3.5Z" />
             </svg>
             <span className="truncate">{f.label}</span>
@@ -400,7 +413,12 @@ function FileItem({
       onClick={onClick}
     >
       {icon === "image" ? (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 shrink-0 text-foreground-muted">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="w-3 h-3 shrink-0 text-foreground-muted"
+        >
           <path
             fillRule="evenodd"
             d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4Zm10.5 5.707a.5.5 0 0 0-.146-.353l-1-1a.5.5 0 0 0-.708 0L7.793 11.207a.5.5 0 0 1-.708 0l-.646-.647a.5.5 0 0 0-.707 0L3.5 12.793V12a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v-2.293ZM6 6.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0Z"
@@ -408,7 +426,12 @@ function FileItem({
           />
         </svg>
       ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 shrink-0 text-foreground-muted">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="w-3 h-3 shrink-0 text-foreground-muted"
+        >
           <path d="M4 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6.621a2 2 0 0 0-.586-1.414l-2.621-2.621A2 2 0 0 0 9.379 2H4Z" />
         </svg>
       )}

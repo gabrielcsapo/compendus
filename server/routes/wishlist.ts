@@ -13,11 +13,14 @@ app.get("/api/wishlist", async (c) => {
     const limitParam = c.req.query("limit");
     const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
-    const result = await getWantedBooks({
-      status: status || undefined,
-      series: series || undefined,
-      limit,
-    }, profileId);
+    const result = await getWantedBooks(
+      {
+        status: status || undefined,
+        series: series || undefined,
+        limit,
+      },
+      profileId,
+    );
 
     return c.json({
       success: true,

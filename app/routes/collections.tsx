@@ -5,7 +5,7 @@ import { CreateCollectionButton } from "../components/CreateCollectionModal";
 export default async function Collections() {
   const collections = await getCollections();
   // Batch-fetch all book counts in a single query instead of N+1
-  const counts = await getCollectionBookCounts(collections.map(c => c.id));
+  const counts = await getCollectionBookCounts(collections.map((c) => c.id));
 
   return (
     <main className="container my-8 px-6 mx-auto">

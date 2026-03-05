@@ -22,8 +22,7 @@ export const buttonStyles = {
   primary:
     "!bg-primary !text-white !border-primary hover:!bg-primary-hover hover:!border-primary-hover",
 
-  secondary:
-    "!border-secondary !text-secondary hover:!bg-secondary hover:!text-white",
+  secondary: "!border-secondary !text-secondary hover:!bg-secondary hover:!text-white",
 
   ghost:
     "!bg-transparent !border-transparent !shadow-none hover:!bg-surface-elevated hover:!shadow-none hover:!translate-y-0",

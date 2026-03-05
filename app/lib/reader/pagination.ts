@@ -227,7 +227,11 @@ class PaginationEngine {
     const endChar = startChar + charsPerPage;
 
     // Find which chapters this page spans
-    const { html, chapterTitle, overlappingChapters } = this.extractTextRange(content, startChar, endChar);
+    const { html, chapterTitle, overlappingChapters } = this.extractTextRange(
+      content,
+      startChar,
+      endChar,
+    );
 
     const position = startChar / content.totalCharacters;
     const endPosition = Math.min(1, endChar / content.totalCharacters);
@@ -245,7 +249,10 @@ class PaginationEngine {
   /**
    * Collect unique CSS URLs from overlapping chapters for the resource API
    */
-  private collectCssUrls(chapters: (NormalizedChapter | undefined)[], bookId: string): string[] | undefined {
+  private collectCssUrls(
+    chapters: (NormalizedChapter | undefined)[],
+    bookId: string,
+  ): string[] | undefined {
     const seen = new Set<string>();
     const urls: string[] = [];
 

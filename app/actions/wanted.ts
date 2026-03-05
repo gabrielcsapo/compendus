@@ -6,12 +6,15 @@ import { eq, desc, sql, and, or } from "drizzle-orm";
 import type { WantedBook } from "../lib/db/schema.js";
 import type { MetadataSearchResult } from "../lib/metadata/index.js";
 
-export async function getWantedBooks(options?: {
-  status?: WantedBook["status"];
-  series?: string;
-  limit?: number;
-  filterOwned?: boolean; // Default true - removes books now in library
-}, profileId?: string): Promise<{ books: WantedBook[]; removed: number }> {
+export async function getWantedBooks(
+  options?: {
+    status?: WantedBook["status"];
+    series?: string;
+    limit?: number;
+    filterOwned?: boolean; // Default true - removes books now in library
+  },
+  profileId?: string,
+): Promise<{ books: WantedBook[]; removed: number }> {
   const filterOwned = options?.filterOwned !== false;
 
   let query = db.select().from(wantedBooks).$dynamic();
@@ -31,10 +34,7 @@ export async function getWantedBooks(options?: {
     query = query.where(and(...conditions));
   }
 
-  query = query.orderBy(
-    desc(wantedBooks.priority),
-    desc(wantedBooks.createdAt),
-  );
+  query = query.orderBy(desc(wantedBooks.priority), desc(wantedBooks.createdAt));
 
   if (options?.limit) {
     query = query.limit(options.limit);
@@ -161,8 +161,7 @@ export async function addToWantedList(
     profileId: profileId!,
     title: metadata.title,
     subtitle: metadata.subtitle,
-    authors:
-      metadata.authors.length > 0 ? JSON.stringify(metadata.authors) : null,
+    authors: metadata.authors.length > 0 ? JSON.stringify(metadata.authors) : null,
     publisher: metadata.publisher,
     publishedDate: metadata.publishedDate,
     description: metadata.description,
@@ -217,7 +216,10 @@ export async function removeFromWantedList(id: string, profileId?: string): Prom
 
 export async function clearWantedList(profileId?: string): Promise<number> {
   if (profileId) {
-    const result = await db.delete(wantedBooks).where(eq(wantedBooks.profileId, profileId)).returning({ id: wantedBooks.id });
+    const result = await db
+      .delete(wantedBooks)
+      .where(eq(wantedBooks.profileId, profileId))
+      .returning({ id: wantedBooks.id });
     return result.length;
   }
   const result = await db.delete(wantedBooks).returning({ id: wantedBooks.id });
@@ -250,10 +252,8 @@ export async function isBookWanted(
   // Check by ISBN
   if (metadata.isbn13 || metadata.isbn10) {
     const conditions = [];
-    if (metadata.isbn13)
-      conditions.push(eq(wantedBooks.isbn13, metadata.isbn13));
-    if (metadata.isbn10)
-      conditions.push(eq(wantedBooks.isbn10, metadata.isbn10));
+    if (metadata.isbn13) conditions.push(eq(wantedBooks.isbn13, metadata.isbn13));
+    if (metadata.isbn10) conditions.push(eq(wantedBooks.isbn10, metadata.isbn10));
 
     if (profileId) {
       const byIsbn = await db
@@ -277,9 +277,7 @@ export async function isBookWanted(
   return false;
 }
 
-export async function isBookOwned(
-  metadata: MetadataSearchResult,
-): Promise<boolean> {
+export async function isBookOwned(metadata: MetadataSearchResult): Promise<boolean> {
   if (!metadata.isbn13 && !metadata.isbn10 && !metadata.isbn) {
     return false;
   }

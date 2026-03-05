@@ -169,15 +169,9 @@ app.post("/api/editor/:bookId/session/save", async (c) => {
   // Update file size in DB
   const fileSize = buffer.length;
   if (resolved.book.convertedEpubPath) {
-    await db
-      .update(books)
-      .set({ convertedEpubSize: fileSize })
-      .where(eq(books.id, bookId));
+    await db.update(books).set({ convertedEpubSize: fileSize }).where(eq(books.id, bookId));
   } else {
-    await db
-      .update(books)
-      .set({ fileSize })
-      .where(eq(books.id, bookId));
+    await db.update(books).set({ fileSize }).where(eq(books.id, bookId));
   }
 
   // Invalidate reader cache

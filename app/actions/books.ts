@@ -1,8 +1,22 @@
 "use server";
 
-import { db, books, booksTags, booksCollections, tags, bookEdits, userBookState, profiles } from "../lib/db";
+import {
+  db,
+  books,
+  booksTags,
+  booksCollections,
+  tags,
+  bookEdits,
+  userBookState,
+  profiles,
+} from "../lib/db";
 import { eq, desc, asc, like, inArray, sql, and, or } from "drizzle-orm";
-import { deleteBookFile, deleteCoverImage, getBookFilePath, resolveStoragePath } from "../lib/storage";
+import {
+  deleteBookFile,
+  deleteCoverImage,
+  getBookFilePath,
+  resolveStoragePath,
+} from "../lib/storage";
 import { findBestMetadata, searchAllSources, type MetadataSearchResult } from "../lib/metadata";
 import { processAndStoreCover } from "../lib/processing/cover";
 import { writeMetadataToFile } from "../lib/processing/metadata-writer";
@@ -107,10 +121,7 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<BookWithS
       .from(books)
       .leftJoin(
         userBookState,
-        and(
-          eq(userBookState.bookId, books.id),
-          eq(userBookState.profileId, profileId),
-        ),
+        and(eq(userBookState.bookId, books.id), eq(userBookState.profileId, profileId)),
       )
       .$dynamic();
 
@@ -126,7 +137,10 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<BookWithS
       const formats = getFormatsByType(type);
       conditions.push(
         sql`(
-          (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+          (${books.format} IN (${sql.join(
+            formats.map((f) => sql`${f}`),
+            sql`, `,
+          )}) AND ${books.bookTypeOverride} IS NULL)
           OR ${books.bookTypeOverride} = ${type}
         )`,
       );
@@ -169,10 +183,11 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<BookWithS
         const orderFn = order === "asc" ? asc : desc;
         query = query.orderBy(orderFn(userBookState.lastReadAt));
       } else {
-        const orderColumn = {
-          title: books.title,
-          createdAt: books.createdAt,
-        }[orderBy] || books.createdAt;
+        const orderColumn =
+          {
+            title: books.title,
+            createdAt: books.createdAt,
+          }[orderBy] || books.createdAt;
         const orderFn = order === "asc" ? asc : desc;
         query = query.orderBy(orderFn(orderColumn));
       }
@@ -212,7 +227,10 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<BookWithS
     // 2. Have the bookTypeOverride set to this type
     conditions.push(
       sql`(
-        (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+        (${books.format} IN (${sql.join(
+          formats.map((f) => sql`${f}`),
+          sql`, `,
+        )}) AND ${books.bookTypeOverride} IS NULL)
         OR ${books.bookTypeOverride} = ${type}
       )`,
     );
@@ -266,7 +284,10 @@ export async function getBooks(options: GetBooksOptions = {}): Promise<BookWithS
   return query;
 }
 
-export async function getBook(id: string, explicitProfileId?: string): Promise<BookWithState | null> {
+export async function getBook(
+  id: string,
+  explicitProfileId?: string,
+): Promise<BookWithState | null> {
   const profileId = explicitProfileId ?? resolveProfileId();
   if (profileId) {
     const row = await db
@@ -282,10 +303,7 @@ export async function getBook(id: string, explicitProfileId?: string): Promise<B
       .from(books)
       .leftJoin(
         userBookState,
-        and(
-          eq(userBookState.bookId, books.id),
-          eq(userBookState.profileId, profileId),
-        ),
+        and(eq(userBookState.bookId, books.id), eq(userBookState.profileId, profileId)),
       )
       .where(eq(books.id, id))
       .get();
@@ -338,7 +356,13 @@ export async function updateBook(
   if (!book) return null;
 
   // Separate reading state fields from metadata fields
-  const readingStateFields = ["readingProgress", "lastPosition", "isRead", "rating", "review"] as const;
+  const readingStateFields = [
+    "readingProgress",
+    "lastPosition",
+    "isRead",
+    "rating",
+    "review",
+  ] as const;
   const readingStateData: Record<string, unknown> = {};
   const metadataData: Record<string, unknown> = {};
 
@@ -352,9 +376,20 @@ export async function updateBook(
 
   // Record audit trail for metadata field changes
   const auditableFields = [
-    "title", "subtitle", "authors", "publisher", "publishedDate",
-    "description", "isbn", "isbn13", "isbn10", "language",
-    "pageCount", "series", "seriesNumber", "bookTypeOverride",
+    "title",
+    "subtitle",
+    "authors",
+    "publisher",
+    "publishedDate",
+    "description",
+    "isbn",
+    "isbn13",
+    "isbn10",
+    "language",
+    "pageCount",
+    "series",
+    "seriesNumber",
+    "bookTypeOverride",
   ] as const;
 
   const editGroupId = uuid();
@@ -390,7 +425,10 @@ export async function updateBook(
   }
 
   // Update metadata fields on books table (if any metadata fields changed)
-  if (Object.keys(metadataData).length > 0 || (!profileId && Object.keys(readingStateData).length > 0)) {
+  if (
+    Object.keys(metadataData).length > 0 ||
+    (!profileId && Object.keys(readingStateData).length > 0)
+  ) {
     const updateData: Record<string, unknown> = { ...metadataData };
 
     // When no profileId, also write reading state to books table (legacy compat)
@@ -405,7 +443,7 @@ export async function updateBook(
 
     // If title or authors changed, update the filename
     if ("title" in metadataData || "authors" in metadataData) {
-      const newTitle = metadataData.title as string || book.title;
+      const newTitle = (metadataData.title as string) || book.title;
       const newAuthors = metadataData.authors
         ? JSON.parse(metadataData.authors as string)
         : book.authors
@@ -474,12 +512,7 @@ async function upsertUserBookState(
   const existing = await db
     .select()
     .from(userBookState)
-    .where(
-      and(
-        eq(userBookState.profileId, profileId),
-        eq(userBookState.bookId, bookId),
-      ),
-    )
+    .where(and(eq(userBookState.profileId, profileId), eq(userBookState.bookId, bookId)))
     .get();
 
   const updateFields: Record<string, unknown> = { ...data };
@@ -489,10 +522,7 @@ async function upsertUserBookState(
   updateFields.updatedAt = sql`(unixepoch())`;
 
   if (existing) {
-    await db
-      .update(userBookState)
-      .set(updateFields)
-      .where(eq(userBookState.id, existing.id));
+    await db.update(userBookState).set(updateFields).where(eq(userBookState.id, existing.id));
   } else {
     await db.insert(userBookState).values({
       id: randomUUID(),
@@ -523,7 +553,9 @@ export async function deleteBook(id: string): Promise<boolean> {
  * Delete an orphaned file from disk (file that has no database entry)
  * Used by admin data page to clean up files without matching records
  */
-export async function deleteOrphanedFile(filePath: string): Promise<{ success: boolean; message: string }> {
+export async function deleteOrphanedFile(
+  filePath: string,
+): Promise<{ success: boolean; message: string }> {
   // Security: ensure the file is in the expected books directory
   const { BOOKS_DIR } = await import("../lib/storage");
   const { resolve } = await import("path");
@@ -546,7 +578,9 @@ export async function deleteOrphanedFile(filePath: string): Promise<{ success: b
  * Delete a database record that has no corresponding file on disk
  * Used by admin data page to clean up orphaned database entries
  */
-export async function deleteMissingFileRecord(bookId: string): Promise<{ success: boolean; message: string }> {
+export async function deleteMissingFileRecord(
+  bookId: string,
+): Promise<{ success: boolean; message: string }> {
   const book = await getBook(bookId);
   if (!book) {
     return { success: false, message: "Book not found in database" };
@@ -569,12 +603,17 @@ export async function deleteMissingFileRecord(bookId: string): Promise<{ success
  * - Running jobs: signalled to abort
  * - Completed/error jobs: cleared from history
  */
-export async function cancelBackgroundJob(jobId: string): Promise<{ success: boolean; message: string }> {
+export async function cancelBackgroundJob(
+  jobId: string,
+): Promise<{ success: boolean; message: string }> {
   const { cancelJob } = await import("../lib/queue");
   return cancelJob(jobId);
 }
 
-export async function getRecentBooks(limit: number = 10, explicitProfileId?: string): Promise<BookWithState[]> {
+export async function getRecentBooks(
+  limit: number = 10,
+  explicitProfileId?: string,
+): Promise<BookWithState[]> {
   const profileId = explicitProfileId ?? resolveProfileId();
   if (profileId) {
     const rows = await db
@@ -590,10 +629,7 @@ export async function getRecentBooks(limit: number = 10, explicitProfileId?: str
       .from(books)
       .innerJoin(
         userBookState,
-        and(
-          eq(userBookState.bookId, books.id),
-          eq(userBookState.profileId, profileId),
-        ),
+        and(eq(userBookState.bookId, books.id), eq(userBookState.profileId, profileId)),
       )
       .where(sql`${userBookState.lastReadAt} IS NOT NULL`)
       .orderBy(desc(userBookState.lastReadAt))
@@ -619,14 +655,21 @@ export async function getRecentBooks(limit: number = 10, explicitProfileId?: str
     .limit(limit);
 }
 
-export async function getBooksCount(type?: BookType, format?: string | string[], series?: string): Promise<number> {
+export async function getBooksCount(
+  type?: BookType,
+  format?: string | string[],
+  series?: string,
+): Promise<number> {
   const conditions = [];
 
   if (type) {
     const formats = getFormatsByType(type);
     conditions.push(
       sql`(
-        (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+        (${books.format} IN (${sql.join(
+          formats.map((f) => sql`${f}`),
+          sql`, `,
+        )}) AND ${books.bookTypeOverride} IS NULL)
         OR ${books.bookTypeOverride} = ${type}
       )`,
     );
@@ -660,7 +703,9 @@ export async function getBooksCount(type?: BookType, format?: string | string[],
 /**
  * Get counts of books grouped by format, optionally filtered by type
  */
-export async function getFormatCounts(type?: BookType): Promise<{ format: string; count: number }[]> {
+export async function getFormatCounts(
+  type?: BookType,
+): Promise<{ format: string; count: number }[]> {
   let query = db
     .select({
       format: books.format,
@@ -673,14 +718,17 @@ export async function getFormatCounts(type?: BookType): Promise<{ format: string
     const formats = getFormatsByType(type);
     query = query.where(
       sql`(
-        (${books.format} IN (${sql.join(formats.map(f => sql`${f}`), sql`, `)}) AND ${books.bookTypeOverride} IS NULL)
+        (${books.format} IN (${sql.join(
+          formats.map((f) => sql`${f}`),
+          sql`, `,
+        )}) AND ${books.bookTypeOverride} IS NULL)
         OR ${books.bookTypeOverride} = ${type}
       )`,
     );
   }
 
   const results = await query.groupBy(books.format);
-  return results.map(r => ({ format: r.format, count: r.count }));
+  return results.map((r) => ({ format: r.format, count: r.count }));
 }
 
 /**
@@ -811,26 +859,16 @@ export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
           overlapCount: sql<number>`count(*)`,
         })
         .from(booksTags)
-        .where(
-          and(
-            inArray(booksTags.tagId, tagIdList),
-            sql`${booksTags.bookId} != ${book.id}`,
-          ),
-        )
+        .where(and(inArray(booksTags.tagId, tagIdList), sql`${booksTags.bookId} != ${book.id}`))
         .groupBy(booksTags.bookId)
         .orderBy(desc(sql`count(*)`))
         .limit(limit);
 
       if (tagMatches.length > 0) {
-        const matchedIds = tagMatches
-          .map((m) => m.bookId)
-          .filter((id) => !seen.has(id));
+        const matchedIds = tagMatches.map((m) => m.bookId).filter((id) => !seen.has(id));
 
         if (matchedIds.length > 0) {
-          const tagBooks = await db
-            .select()
-            .from(books)
-            .where(inArray(books.id, matchedIds));
+          const tagBooks = await db.select().from(books).where(inArray(books.id, matchedIds));
 
           // Preserve overlap-count ordering
           const bookMap = new Map(tagBooks.map((b) => [b.id, b]));
@@ -852,7 +890,7 @@ export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
       const authors: string[] = JSON.parse(book.authors);
       const authorsToSearch = authors.slice(0, 2);
       if (authorsToSearch.length > 0) {
-        const conditions = authorsToSearch.map(author => {
+        const conditions = authorsToSearch.map((author) => {
           const escaped = author.replace(/["\\%_]/g, (char) => "\\" + char);
           return like(books.authors, `%"${escaped}"%`);
         });
@@ -886,9 +924,9 @@ export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
 export async function searchMetadata(
   title: string,
   author?: string,
-  format?: BookFormat,
+  _format?: BookFormat,
 ): Promise<MetadataSearchResult[]> {
-  return searchAllSources(title, author, format);
+  return searchAllSources(title, author);
 }
 
 /**
@@ -1079,7 +1117,13 @@ async function createTagsFromSubjects(bookId: string, subjects: string[]): Promi
           profileId: "default",
           name: subject,
         });
-        tag = { id: tagId, profileId: "default", name: subject, color: null, createdAt: new Date() };
+        tag = {
+          id: tagId,
+          profileId: "default",
+          name: subject,
+          color: null,
+          createdAt: new Date(),
+        };
       }
 
       // Check if book already has this tag
