@@ -76,6 +76,7 @@ struct ProfilePickerView: View {
                     }
                 }
                 .padding(.horizontal, 32)
+                .frame(maxWidth: 600)
             }
 
             Spacer()
