@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { getCoverUrl } from "../lib/cover";
 import type { CoverSize } from "../lib/cover";
 
@@ -24,7 +25,13 @@ interface BookCoverProps {
  * Renders a book cover image with fallback.
  * Fills its container — parent controls width, height, aspect-ratio, border-radius, and overflow.
  */
-export function BookCover({ book, size = "thumb", alt, imgClassName, fallback }: BookCoverProps) {
+export const BookCover = memo(function BookCover({
+  book,
+  size = "thumb",
+  alt,
+  imgClassName,
+  fallback,
+}: BookCoverProps) {
   const url = getCoverUrl(book, size);
 
   if (url) {
@@ -32,6 +39,8 @@ export function BookCover({ book, size = "thumb", alt, imgClassName, fallback }:
       <img
         src={url}
         alt={alt ?? book.title}
+        loading="lazy"
+        decoding="async"
         className={`w-full h-full object-cover${imgClassName ? ` ${imgClassName}` : ""}`}
       />
     );
@@ -46,4 +55,4 @@ export function BookCover({ book, size = "thumb", alt, imgClassName, fallback }:
       </span>
     </div>
   );
-}
+});

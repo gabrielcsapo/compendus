@@ -168,14 +168,10 @@ export async function updateHighlightNote(
   profileId?: string,
 ): Promise<void> {
   if (!profileId) throw new Error("profileId is required");
-  // Verify ownership
-  const highlight = await db.select().from(highlights).where(eq(highlights.id, highlightId)).get();
-  if (!highlight || highlight.profileId !== profileId) return;
-
   await db
     .update(highlights)
     .set({ note: note || null, updatedAt: new Date() })
-    .where(eq(highlights.id, highlightId));
+    .where(and(eq(highlights.id, highlightId), eq(highlights.profileId, profileId)));
 }
 
 export async function updateHighlightColor(
@@ -184,17 +180,17 @@ export async function updateHighlightColor(
   profileId?: string,
 ): Promise<void> {
   if (!profileId) throw new Error("profileId is required");
-  // Verify ownership
-  const highlight = await db.select().from(highlights).where(eq(highlights.id, highlightId)).get();
-  if (!highlight || highlight.profileId !== profileId) return;
-
   await db
     .update(highlights)
     .set({ color, updatedAt: new Date() })
-    .where(eq(highlights.id, highlightId));
+    .where(and(eq(highlights.id, highlightId), eq(highlights.profileId, profileId)));
 }
 
-export async function getAllHighlights(profileId?: string): Promise<
+export async function getAllHighlights(
+  profileId?: string,
+  limit = 200,
+  offset = 0,
+): Promise<
   {
     id: string;
     bookId: string;
@@ -235,6 +231,8 @@ export async function getAllHighlights(profileId?: string): Promise<
         : isNull(highlights.deletedAt),
     )
     .orderBy(sql`${highlights.createdAt} DESC`)
+    .limit(limit)
+    .offset(offset)
     .all();
 
   return rows.map((h) => ({

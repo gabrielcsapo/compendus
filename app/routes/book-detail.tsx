@@ -19,13 +19,10 @@ import { BookReview } from "../components/BookReview";
 
 export default async function BookDetail({ params }: { params?: Record<string, string> }) {
   const id = params?.id as string;
-  const book = await getBook(id);
+  const [book, tags] = await Promise.all([getBook(id), getTagsForBook(id)]);
   if (!book) {
     throw new Response("Book not found", { status: 404 });
   }
-
-  // Tags needed immediately for EditBookButton in header
-  const tags = await getTagsForBook(id);
 
   // Parse authors with defensive handling for corrupted data
   const rawAuthors = book.authors ? JSON.parse(book.authors) : [];
@@ -177,7 +174,7 @@ export default async function BookDetail({ params }: { params?: Record<string, s
 
           {/* Linked formats — streamed via Suspense */}
           <Suspense>
-            <LinkedFormatsSection bookId={id} />
+            <LinkedFormatsSection bookId={id} book={book} />
           </Suspense>
         </aside>
 
@@ -386,8 +383,14 @@ export default async function BookDetail({ params }: { params?: Record<string, s
 }
 
 // Async server component — streams linked formats after book header renders
-async function LinkedFormatsSection({ bookId }: { bookId: string }) {
-  const linkedFormats = await getLinkedFormats(bookId);
+async function LinkedFormatsSection({
+  bookId,
+  book,
+}: {
+  bookId: string;
+  book: Awaited<ReturnType<typeof getBook>>;
+}) {
+  const linkedFormats = await getLinkedFormats(bookId, book!);
   if (linkedFormats.length === 0) return null;
 
   return (

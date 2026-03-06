@@ -37,6 +37,7 @@ struct DownloadedBookDetailView: View {
     @State private var isLoadingStats = true
     @State private var showingReadingHistory = false
     @State private var isCheckingConnection = false
+    @State private var isLoadingAudiobook = false
     @State private var showingDeleteError = false
     @State private var deleteError: String?
 
@@ -287,20 +288,28 @@ struct DownloadedBookDetailView: View {
         VStack(spacing: 10) {
             Button {
                 if book.isAudiobook {
+                    isLoadingAudiobook = true
                     Task {
                         await audiobookPlayer.loadBook(book)
                         audiobookPlayer.play()
                         audiobookPlayer.isFullPlayerPresented = true
+                        isLoadingAudiobook = false
                     }
                 } else {
                     bookToRead = book
                 }
             } label: {
-                Label(readButtonTitle, systemImage: readButtonIcon)
-                    .frame(maxWidth: .infinity)
+                if isLoadingAudiobook {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label(readButtonTitle, systemImage: readButtonIcon)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .disabled(isLoadingAudiobook)
 
             if book.readingProgress > 0 && book.readingProgress < 1.0 {
                 VStack(spacing: 4) {
@@ -645,6 +654,8 @@ struct BookManagementSheet: View {
     @State private var showingDeleteBookConfirmation = false
     @State private var showingDeleteTranscriptConfirmation = false
     @State private var isDeletingTranscript = false
+    @State private var transcriptDeleteError: String?
+    @State private var showingTranscriptDeleteError = false
     @State private var showingEditSheet = false
     @State private var showingReviewSheet = false
 
@@ -829,6 +840,11 @@ struct BookManagementSheet: View {
         .sheet(isPresented: $showingReviewSheet) {
             BookReviewSheet(book: book)
         }
+        .alert("Transcript Delete", isPresented: $showingTranscriptDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(transcriptDeleteError ?? "An error occurred.")
+        }
     }
 
     private func toggleReadStatus() {
@@ -865,9 +881,14 @@ struct BookManagementSheet: View {
         book.transcriptData = nil
         try? modelContext.save()
 
-        // Also delete from server (fire-and-forget)
+        // Also delete from server
         Task {
-            try? await apiService.deleteTranscript(bookId: book.id)
+            do {
+                try await apiService.deleteTranscript(bookId: book.id)
+            } catch {
+                transcriptDeleteError = "Local transcript removed, but failed to delete from server."
+                showingTranscriptDeleteError = true
+            }
             isDeletingTranscript = false
         }
     }

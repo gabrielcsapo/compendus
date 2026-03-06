@@ -14,6 +14,7 @@ struct ProfilePickerView: View {
     @State private var profiles: [Profile] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var isSelectingProfile = false
 
     @State private var selectedLockedProfile: Profile?
 
@@ -56,6 +57,14 @@ struct ProfilePickerView: View {
                         loadProfiles()
                     }
                     .buttonStyle(.bordered)
+                }
+                .padding()
+            } else if isSelectingProfile {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Signing in...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
                 .padding()
             } else {
@@ -135,6 +144,7 @@ struct ProfilePickerView: View {
     }
 
     private func selectProfile(_ profile: Profile) {
+        isSelectingProfile = true
         Task {
             do {
                 let pin: String? = nil
@@ -143,7 +153,10 @@ struct ProfilePickerView: View {
                     serverConfig.selectProfile(selectedProfile)
                 }
             } catch {
-                // Non-PIN profiles shouldn't fail auth
+                await MainActor.run {
+                    isSelectingProfile = false
+                    errorMessage = "Failed to select profile. Please try again."
+                }
             }
         }
     }

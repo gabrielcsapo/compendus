@@ -35,6 +35,8 @@ struct EditBookView: View {
     @State private var bookTags: [BookTag] = []
     @State private var newTagName: String = ""
     @State private var isLoadingTags = false
+    @State private var isAddingTag = false
+    @State private var removingTagIds: Set<String> = []
 
     // Save state
     @State private var isSaving = false
@@ -163,7 +165,7 @@ struct EditBookView: View {
                 if !bookTags.isEmpty {
                     FlowLayout(spacing: 8) {
                         ForEach(bookTags) { tag in
-                            TagChipView(tag: tag) {
+                            TagChipView(tag: tag, isRemoving: removingTagIds.contains(tag.id)) {
                                 removeTag(tag)
                             }
                         }
@@ -175,11 +177,15 @@ struct EditBookView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .submitLabel(.done)
+                        .disabled(isAddingTag)
                         .onSubmit {
                             addCurrentTag()
                         }
 
-                    if !newTagName.trimmingCharacters(in: .whitespaces).isEmpty {
+                    if isAddingTag {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if !newTagName.trimmingCharacters(in: .whitespaces).isEmpty {
                         Button("Add") {
                             addCurrentTag()
                         }
@@ -207,7 +213,7 @@ struct EditBookView: View {
 
     private func addCurrentTag() {
         let name = newTagName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty, !isAddingTag else { return }
 
         // Don't add duplicates
         if bookTags.contains(where: { $0.name.lowercased() == name.lowercased() }) {
@@ -219,6 +225,7 @@ struct EditBookView: View {
         let tempTag = BookTag(id: UUID().uuidString, name: name.lowercased(), color: nil, createdAt: nil)
         bookTags.append(tempTag)
         newTagName = ""
+        isAddingTag = true
 
         // Try API, queue if offline
         Task {
@@ -234,10 +241,13 @@ struct EditBookView: View {
                     syncService.queueAndSync(pendingEdit, modelContext: modelContext)
                 }
             }
+            isAddingTag = false
         }
     }
 
     private func removeTag(_ tag: BookTag) {
+        guard !removingTagIds.contains(tag.id) else { return }
+        removingTagIds.insert(tag.id)
         bookTags.removeAll { $0.id == tag.id }
 
         Task {
@@ -249,6 +259,7 @@ struct EditBookView: View {
                     syncService.queueAndSync(pendingEdit, modelContext: modelContext)
                 }
             }
+            removingTagIds.remove(tag.id)
         }
     }
 
@@ -335,17 +346,23 @@ struct EditBookView: View {
 
 struct TagChipView: View {
     let tag: BookTag
+    var isRemoving: Bool = false
     let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 4) {
             Text(tag.name)
                 .font(.caption)
-            Button {
-                onRemove()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
+            if isRemoving {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Button {
+                    onRemove()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                }
             }
         }
         .padding(.horizontal, 10)

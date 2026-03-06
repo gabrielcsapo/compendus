@@ -25,12 +25,13 @@ export default function Root() {
             })();`,
           }}
         />
-        {/* Google Fonts - Inter */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Self-hosted Inter font */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
+          rel="preload"
+          href="/fonts/Inter/Inter-VariableFont_opsz,wght.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
         />
       </head>
       <body className="min-h-screen flex flex-col">

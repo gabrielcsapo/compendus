@@ -71,8 +71,9 @@ export async function getDistinctSeries(): Promise<string[]> {
 }
 
 export async function getDistinctAuthors(): Promise<string[]> {
+  // Select only the authors column instead of full rows
   const results = await db
-    .select({ authors: books.authors })
+    .selectDistinct({ authors: books.authors })
     .from(books)
     .where(sql`${books.authors} IS NOT NULL`);
 
@@ -100,8 +101,23 @@ export async function getAllBooksWithTags(): Promise<{
   books: Book[];
   bookTags: Record<string, Tag[]>;
 }> {
-  // Load all books ordered by title
-  const allBooks = await db.select().from(books).orderBy(asc(books.title));
+  // Load only columns needed for batch edit UI
+  const allBooks = (await db
+    .select({
+      id: books.id,
+      title: books.title,
+      authors: books.authors,
+      series: books.series,
+      seriesNumber: books.seriesNumber,
+      format: books.format,
+      language: books.language,
+      coverPath: books.coverPath,
+      coverColor: books.coverColor,
+      bookTypeOverride: books.bookTypeOverride,
+      updatedAt: books.updatedAt,
+    })
+    .from(books)
+    .orderBy(asc(books.title))) as unknown as Book[];
 
   // Load all book-tag associations joined with tags
   const allBookTags = await db

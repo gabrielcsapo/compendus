@@ -758,103 +758,114 @@ export async function getBooksByAuthor(authorName: string): Promise<Book[]> {
  * Get books with the same ISBN but different format (linked formats)
  * Returns other formats of the same book (e.g., audiobook version of an ebook)
  */
-export async function getLinkedFormats(bookId: string): Promise<Book[]> {
-  const book = await getBook(bookId);
+export async function getLinkedFormats(
+  bookId: string,
+  existingBook?: Book | null,
+): Promise<Book[]> {
+  const book = existingBook ?? (await getBook(bookId));
   if (!book) return [];
 
   // Get all ISBNs for this book
   const isbns = [book.isbn, book.isbn13, book.isbn10].filter(Boolean) as string[];
   if (isbns.length === 0) return [];
 
-  // Find books with matching ISBN but different ID
+  // Find books with matching ISBN but different ID — select only needed columns
   const linkedBooks = await db
-    .select()
+    .select({
+      id: books.id,
+      title: books.title,
+      format: books.format,
+      coverPath: books.coverPath,
+      coverColor: books.coverColor,
+      updatedAt: books.updatedAt,
+    })
     .from(books)
     .where(
       and(
         sql`${books.id} != ${bookId}`,
-        sql`(${books.isbn} IN (${sql.join(
-          isbns.map((i) => sql`${i}`),
-          sql`, `,
-        )}) OR ${books.isbn13} IN (${sql.join(
-          isbns.map((i) => sql`${i}`),
-          sql`, `,
-        )}) OR ${books.isbn10} IN (${sql.join(
-          isbns.map((i) => sql`${i}`),
-          sql`, `,
-        )}))`,
+        or(inArray(books.isbn, isbns), inArray(books.isbn13, isbns), inArray(books.isbn10, isbns)),
       ),
     );
 
-  return linkedBooks;
+  return linkedBooks as unknown as Book[];
 }
 
 /**
  * Get related books based on series, shared tags, and same author.
  * Returns up to `limit` books, prioritizing: series > tags > author.
  */
+const relatedBookColumns = {
+  id: books.id,
+  title: books.title,
+  authors: books.authors,
+  coverPath: books.coverPath,
+  coverColor: books.coverColor,
+  updatedAt: books.updatedAt,
+  format: books.format,
+  series: books.series,
+  seriesNumber: books.seriesNumber,
+};
+
 export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
   const seen = new Set<string>([book.id]);
   const related: Book[] = [];
 
-  // 1. Same series (highest priority)
-  if (book.series) {
-    const seriesBooks = await db
-      .select()
-      .from(books)
-      .where(and(eq(books.series, book.series), sql`${books.id} != ${book.id}`))
-      .orderBy(asc(books.seriesNumber));
+  // Run series query and tag IDs query in parallel
+  const [seriesBooks, bookTagIds] = await Promise.all([
+    book.series
+      ? db
+          .select(relatedBookColumns)
+          .from(books)
+          .where(and(eq(books.series, book.series), sql`${books.id} != ${book.id}`))
+          .orderBy(asc(books.seriesNumber))
+      : Promise.resolve([]),
+    db.select({ tagId: booksTags.tagId }).from(booksTags).where(eq(booksTags.bookId, book.id)),
+  ]);
 
-    for (const b of seriesBooks) {
-      if (!seen.has(b.id)) {
-        seen.add(b.id);
-        related.push(b);
-      }
+  // 1. Same series (highest priority)
+  for (const b of seriesBooks) {
+    if (!seen.has(b.id)) {
+      seen.add(b.id);
+      related.push(b as unknown as Book);
     }
   }
 
   // 2. Shared tags
-  if (related.length < limit) {
-    const bookTagIds = await db
-      .select({ tagId: booksTags.tagId })
+  if (related.length < limit && bookTagIds.length > 0) {
+    const tagIdList = bookTagIds.map((t) => t.tagId);
+    const tagMatches = await db
+      .select({
+        bookId: booksTags.bookId,
+        overlapCount: sql<number>`count(*)`,
+      })
       .from(booksTags)
-      .where(eq(booksTags.bookId, book.id));
+      .where(and(inArray(booksTags.tagId, tagIdList), sql`${booksTags.bookId} != ${book.id}`))
+      .groupBy(booksTags.bookId)
+      .orderBy(desc(sql`count(*)`))
+      .limit(limit);
 
-    if (bookTagIds.length > 0) {
-      const tagIdList = bookTagIds.map((t) => t.tagId);
-      // Find books sharing these tags, ranked by overlap count
-      const tagMatches = await db
-        .select({
-          bookId: booksTags.bookId,
-          overlapCount: sql<number>`count(*)`,
-        })
-        .from(booksTags)
-        .where(and(inArray(booksTags.tagId, tagIdList), sql`${booksTags.bookId} != ${book.id}`))
-        .groupBy(booksTags.bookId)
-        .orderBy(desc(sql`count(*)`))
-        .limit(limit);
+    if (tagMatches.length > 0) {
+      const matchedIds = tagMatches.map((m) => m.bookId).filter((id) => !seen.has(id));
 
-      if (tagMatches.length > 0) {
-        const matchedIds = tagMatches.map((m) => m.bookId).filter((id) => !seen.has(id));
+      if (matchedIds.length > 0) {
+        const tagBooks = await db
+          .select(relatedBookColumns)
+          .from(books)
+          .where(inArray(books.id, matchedIds));
 
-        if (matchedIds.length > 0) {
-          const tagBooks = await db.select().from(books).where(inArray(books.id, matchedIds));
-
-          // Preserve overlap-count ordering
-          const bookMap = new Map(tagBooks.map((b) => [b.id, b]));
-          for (const id of matchedIds) {
-            const b = bookMap.get(id);
-            if (b && !seen.has(b.id)) {
-              seen.add(b.id);
-              related.push(b);
-            }
+        const bookMap = new Map(tagBooks.map((b) => [b.id, b]));
+        for (const id of matchedIds) {
+          const b = bookMap.get(id);
+          if (b && !seen.has(b.id)) {
+            seen.add(b.id);
+            related.push(b as unknown as Book);
           }
         }
       }
     }
   }
 
-  // 3. Same author (lowest priority) — single query for all authors
+  // 3. Same author (lowest priority)
   if (related.length < limit && book.authors) {
     try {
       const authors: string[] = JSON.parse(book.authors);
@@ -866,7 +877,7 @@ export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
         });
 
         const authorBooks = await db
-          .select()
+          .select(relatedBookColumns)
           .from(books)
           .where(and(or(...conditions), sql`${books.id} != ${book.id}`))
           .orderBy(asc(books.title))
@@ -875,7 +886,7 @@ export async function getRelatedBooks(book: Book, limit = 10): Promise<Book[]> {
         for (const b of authorBooks) {
           if (!seen.has(b.id)) {
             seen.add(b.id);
-            related.push(b);
+            related.push(b as unknown as Book);
             if (related.length >= limit) break;
           }
         }

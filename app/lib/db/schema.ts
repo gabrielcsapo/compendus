@@ -142,6 +142,10 @@ export const books = sqliteTable(
     index("idx_books_created_at").on(table.createdAt),
     index("idx_books_last_read_at").on(table.lastReadAt),
     uniqueIndex("idx_books_file_hash").on(table.fileHash),
+    index("idx_books_isbn").on(table.isbn),
+    index("idx_books_isbn13").on(table.isbn13),
+    index("idx_books_isbn10").on(table.isbn10),
+    index("idx_books_series").on(table.series),
   ],
 );
 

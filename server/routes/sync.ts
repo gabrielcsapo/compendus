@@ -245,53 +245,55 @@ app.post("/api/sync/highlights", async (c) => {
         )
       : new Map();
 
-  for (const h of body.highlights) {
-    try {
-      const existing = existingHighlights.get(h.id);
+  db.transaction((tx) => {
+    for (const h of body.highlights) {
+      try {
+        const existing = existingHighlights.get(h.id);
 
-      if (existing) {
-        // Conflict check
-        if (h.updatedAt) {
-          const clientTs = Math.floor(new Date(h.updatedAt).getTime() / 1000);
-          const serverTs = tsToUnixSeconds(existing.updatedAt);
-          if (serverTs > clientTs) continue; // Server is newer, skip
+        if (existing) {
+          // Conflict check
+          if (h.updatedAt) {
+            const clientTs = Math.floor(new Date(h.updatedAt).getTime() / 1000);
+            const serverTs = tsToUnixSeconds(existing.updatedAt);
+            if (serverTs > clientTs) continue; // Server is newer, skip
+          }
+
+          tx.update(highlights)
+            .set({
+              startPosition: h.startPosition,
+              endPosition: h.endPosition,
+              text: h.text,
+              note: h.note ?? null,
+              color: h.color ?? existing.color,
+              updatedAt: now,
+              deletedAt: h.deletedAt ? new Date(h.deletedAt) : null,
+            })
+            .where(eq(highlights.id, h.id))
+            .run();
+        } else {
+          tx.insert(highlights)
+            .values({
+              id: h.id,
+              profileId,
+              bookId: h.bookId,
+              startPosition: h.startPosition,
+              endPosition: h.endPosition,
+              text: h.text,
+              note: h.note ?? null,
+              color: h.color ?? "#ffff00",
+              createdAt: h.createdAt ? new Date(h.createdAt) : now,
+              updatedAt: now,
+              deletedAt: h.deletedAt ? new Date(h.deletedAt) : null,
+            })
+            .run();
         }
-
-        db.update(highlights)
-          .set({
-            startPosition: h.startPosition,
-            endPosition: h.endPosition,
-            text: h.text,
-            note: h.note ?? null,
-            color: h.color ?? existing.color,
-            updatedAt: now,
-            deletedAt: h.deletedAt ? new Date(h.deletedAt) : null,
-          })
-          .where(eq(highlights.id, h.id))
-          .run();
-      } else {
-        db.insert(highlights)
-          .values({
-            id: h.id,
-            profileId,
-            bookId: h.bookId,
-            startPosition: h.startPosition,
-            endPosition: h.endPosition,
-            text: h.text,
-            note: h.note ?? null,
-            color: h.color ?? "#ffff00",
-            createdAt: h.createdAt ? new Date(h.createdAt) : now,
-            updatedAt: now,
-            deletedAt: h.deletedAt ? new Date(h.deletedAt) : null,
-          })
-          .run();
+      } catch (e: unknown) {
+        // Skip FK violations (book doesn't exist on server)
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("FOREIGN KEY")) throw e;
       }
-    } catch (e: unknown) {
-      // Skip FK violations (book doesn't exist on server)
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("FOREIGN KEY")) throw e;
     }
-  }
+  });
 
   return c.json({ success: true });
 });
@@ -395,50 +397,52 @@ app.post("/api/sync/bookmarks", async (c) => {
         )
       : new Map();
 
-  for (const b of body.bookmarks) {
-    try {
-      const existing = existingBookmarks.get(b.id);
+  db.transaction((tx) => {
+    for (const b of body.bookmarks) {
+      try {
+        const existing = existingBookmarks.get(b.id);
 
-      if (existing) {
-        if (b.updatedAt) {
-          const clientTs = Math.floor(new Date(b.updatedAt).getTime() / 1000);
-          const serverTs = tsToUnixSeconds(existing.updatedAt);
-          if (serverTs > clientTs) continue;
+        if (existing) {
+          if (b.updatedAt) {
+            const clientTs = Math.floor(new Date(b.updatedAt).getTime() / 1000);
+            const serverTs = tsToUnixSeconds(existing.updatedAt);
+            if (serverTs > clientTs) continue;
+          }
+
+          tx.update(bookmarks)
+            .set({
+              position: b.position,
+              title: b.title ?? existing.title,
+              note: b.note ?? existing.note,
+              color: b.color ?? existing.color,
+              updatedAt: now,
+              deletedAt: b.deletedAt ? new Date(b.deletedAt) : null,
+            })
+            .where(eq(bookmarks.id, b.id))
+            .run();
+        } else {
+          tx.insert(bookmarks)
+            .values({
+              id: b.id,
+              profileId,
+              bookId: b.bookId,
+              position: b.position,
+              title: b.title ?? null,
+              note: b.note ?? null,
+              color: b.color ?? null,
+              createdAt: b.createdAt ? new Date(b.createdAt) : now,
+              updatedAt: now,
+              deletedAt: b.deletedAt ? new Date(b.deletedAt) : null,
+            })
+            .run();
         }
-
-        db.update(bookmarks)
-          .set({
-            position: b.position,
-            title: b.title ?? existing.title,
-            note: b.note ?? existing.note,
-            color: b.color ?? existing.color,
-            updatedAt: now,
-            deletedAt: b.deletedAt ? new Date(b.deletedAt) : null,
-          })
-          .where(eq(bookmarks.id, b.id))
-          .run();
-      } else {
-        db.insert(bookmarks)
-          .values({
-            id: b.id,
-            profileId,
-            bookId: b.bookId,
-            position: b.position,
-            title: b.title ?? null,
-            note: b.note ?? null,
-            color: b.color ?? null,
-            createdAt: b.createdAt ? new Date(b.createdAt) : now,
-            updatedAt: now,
-            deletedAt: b.deletedAt ? new Date(b.deletedAt) : null,
-          })
-          .run();
+      } catch (e: unknown) {
+        // Skip FK violations (book doesn't exist on server)
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("FOREIGN KEY")) throw e;
       }
-    } catch (e: unknown) {
-      // Skip FK violations (book doesn't exist on server)
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("FOREIGN KEY")) throw e;
     }
-  }
+  });
 
   return c.json({ success: true });
 });
@@ -536,29 +540,31 @@ app.post("/api/sync/reading-sessions", async (c) => {
         )
       : new Set<string>();
 
-  for (const s of body.sessions) {
-    try {
-      // Skip if already exists (dedupe by ID)
-      if (existingSessionIds.has(s.id)) continue;
+  db.transaction((tx) => {
+    for (const s of body.sessions) {
+      try {
+        // Skip if already exists (dedupe by ID)
+        if (existingSessionIds.has(s.id)) continue;
 
-      db.insert(readingSessions)
-        .values({
-          id: s.id,
-          profileId,
-          bookId: s.bookId,
-          startedAt: new Date(s.startedAt),
-          endedAt: s.endedAt ? new Date(s.endedAt) : null,
-          pagesRead: s.pagesRead ?? null,
-          startPosition: s.startPosition ?? null,
-          endPosition: s.endPosition ?? null,
-        })
-        .run();
-    } catch (e: unknown) {
-      // Skip FK violations (book doesn't exist on server)
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("FOREIGN KEY")) throw e;
+        tx.insert(readingSessions)
+          .values({
+            id: s.id,
+            profileId,
+            bookId: s.bookId,
+            startedAt: new Date(s.startedAt),
+            endedAt: s.endedAt ? new Date(s.endedAt) : null,
+            pagesRead: s.pagesRead ?? null,
+            startPosition: s.startPosition ?? null,
+            endPosition: s.endPosition ?? null,
+          })
+          .run();
+      } catch (e: unknown) {
+        // Skip FK violations (book doesn't exist on server)
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("FOREIGN KEY")) throw e;
+      }
     }
-  }
+  });
 
   return c.json({ success: true });
 });

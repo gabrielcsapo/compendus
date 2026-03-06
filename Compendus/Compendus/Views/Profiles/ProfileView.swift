@@ -61,12 +61,12 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingPinSheet) {
             PinChangeSheet(hasExistingPin: currentProfile?.hasPin == true) { newPin in
-                Task { await updatePin(newPin) }
+                await updatePin(newPin)
             }
         }
         .sheet(isPresented: $showingNameSheet) {
             NameChangeSheet(currentName: currentProfile?.name ?? serverConfig.selectedProfileName ?? "") { newName in
-                Task { await updateName(newName) }
+                await updateName(newName)
             }
         }
     }
@@ -86,7 +86,7 @@ struct ProfileView: View {
                     }
 
                     if isUploading {
-                        ProgressView("Uploading...")
+                        ProgressView("Updating...")
                             .font(.subheadline)
                     } else {
                         Menu {
@@ -288,55 +288,69 @@ struct ProfileView: View {
     }
 
     private func selectEmoji(_ emoji: String) async {
-        guard let profileId = serverConfig.selectedProfileId else { return }
+        isUploading = true
+        guard let profileId = serverConfig.selectedProfileId else {
+            isUploading = false
+            return
+        }
         do {
             let updated = try await apiService.updateProfile(id: profileId, avatar: .some(emoji))
             await MainActor.run {
                 serverConfig.selectProfile(updated)
                 currentProfile = updated
+                isUploading = false
             }
         } catch {
             await MainActor.run {
+                isUploading = false
                 errorMessage = "Failed to update avatar"
                 showingError = true
             }
         }
     }
 
-    private func updateName(_ newName: String) async {
-        guard let profileId = serverConfig.selectedProfileId else { return }
+    private func updateName(_ newName: String) async -> Bool {
+        guard let profileId = serverConfig.selectedProfileId else { return false }
         do {
             let updated = try await apiService.updateProfile(id: profileId, name: newName)
             await MainActor.run {
                 serverConfig.selectProfile(updated)
                 currentProfile = updated
             }
+            return true
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to update name"
                 showingError = true
             }
+            return false
         }
     }
 
-    private func updatePin(_ newPin: String?) async {
-        guard let profileId = serverConfig.selectedProfileId else { return }
+    private func updatePin(_ newPin: String?) async -> Bool {
+        guard let profileId = serverConfig.selectedProfileId else { return false }
         do {
             let updated = try await apiService.updateProfile(id: profileId, pin: .some(newPin))
             await MainActor.run {
                 serverConfig.selectProfile(updated)
                 currentProfile = updated
             }
+            return true
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to update PIN"
                 showingError = true
             }
+            return false
         }
     }
 
     private func removeAvatar() async {
-        guard let profileId = serverConfig.selectedProfileId else { return }
+        isUploading = true
+        guard let profileId = serverConfig.selectedProfileId else {
+            isUploading = false
+            return
+        }
         do {
             let profile: Profile
             if serverConfig.hasImageAvatar {
@@ -347,9 +361,11 @@ struct ProfileView: View {
             await MainActor.run {
                 serverConfig.selectProfile(profile)
                 currentProfile = profile
+                isUploading = false
             }
         } catch {
             await MainActor.run {
+                isUploading = false
                 errorMessage = "Failed to remove avatar"
                 showingError = true
             }
@@ -361,10 +377,11 @@ struct ProfileView: View {
 
 private struct NameChangeSheet: View {
     let currentName: String
-    let onSave: (String) -> Void
+    let onSave: (String) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
+    @State private var isSaving = false
 
     var body: some View {
         NavigationStack {
@@ -373,6 +390,7 @@ private struct NameChangeSheet: View {
                     TextField("Name", text: $name)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
+                        .disabled(isSaving)
                 }
             }
             .navigationTitle("Change Name")
@@ -380,18 +398,28 @@ private struct NameChangeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        dismiss()
-                        onSave(name.trimmingCharacters(in: .whitespaces))
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            isSaving = true
+                            Task {
+                                let success = await onSave(name.trimmingCharacters(in: .whitespaces))
+                                isSaving = false
+                                if success { dismiss() }
+                            }
+                        }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || name.trimmingCharacters(in: .whitespaces) == currentName)
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || name.trimmingCharacters(in: .whitespaces) == currentName)
                 }
             }
             .onAppear { name = currentName }
         }
         .presentationDetents([.medium])
+        .interactiveDismissDisabled(isSaving)
     }
 }
 
@@ -399,12 +427,13 @@ private struct NameChangeSheet: View {
 
 private struct PinChangeSheet: View {
     let hasExistingPin: Bool
-    let onSave: (String?) -> Void
+    let onSave: (String?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var pin = ""
     @State private var confirmPin = ""
     @State private var showingRemoveConfirmation = false
+    @State private var isSaving = false
 
     private var isValid: Bool {
         pin.count == 4 && pin == confirmPin && pin.allSatisfy(\.isNumber)
@@ -417,10 +446,12 @@ private struct PinChangeSheet: View {
                     SecureField("New 4-digit PIN", text: $pin)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
+                        .disabled(isSaving)
 
                     SecureField("Confirm PIN", text: $confirmPin)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)
+                        .disabled(isSaving)
                 } footer: {
                     if !pin.isEmpty && pin.count < 4 {
                         Text("PIN must be 4 digits")
@@ -436,6 +467,7 @@ private struct PinChangeSheet: View {
                         Button("Remove PIN", role: .destructive) {
                             showingRemoveConfirmation = true
                         }
+                        .disabled(isSaving)
                     }
                 }
             }
@@ -444,24 +476,38 @@ private struct PinChangeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        dismiss()
-                        onSave(pin)
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            isSaving = true
+                            Task {
+                                let success = await onSave(pin)
+                                isSaving = false
+                                if success { dismiss() }
+                            }
+                        }
+                        .disabled(!isValid)
                     }
-                    .disabled(!isValid)
                 }
             }
             .confirmationDialog("Remove PIN?", isPresented: $showingRemoveConfirmation) {
                 Button("Remove PIN", role: .destructive) {
-                    dismiss()
-                    onSave(nil)
+                    isSaving = true
+                    Task {
+                        let success = await onSave(nil)
+                        isSaving = false
+                        if success { dismiss() }
+                    }
                 }
             } message: {
                 Text("Anyone will be able to access this profile without a PIN.")
             }
         }
         .presentationDetents([.medium])
+        .interactiveDismissDisabled(isSaving)
     }
 }

@@ -30,6 +30,8 @@ struct DownloadedSeriesDetailView: View {
     @State private var bookToRead: DownloadedBook?
     @State private var bookToDelete: DownloadedBook?
     @State private var showingDeleteConfirmation = false
+    @State private var showingDeleteError = false
+    @State private var deleteError: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 160, maximum: 200), spacing: 16)
@@ -87,7 +89,12 @@ struct DownloadedSeriesDetailView: View {
                 ) {
                     Button("Delete", role: .destructive) {
                         if let book = bookToDelete {
-                            try? downloadManager.deleteBook(book, modelContext: modelContext)
+                            do {
+                                try downloadManager.deleteBook(book, modelContext: modelContext)
+                            } catch {
+                                deleteError = error.localizedDescription
+                                showingDeleteError = true
+                            }
                         }
                         bookToDelete = nil
                     }
@@ -102,6 +109,11 @@ struct DownloadedSeriesDetailView: View {
                 .fullScreenCover(item: $bookToRead) { book in
                     ReaderContainerView(book: book)
                         .environment(readerSettings)
+                }
+                .alert("Delete Failed", isPresented: $showingDeleteError) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(deleteError ?? "An error occurred while deleting the book.")
                 }
         }
     }

@@ -48,6 +48,7 @@ struct AnimatedDownloadButton: View {
         case downloading(progress: Double)
         case completed
         case failed
+        case loading
     }
 
     let state: State
@@ -68,6 +69,8 @@ struct AnimatedDownloadButton: View {
                 onTap?()
             case .failed:
                 onTap?()
+            case .loading:
+                break
             }
         } label: {
             HStack {
@@ -82,7 +85,7 @@ struct AnimatedDownloadButton: View {
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .disabled(state.isDownloading)
+        .disabled(state.isDownloading || state.isLoading)
     }
 
     @ViewBuilder
@@ -102,6 +105,10 @@ struct AnimatedDownloadButton: View {
                 .symbolEffect(.bounce, value: state.isCompleted)
         case .failed:
             Image(systemName: "exclamationmark.circle")
+        case .loading:
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                .scaleEffect(0.8)
         }
     }
 
@@ -117,6 +124,8 @@ struct AnimatedDownloadButton: View {
             Text(isAudiobook ? "Play" : "Read")
         case .failed:
             Text("Retry")
+        case .loading:
+            Text("Loading...")
         }
     }
 
@@ -130,6 +139,8 @@ struct AnimatedDownloadButton: View {
             return .accentColor
         case .failed:
             return .red
+        case .loading:
+            return .gray
         }
     }
 }
@@ -147,6 +158,11 @@ extension AnimatedDownloadButton.State {
 
     var isCompleted: Bool {
         if case .completed = self { return true }
+        return false
+    }
+
+    var isLoading: Bool {
+        if case .loading = self { return true }
         return false
     }
 }

@@ -31,6 +31,7 @@ struct BookDetailView: View {
     @State private var isDescriptionExpanded = false
 
     @State private var readAsEpub = false
+    @State private var isLoadingAudiobook = false
     @State private var relatedBooks: [Book] = []
     @State private var isLoadingRelated = true
     @State private var showingEditSheet = false
@@ -251,11 +252,13 @@ struct BookDetailView: View {
             onTap: {
                 if isDownloaded, let downloaded = downloadedBook {
                     if downloaded.isAudiobook {
-                        dismiss()
+                        isLoadingAudiobook = true
                         Task {
                             await audiobookPlayer.loadBook(downloaded)
                             audiobookPlayer.play()
                             audiobookPlayer.isFullPlayerPresented = true
+                            isLoadingAudiobook = false
+                            dismiss()
                         }
                     } else if let onRead {
                         // Dismiss sheet and let parent present the reader full-screen
@@ -281,7 +284,9 @@ struct BookDetailView: View {
     }
 
     private var downloadButtonState: AnimatedDownloadButton.State {
-        if isDownloaded {
+        if isLoadingAudiobook {
+            return .loading
+        } else if isDownloaded {
             return .completed
         } else if isDownloading {
             let progress = downloadManager.activeDownloads[book.id]?.progress ?? 0

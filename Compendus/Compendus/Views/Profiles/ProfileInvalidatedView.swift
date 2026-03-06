@@ -216,6 +216,7 @@ struct ProfileInvalidatedView: View {
     }
 
     private func selectAndMigrate(_ profile: Profile) {
+        isMigrating = true
         Task {
             do {
                 let pin: String? = nil
@@ -225,7 +226,9 @@ struct ProfileInvalidatedView: View {
                 }
                 await migrateData(to: selectedProfile.id)
             } catch {
-                // Non-PIN profiles shouldn't fail auth
+                await MainActor.run {
+                    isMigrating = false
+                }
             }
         }
     }

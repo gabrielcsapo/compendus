@@ -2,7 +2,7 @@
 
 import { v4 as uuid } from "uuid";
 import { db, wantedBooks, books } from "../lib/db";
-import { eq, desc, sql, and, or } from "drizzle-orm";
+import { eq, desc, sql, and, or, inArray } from "drizzle-orm";
 import type { WantedBook } from "../lib/db/schema.js";
 import type { MetadataSearchResult } from "../lib/metadata/index.js";
 
@@ -46,48 +46,76 @@ export async function getWantedBooks(
     return { books: allBooks, removed: 0 };
   }
 
-  // Filter out books that are now in the library
+  // Filter out books that are now in the library (batch approach)
+  // Collect all ISBNs and titles from wanted books
+  const allIsbns = new Set<string>();
+  const allTitles = new Set<string>();
+  for (const book of allBooks) {
+    if (book.isbn) allIsbns.add(book.isbn);
+    if (book.isbn13) allIsbns.add(book.isbn13);
+    if (book.isbn10) allIsbns.add(book.isbn10);
+    if (book.title) allTitles.add(book.title.toLowerCase());
+  }
+
+  // Single query: find owned books by any matching ISBN
+  const ownedByIsbn = new Set<string>();
+  if (allIsbns.size > 0) {
+    const isbnArr = [...allIsbns];
+    const ownedRows = await db
+      .select({ isbn: books.isbn, isbn13: books.isbn13, isbn10: books.isbn10 })
+      .from(books)
+      .where(
+        or(
+          inArray(books.isbn, isbnArr),
+          inArray(books.isbn13, isbnArr),
+          inArray(books.isbn10, isbnArr),
+        ),
+      );
+    for (const row of ownedRows) {
+      if (row.isbn) ownedByIsbn.add(row.isbn);
+      if (row.isbn13) ownedByIsbn.add(row.isbn13);
+      if (row.isbn10) ownedByIsbn.add(row.isbn10);
+    }
+  }
+
+  // Single query: find owned books by title
+  const ownedTitles = new Set<string>();
+  if (allTitles.size > 0) {
+    const titleRows = await db
+      .select({ title: books.title })
+      .from(books)
+      .where(
+        sql`lower(${books.title}) IN (${sql.join(
+          [...allTitles].map((t) => sql`${t}`),
+          sql`, `,
+        )})`,
+      );
+    for (const row of titleRows) {
+      ownedTitles.add(row.title.toLowerCase());
+    }
+  }
+
+  // Now filter without any per-book queries
   const idsToRemove: string[] = [];
   const filteredBooks: WantedBook[] = [];
 
   for (const book of allBooks) {
-    let isOwned = false;
+    const isbnMatch =
+      (book.isbn && ownedByIsbn.has(book.isbn)) ||
+      (book.isbn13 && ownedByIsbn.has(book.isbn13)) ||
+      (book.isbn10 && ownedByIsbn.has(book.isbn10));
+    const titleMatch = book.title && ownedTitles.has(book.title.toLowerCase());
 
-    // First try matching by ISBN (most accurate)
-    const isbnConditions = [];
-    if (book.isbn13) isbnConditions.push(eq(books.isbn13, book.isbn13));
-    if (book.isbn10) isbnConditions.push(eq(books.isbn10, book.isbn10));
-    if (book.isbn) isbnConditions.push(eq(books.isbn, book.isbn));
-
-    if (isbnConditions.length > 0) {
-      const owned = await db
-        .select({ id: books.id })
-        .from(books)
-        .where(or(...isbnConditions))
-        .get();
-      isOwned = !!owned;
-    }
-
-    // Fallback: match by exact title (case-insensitive)
-    if (!isOwned && book.title) {
-      const ownedByTitle = await db
-        .select({ id: books.id })
-        .from(books)
-        .where(sql`lower(${books.title}) = lower(${book.title})`)
-        .get();
-      isOwned = !!ownedByTitle;
-    }
-
-    if (isOwned) {
+    if (isbnMatch || titleMatch) {
       idsToRemove.push(book.id);
     } else {
       filteredBooks.push(book);
     }
   }
 
-  // Remove owned books from wishlist
-  for (const id of idsToRemove) {
-    await db.delete(wantedBooks).where(eq(wantedBooks.id, id));
+  // Batch delete owned books from wishlist
+  if (idsToRemove.length > 0) {
+    await db.delete(wantedBooks).where(inArray(wantedBooks.id, idsToRemove));
   }
 
   return { books: filteredBooks, removed: idsToRemove.length };

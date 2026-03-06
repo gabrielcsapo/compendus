@@ -78,7 +78,7 @@ export default function DashboardPage({
                   <div
                     key={i}
                     className="flex-1 bg-surface-elevated rounded-t"
-                    style={{ height: `${20 + Math.random() * 60}%` }}
+                    style={{ height: `${20 + ((i * 17) % 60)}%` }}
                   />
                 ))}
               </div>
