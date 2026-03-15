@@ -131,11 +131,19 @@ class XHTMLContentParser {
             } else if let el = child as? Element {
                 let tag = el.tagName().lowercased()
 
-                // Skip non-content elements: scripts, styles, form controls,
-                // and EPUB-specific namespace elements (epub:trigger, etc.)
-                if ["script", "style", "link", "meta",
-                    "button", "input", "select", "textarea", "form"].contains(tag)
+                // Skip non-content elements: scripts, styles, metadata
+                if ["script", "style", "link", "meta"].contains(tag) {
+                    continue
+                }
+
+                // Form controls and EPUB namespace elements: extract text as fallback
+                if ["button", "input", "select", "textarea", "form"].contains(tag)
                     || tag.hasPrefix("epub:") {
+                    let fallbackText = extractPlainText(from: el)
+                    if !fallbackText.isEmpty {
+                        parserLogger.info("Rendering <\(tag)> as plain text (unsupported element)")
+                        pendingRuns.append(TextRun(text: fallbackText))
+                    }
                     continue
                 }
 
@@ -247,6 +255,11 @@ class XHTMLContentParser {
             return processFigure(el, blockStyle: blockStyle)
 
         case "figcaption":
+            // Try block children first (e.g. <figcaption><p>...</p><p>...</p></figcaption>)
+            let children = processChildren(of: el)
+            if !children.isEmpty {
+                return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+            }
             let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
             return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs, blockStyle: blockStyle)
 
@@ -261,7 +274,17 @@ class XHTMLContentParser {
             return .paragraph(runs: runs.isEmpty ? [TextRun(text: " ")] : runs, blockStyle: blockStyle)
 
         case "tr", "td", "th", "thead", "tbody", "tfoot":
-            // Should be handled by processTable
+            // Normally handled by processTable, but if encountered standalone
+            // extract text content to avoid loss
+            parserLogger.info("Table element <\(tag)> found outside table context, extracting text")
+            let children = processChildren(of: el)
+            if !children.isEmpty {
+                return children.count == 1 ? children[0] : .container(children: children, blockStyle: blockStyle)
+            }
+            let runs = collectInlineRuns(from: el, inheritedStyles: [], inheritedLink: nil)
+            if !runs.isEmpty {
+                return .paragraph(runs: runs, blockStyle: blockStyle)
+            }
             return nil
 
         case "address":
@@ -379,10 +402,20 @@ class XHTMLContentParser {
             } else if let el = child as? Element {
                 let tag = el.tagName().lowercased()
 
-                // Skip non-content: scripts, styles, form controls, epub: elements
-                if ["script", "style", "link", "meta",
-                    "button", "input", "select", "textarea", "form"].contains(tag)
+                // Skip non-content: scripts, styles, metadata
+                if ["script", "style", "link", "meta"].contains(tag) {
+                    continue
+                }
+
+                // Form controls and EPUB namespace elements: extract text as fallback
+                if ["button", "input", "select", "textarea", "form"].contains(tag)
                     || tag.hasPrefix("epub:") {
+                    let fallbackText = extractPlainText(from: el)
+                    if !fallbackText.isEmpty {
+                        runs.append(TextRun(text: fallbackText, styles: inheritedStyles, link: inheritedLink,
+                                            textColor: inheritedColor, fontFamily: inheritedFontFamily,
+                                            fontSizeScale: inheritedFontSizeScale))
+                    }
                     continue
                 }
 
@@ -712,9 +745,15 @@ class XHTMLContentParser {
                     children.append(audio)
                 }
             } else if tag == "figcaption" {
-                let runs = collectInlineRuns(from: child, inheritedStyles: [], inheritedLink: nil)
-                if !runs.isEmpty {
-                    children.append(.paragraph(runs: runs))
+                // Try block children first (multi-paragraph captions)
+                let captionChildren = processChildren(of: child)
+                if !captionChildren.isEmpty {
+                    children.append(contentsOf: captionChildren)
+                } else {
+                    let runs = collectInlineRuns(from: child, inheritedStyles: [], inheritedLink: nil)
+                    if !runs.isEmpty {
+                        children.append(.paragraph(runs: runs))
+                    }
                 }
             } else if tag == "a" {
                 // Handle <figure><a><img></a></figure> pattern (fixes bug #2)
@@ -783,6 +822,13 @@ class XHTMLContentParser {
             } else if tag == "img" {
                 return processImage(child)
             }
+        }
+
+        // Last resort: extract any text content (e.g. <text>, <tspan>) as plain text
+        let svgText = extractPlainText(from: el)
+        if !svgText.isEmpty {
+            parserLogger.info("SVG rendered as plain text fallback")
+            return .paragraph(runs: [TextRun(text: svgText)])
         }
         return nil
     }
@@ -955,6 +1001,29 @@ class XHTMLContentParser {
             print("[ResolveURL] NOT FOUND: src='\(src)' base='\(baseURL.path)' resolved='\(resolved.path)'")
         }
         return resolved
+    }
+
+    /// Recursively extract all plain text from an element, collapsing whitespace.
+    /// Used as a fallback for unsupported elements to avoid content loss.
+    private func extractPlainText(from element: Element) -> String {
+        var parts: [String] = []
+        for child in element.getChildNodes() {
+            if let textNode = child as? TextNode {
+                let text = collapseWhitespace(textNode.getWholeText())
+                if !text.isEmpty && text != " " {
+                    parts.append(text)
+                }
+            } else if let el = child as? Element {
+                let tag = el.tagName().lowercased()
+                // Skip scripts/styles but recurse into everything else
+                if tag == "script" || tag == "style" { continue }
+                let childText = extractPlainText(from: el)
+                if !childText.isEmpty {
+                    parts.append(childText)
+                }
+            }
+        }
+        return parts.joined(separator: " ").trimmingCharacters(in: .whitespaces)
     }
 
     /// Remove leading/trailing whitespace-only runs and trim edge whitespace.

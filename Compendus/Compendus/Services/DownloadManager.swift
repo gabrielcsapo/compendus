@@ -509,23 +509,45 @@ extension DownloadManager: URLSessionDownloadDelegate {
             return
         }
 
-        // Create a fresh ModelContext for this background thread
-        let context = ModelContext(container)
+        // Read pending download data on background context and snapshot all properties
+        // immediately, before any context changes can detach the object.
+        let bgContext = ModelContext(container)
 
         let descriptor = FetchDescriptor<PendingDownload>(
             predicate: #Predicate { $0.id == bookId }
         )
-        guard let pending = try? context.fetch(descriptor).first else {
+        guard let pending = try? bgContext.fetch(descriptor).first else {
             print("[DownloadManager] No PendingDownload found for \(bookId)")
             return
         }
 
+        // Snapshot all properties while the background context is still alive.
+        // [String] (authors) is a transformable attribute that requires fault resolution,
+        // so we must read it here before the object can be detached.
+        let pendingFormat = pending.format
+        let pendingFileSize = pending.fileSize
+        let pendingCoverData = pending.coverData
+        let pendingBookId = pending.bookId
+        let pendingTitle = pending.title
+        let pendingAuthors = pending.authors
+        let pendingSubtitle = pending.subtitle
+        let pendingPublisher = pending.publisher
+        let pendingPublishedDate = pending.publishedDate
+        let pendingBookDescription = pending.bookDescription
+        let pendingSeries = pending.series
+        let pendingSeriesNumber = pending.seriesNumber
+        let pendingDuration = pending.duration
+        let pendingNarrator = pending.narrator
+        let pendingChaptersData = pending.chaptersData
+        let pendingPageCount = pending.pageCount
+
         do {
+            // File operations must happen synchronously on this thread
             let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             let booksDir = documentsURL.appendingPathComponent("books", isDirectory: true)
             try FileManager.default.createDirectory(at: booksDir, withIntermediateDirectories: true)
 
-            let fileName = "\(bookId).\(pending.format)"
+            let fileName = "\(bookId).\(pendingFormat)"
             let destinationURL = booksDir.appendingPathComponent(fileName)
 
             if FileManager.default.fileExists(atPath: destinationURL.path) {
@@ -539,21 +561,53 @@ extension DownloadManager: URLSessionDownloadDelegate {
                let size = attrs[.size] as? Int {
                 actualFileSize = size
             } else {
-                actualFileSize = pending.fileSize
+                actualFileSize = pendingFileSize
             }
 
-            let downloadedBook = pending.toDownloadedBook(
-                localPath: "books/\(fileName)",
-                fileSize: actualFileSize,
-                coverData: pending.coverData
-            )
+            let localPath = "books/\(fileName)"
+            let format = pendingFormat.lowercased()
 
-            context.insert(downloadedBook)
-            context.delete(pending)
-            try context.save()
-
-            let format = downloadedBook.format.lowercased()
+            // Perform SwiftData mutations on the main thread so @Query updates
+            // atomically and PendingDownload objects are never detached mid-render.
             DispatchQueue.main.async {
+                let mainContext = ModelContext(container)
+
+                let downloadedBook = DownloadedBook(
+                    id: pendingBookId,
+                    title: pendingTitle,
+                    subtitle: pendingSubtitle,
+                    authors: pendingAuthors,
+                    publisher: pendingPublisher,
+                    publishedDate: pendingPublishedDate,
+                    bookDescription: pendingBookDescription,
+                    format: pendingFormat,
+                    fileSize: actualFileSize,
+                    localPath: localPath,
+                    coverData: pendingCoverData,
+                    series: pendingSeries,
+                    seriesNumber: pendingSeriesNumber,
+                    duration: pendingDuration,
+                    narrator: pendingNarrator,
+                    chaptersData: pendingChaptersData,
+                    pageCount: pendingPageCount
+                )
+
+                mainContext.insert(downloadedBook)
+
+                // Delete the PendingDownload from the main context
+                let deleteDescriptor = FetchDescriptor<PendingDownload>(
+                    predicate: #Predicate { $0.id == bookId }
+                )
+                if let pendingToDelete = try? mainContext.fetch(deleteDescriptor).first {
+                    mainContext.delete(pendingToDelete)
+                }
+
+                do {
+                    try mainContext.save()
+                } catch {
+                    print("[DownloadManager] Failed to save completed download for \(bookId): \(error)")
+                }
+
                 self.activeDownloads[bookId]?.state = .completed
                 self.activeDownloads[bookId]?.progress = 1.0
                 HapticFeedback.success()
@@ -571,11 +625,17 @@ extension DownloadManager: URLSessionDownloadDelegate {
         } catch {
             print("[DownloadManager] Failed to process completed download for \(bookId): \(error)")
 
-            pending.status = "failed"
-            pending.errorMessage = error.localizedDescription
-            try? context.save()
-
             DispatchQueue.main.async {
+                let mainContext = ModelContext(container)
+                let failDescriptor = FetchDescriptor<PendingDownload>(
+                    predicate: #Predicate { $0.id == bookId }
+                )
+                if let pendingToFail = try? mainContext.fetch(failDescriptor).first {
+                    pendingToFail.status = "failed"
+                    pendingToFail.errorMessage = error.localizedDescription
+                    try? mainContext.save()
+                }
+
                 self.activeDownloads[bookId]?.state = .failed(error)
                 HapticFeedback.error()
             }
@@ -611,20 +671,21 @@ extension DownloadManager: URLSessionDownloadDelegate {
             print("[DownloadManager] HTTP Status: \(response.statusCode)")
         }
 
-        // Update PendingDownload status
-        if let container = modelContainer {
-            let context = ModelContext(container)
-            let descriptor = FetchDescriptor<PendingDownload>(
-                predicate: #Predicate { $0.id == bookId }
-            )
-            if let pending = try? context.fetch(descriptor).first {
-                pending.status = "failed"
-                pending.errorMessage = error.localizedDescription
-                try? context.save()
-            }
-        }
-
+        // Update PendingDownload status on main thread to avoid detaching
+        // objects from the context while @Query still holds references
         DispatchQueue.main.async {
+            if let container = self.modelContainer {
+                let mainContext = ModelContext(container)
+                let descriptor = FetchDescriptor<PendingDownload>(
+                    predicate: #Predicate { $0.id == bookId }
+                )
+                if let pending = try? mainContext.fetch(descriptor).first {
+                    pending.status = "failed"
+                    pending.errorMessage = error.localizedDescription
+                    try? mainContext.save()
+                }
+            }
+
             self.activeDownloads[bookId]?.state = .failed(error)
             HapticFeedback.error()
         }

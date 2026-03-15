@@ -30,7 +30,7 @@ final class AttributedStringBuilderTests: XCTestCase {
 
     func testEmptyNodes() {
         let builder = makeBuilder()
-        let (attrString, offsetMap) = builder.build(from: [])
+        let (attrString, offsetMap, _) = builder.build(from: [])
 
         XCTAssertEqual(attrString.length, 0, "Empty nodes should produce empty string")
         XCTAssertTrue(offsetMap.entries.isEmpty, "No offset entries for empty content")
@@ -41,7 +41,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .paragraph(runs: [TextRun(text: "Hello world")])
         ]
         let builder = makeBuilder()
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         XCTAssertGreaterThan(attrString.length, 0)
         XCTAssertTrue(attrString.string.contains("Hello world"))
@@ -52,7 +52,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .paragraph(runs: [TextRun(text: "Test")])
         ]
         let builder = makeBuilder(fontFamily: .serif, fontSize: 20)
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         let attrs = attrString.attributes(at: 0, effectiveRange: nil)
         let font = attrs[.font] as? UIFont
@@ -67,8 +67,8 @@ final class AttributedStringBuilderTests: XCTestCase {
         let h1Nodes: [ContentNode] = [.heading(level: 1, runs: [TextRun(text: "Heading")])]
 
         let builder = makeBuilder(fontSize: 18)
-        let (bodyStr, _) = builder.build(from: bodyNodes)
-        let (h1Str, _) = builder.build(from: h1Nodes)
+        let (bodyStr, _, _) = builder.build(from: bodyNodes)
+        let (h1Str, _, _) = builder.build(from: h1Nodes)
 
         let bodyFont = bodyStr.attributes(at: 0, effectiveRange: nil)[.font] as? UIFont
         let h1Font = h1Str.attributes(at: 0, effectiveRange: nil)[.font] as? UIFont
@@ -87,7 +87,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .paragraph(runs: [TextRun(text: "bold", styles: [.bold])])
         ]
         let builder = makeBuilder()
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         let attrs = attrString.attributes(at: 0, effectiveRange: nil)
         let font = attrs[.font] as? UIFont
@@ -101,7 +101,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .paragraph(runs: [TextRun(text: "italic", styles: [.italic])])
         ]
         let builder = makeBuilder()
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         let attrs = attrString.attributes(at: 0, effectiveRange: nil)
         let font = attrs[.font] as? UIFont
@@ -115,7 +115,7 @@ final class AttributedStringBuilderTests: XCTestCase {
     func testLightThemeTextColor() {
         let nodes: [ContentNode] = [.paragraph(runs: [TextRun(text: "text")])]
         let builder = makeBuilder(theme: .light)
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         let attrs = attrString.attributes(at: 0, effectiveRange: nil)
         let color = attrs[.foregroundColor] as? UIColor
@@ -129,7 +129,7 @@ final class AttributedStringBuilderTests: XCTestCase {
     func testDarkThemeTextColor() {
         let nodes: [ContentNode] = [.paragraph(runs: [TextRun(text: "text")])]
         let builder = makeBuilder(theme: .dark)
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         let attrs = attrString.attributes(at: 0, effectiveRange: nil)
         let color = attrs[.foregroundColor] as? UIColor
@@ -148,7 +148,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .image(url: URL(fileURLWithPath: "/nonexistent.png"), alt: "Alt text", width: nil, height: nil, style: .empty)
         ]
         let builder = makeBuilder()
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         // Should contain alt text since image doesn't exist
         XCTAssertTrue(attrString.string.contains("Alt text"),
@@ -158,7 +158,7 @@ final class AttributedStringBuilderTests: XCTestCase {
     func testHorizontalRule() {
         let nodes: [ContentNode] = [.horizontalRule]
         let builder = makeBuilder()
-        let (attrString, _) = builder.build(from: nodes)
+        let (attrString, _, _) = builder.build(from: nodes)
 
         XCTAssertGreaterThan(attrString.length, 0, "Horizontal rule should produce content")
         XCTAssertTrue(attrString.string.contains("\u{2014}"), "Should contain em-dash")
@@ -173,7 +173,7 @@ final class AttributedStringBuilderTests: XCTestCase {
             .paragraph(runs: [TextRun(text: "Third")])
         ]
         let builder = makeBuilder()
-        let (_, offsetMap) = builder.build(from: nodes)
+        let (_, offsetMap, _) = builder.build(from: nodes)
 
         XCTAssertEqual(offsetMap.entries.count, 3, "Should have one entry per node")
 
