@@ -23,6 +23,8 @@ const SHARED_EXTERNALS = [
   "util",
   "events",
   "os",
+  "tty",
+  "net",
   "zlib",
   "child_process",
   // Native modules that can't be bundled
