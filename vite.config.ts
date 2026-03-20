@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { flightRouter } from "react-flight-router/dev";
 import { defineConfig } from "vite";
 import { resolve } from "path";
-import { apiPlugin } from "./vite-plugins/api.js";
+import { apiPlugin } from "./vite-plugins/api.ts";
 
 export default defineConfig({
   clearScreen: false,
@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [tailwindcss(), react(), apiPlugin(), flightRouter({ routesFile: "./app/routes.ts" })],
   resolve: {
     alias: {
-      "@": resolve(__dirname, "./app"),
+      "@": resolve(import.meta.dirname, "./app"),
     },
   },
   optimizeDeps: {
