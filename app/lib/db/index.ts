@@ -20,6 +20,9 @@ sqlite.pragma("journal_mode = WAL");
 // Create Drizzle instance
 export const db = drizzle(sqlite, { schema });
 
+// Export raw sqlite instance for complex raw SQL queries (CTEs, window functions)
+export const rawDb = sqlite;
+
 // Run migrations automatically on startup
 // In production builds, import.meta.dirname points to dist/rsc/assets/ but migrations
 // are at dist/rsc/migrations/. Try multiple locations to find migrations.

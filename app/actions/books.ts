@@ -1011,6 +1011,23 @@ export async function refreshMetadata(
     await createTagsFromSubjects(bookId, newMetadata.subjects);
   }
 
+  // Persist subjects for genre-based curation
+  if (newMetadata.subjects.length > 0) {
+    const { bookSubjects } = await import("../lib/db/schema");
+    await db.delete(bookSubjects).where(eq(bookSubjects.bookId, bookId));
+    await db.insert(bookSubjects).values(
+      newMetadata.subjects
+        .map((s) => s.toLowerCase().trim())
+        .filter((s) => s.length > 0 && s.length < 100)
+        .slice(0, 20)
+        .map((subject) => ({
+          id: randomUUID(),
+          bookId,
+          subject,
+        })),
+    );
+  }
+
   // Update the book if we have new data
   if (Object.keys(updateData).length > 0) {
     updateData.updatedAt = sql`(unixepoch())`;
@@ -1259,6 +1276,23 @@ export async function applyMetadata(
   }
 
   await db.update(books).set(updateData).where(eq(books.id, bookId));
+
+  // Persist subjects for genre-based curation
+  if (enrichedMetadata.subjects.length > 0) {
+    const { bookSubjects } = await import("../lib/db/schema");
+    await db.delete(bookSubjects).where(eq(bookSubjects.bookId, bookId));
+    await db.insert(bookSubjects).values(
+      enrichedMetadata.subjects
+        .map((s) => s.toLowerCase().trim())
+        .filter((s) => s.length > 0 && s.length < 100)
+        .slice(0, 20)
+        .map((subject) => ({
+          id: randomUUID(),
+          bookId,
+          subject,
+        })),
+    );
+  }
 
   // Write metadata to the actual book file in the background (fire-and-forget).
   // Large audio files can take a long time to rewrite with ffmpeg/node-id3.

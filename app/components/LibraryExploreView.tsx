@@ -4,10 +4,26 @@ import { BookCarousel } from "./BookCarousel";
 import type { ExploreData } from "../actions/explore";
 
 export function LibraryExploreView({ data }: { data: ExploreData }) {
-  const { inProgress, recentlyAdded, topSeries, topTags } = data;
+  const {
+    inProgress,
+    readNextInSeries,
+    staleReads,
+    recentlyAdded,
+    moreByAuthor,
+    genreSections,
+    topSeries,
+    topTags,
+  } = data;
 
   const hasContent =
-    inProgress.length > 0 || recentlyAdded.length > 0 || topSeries.length > 0 || topTags.length > 0;
+    inProgress.length > 0 ||
+    readNextInSeries.length > 0 ||
+    staleReads.length > 0 ||
+    recentlyAdded.length > 0 ||
+    moreByAuthor.length > 0 ||
+    genreSections.length > 0 ||
+    topSeries.length > 0 ||
+    topTags.length > 0;
 
   if (!hasContent) {
     return (
@@ -37,6 +53,12 @@ export function LibraryExploreView({ data }: { data: ExploreData }) {
     <div className="space-y-10 pb-8">
       {inProgress.length > 0 && <BookCarousel title="Continue Reading" books={inProgress} />}
 
+      {readNextInSeries.length > 0 && (
+        <BookCarousel title="Read Next in Series" books={readNextInSeries.map((r) => r.book)} />
+      )}
+
+      {staleReads.length > 0 && <BookCarousel title="Finish These?" books={staleReads} />}
+
       {recentlyAdded.length > 0 && (
         <BookCarousel
           title="Recently Added"
@@ -44,6 +66,22 @@ export function LibraryExploreView({ data }: { data: ExploreData }) {
           seeAllHref="/library?view=grid"
         />
       )}
+
+      {moreByAuthor.map((authorGroup) => (
+        <BookCarousel
+          key={authorGroup.author}
+          title={`More by ${authorGroup.author}`}
+          books={authorGroup.books}
+        />
+      ))}
+
+      {genreSections.map((genre) => (
+        <BookCarousel
+          key={genre.subject}
+          title={genre.subject.replace(/\b\w/g, (c) => c.toUpperCase())}
+          books={genre.books}
+        />
+      ))}
 
       {topSeries.map((series) => (
         <BookCarousel

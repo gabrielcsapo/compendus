@@ -421,6 +421,23 @@ export const bookEdits = sqliteTable(
   ],
 );
 
+// Book subjects (auto-populated from OpenLibrary/Google Books metadata)
+export const bookSubjects = sqliteTable(
+  "book_subjects",
+  {
+    id: text("id").primaryKey(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_book_subjects_book_subject").on(table.bookId, table.subject),
+    index("idx_book_subjects_subject").on(table.subject),
+    index("idx_book_subjects_book").on(table.bookId),
+  ],
+);
+
 // Type exports
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
@@ -441,3 +458,4 @@ export type Highlight = typeof highlights.$inferSelect;
 export type ReadingSession = typeof readingSessions.$inferSelect;
 export type WantedBook = typeof wantedBooks.$inferSelect;
 export type NewWantedBook = typeof wantedBooks.$inferInsert;
+export type BookSubject = typeof bookSubjects.$inferSelect;
