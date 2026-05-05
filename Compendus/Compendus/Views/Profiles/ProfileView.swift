@@ -35,9 +35,12 @@ struct ProfileView: View {
         "\u{1F308}", "\u{1F680}", "\u{1F431}", "\u{1F33A}", "\u{1F989}", "\u{1F340}",
     ]
 
+    @State private var showingGoalEditor = false
+
     var body: some View {
         Form {
             streakSliverSection
+            dailyGoalRowSection
             avatarSection
             profileInfoSection
             actionsSection
@@ -251,23 +254,35 @@ struct ProfileView: View {
         .onDisappear { customEmoji = "" }
     }
 
+    /// User-set daily reading goal in minutes. Mirrored from the server profile
+    /// (see `APIService.fetchCurrentProfile`) and persisted in @AppStorage so
+    /// every view reads the same value reactively.
+    @AppStorage("compendus.dailyGoalMinutes") private var dailyGoalMinutes: Int = 15
+
     @ViewBuilder
     private var streakSliverSection: some View {
         Section {
             Button {
                 showingStreakStats = true
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: streakDays > 0 ? "flame.fill" : "flame")
-                        .font(.title3)
-                        .foregroundStyle(streakDays > 0 ? .orange : .secondary)
+                HStack(spacing: 14) {
+                    GoalRing(
+                        value: Double(todayMinutes),
+                        goal: Double(dailyGoalMinutes),
+                        size: 44,
+                        lineWidth: 3
+                    ) {
+                        Image(systemName: streakDays > 0 ? "flame.fill" : "flame")
+                            .font(.callout)
+                            .foregroundStyle(streakDays > 0 ? .orange : .secondary)
+                    }
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(streakDays == 1 ? "1 day streak" : "\(streakDays) day streak")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
-                        Text(todayMinutes > 0 ? "\(todayMinutes)m read today" : "Read today to keep your streak")
+                        Text(streakSubtitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -281,6 +296,53 @@ struct ProfileView: View {
             }
             .foregroundStyle(.primary)
         }
+    }
+
+    @ViewBuilder
+    private var dailyGoalRowSection: some View {
+        Section {
+            Button {
+                showingGoalEditor = true
+            } label: {
+                HStack {
+                    Image(systemName: "target")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Daily reading goal")
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                        Text("\(dailyGoalMinutes) minutes per day")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .sheet(isPresented: $showingGoalEditor) {
+            DailyGoalSheet(
+                currentGoal: dailyGoalMinutes,
+                profileId: currentProfile?.id ?? serverConfig.selectedProfileId ?? ""
+            )
+            .presentationDetents([.medium])
+        }
+    }
+
+    /// Goal-aware subtitle: tells the user how close they are to the day's goal,
+    /// celebrates when they finish, and nudges when they haven't started.
+    private var streakSubtitle: String {
+        if todayMinutes >= dailyGoalMinutes {
+            return "\u{1F389} Daily goal complete · \(todayMinutes)m today"
+        }
+        if todayMinutes > 0 {
+            let remaining = dailyGoalMinutes - todayMinutes
+            return "\(remaining)m to today's \(dailyGoalMinutes)m goal"
+        }
+        return "Read \(dailyGoalMinutes)m today to keep your streak"
     }
 
     // MARK: - Actions

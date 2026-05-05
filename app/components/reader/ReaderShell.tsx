@@ -83,16 +83,20 @@ export function ReaderShell({
   // Track if mouse is in toolbar/slider zone
   const mouseInOverlayZoneRef = useRef(false);
 
-  // Auto-hide overlay timer
+  // Auto-hide overlay timer.
+  // 3s on touch (matches Kindle / Apple Books), 5s on desktop where mouse hover is signal.
   const resetOverlayTimer = useCallback(() => {
     if (overlayTimerRef.current) {
       clearTimeout(overlayTimerRef.current);
     }
+    const isCoarsePointer =
+      typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
+    const delay = isCoarsePointer ? 3000 : 5000;
     overlayTimerRef.current = setTimeout(() => {
       if (!sidebarOpen && !settingsOpen && !mouseInOverlayZoneRef.current) {
         setShowOverlay(false);
       }
-    }, 5000);
+    }, delay);
   }, [sidebarOpen, settingsOpen]);
 
   // Start timer when overlay becomes visible
@@ -238,6 +242,19 @@ export function ReaderShell({
     (position: number) => {
       reader.goToPosition(position);
       setSidebarOpen(false);
+    },
+    [reader],
+  );
+
+  // Open search sidebar pre-populated with selected text
+  const handleSearchInBook = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      void reader.searchBook(trimmed);
+      setSidebarTab("search");
+      setSidebarOpen(true);
+      setShowOverlay(true);
     },
     [reader],
   );
@@ -442,6 +459,7 @@ export function ReaderShell({
               onRemoveHighlight={reader.removeHighlight}
               onUpdateHighlightColor={reader.updateHighlightColor}
               onUpdateHighlightNote={reader.updateHighlightNote}
+              onSearchInBook={handleSearchInBook}
               theme={theme}
             />
           ) : (
@@ -484,6 +502,7 @@ export function ReaderShell({
                 onRemoveHighlight={reader.removeHighlight}
                 onUpdateHighlightColor={reader.updateHighlightColor}
                 onUpdateHighlightNote={reader.updateHighlightNote}
+                onSearchInBook={handleSearchInBook}
                 textContentRef={textContentRef}
               />
 

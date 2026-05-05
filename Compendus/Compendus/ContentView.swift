@@ -126,32 +126,36 @@ struct ContentView: View {
     @ViewBuilder
     private var mainNavigationView: some View {
         #if targetEnvironment(macCatalyst)
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            macSidebarContent
-        } detail: {
-            macDetailContent
-        }
-        .navigationTitle("")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    withAnimation {
-                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        CelebrationOverlay {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                macSidebarContent
+            } detail: {
+                macDetailContent
+            }
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        withAnimation {
+                            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                        }
+                    } label: {
+                        Image(systemName: "sidebar.left")
                     }
-                } label: {
-                    Image(systemName: "sidebar.left")
+                }
+            }
+            .onChange(of: macSidebarSelection) { _, selection in
+                if selection.isLibrarySection {
+                    appNavigation.libraryFilterChipId = selection.chipId
+                } else {
+                    appNavigation.homeFilterChipId = selection.chipId
                 }
             }
         }
-        .onChange(of: macSidebarSelection) { _, selection in
-            if selection.isLibrarySection {
-                appNavigation.libraryFilterChipId = selection.chipId
-            } else {
-                appNavigation.homeFilterChipId = selection.chipId
-            }
-        }
         #else
-        iOSTabView
+        CelebrationOverlay {
+            iOSTabView
+        }
         #endif
     }
 
@@ -356,12 +360,11 @@ struct CustomBottomBar: View {
                     } label: {
                         VStack(spacing: 4) {
                             if index == Self.profileTabIndex {
-                                ProfileAvatarView(serverConfig: serverConfig, size: 22)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(selectedTab == index ? themeManager.accentColor : .clear, lineWidth: 2)
-                                            .frame(width: 26, height: 26)
-                                    )
+                                ProfileTabIcon(
+                                    isActive: selectedTab == index,
+                                    accentColor: themeManager.accentColor,
+                                    serverConfig: serverConfig
+                                )
                             } else {
                                 Image(systemName: selectedTab == index ? tabs[index].activeIcon : tabs[index].icon)
                                     .font(.system(size: 20))
@@ -379,6 +382,80 @@ struct CustomBottomBar: View {
             .padding(.bottom, 4)
         }
         .background(.ultraThinMaterial)
+    }
+}
+
+/// Profile tab icon: avatar wrapped in a daily-goal progress ring with a streak
+/// flame badge. Mirrors the web nav avatar so reading momentum is visible at a
+/// glance from anywhere in the app.
+private struct ProfileTabIcon: View {
+    let isActive: Bool
+    let accentColor: Color
+    let serverConfig: ServerConfig
+
+    @Query(sort: \ReadingSession.startedAt, order: .reverse) private var sessions: [ReadingSession]
+    @AppStorage("compendus.dailyGoalMinutes") private var dailyGoalMinutes: Int = 15
+
+    private var stats: (streakDays: Int, todayMinutes: Int) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let pid = serverConfig.selectedProfileId ?? ""
+
+        var daysWithReading: Set<Date> = []
+        var todaySeconds = 0
+        for s in sessions where s.profileId == pid || s.profileId.isEmpty {
+            let day = calendar.startOfDay(for: s.startedAt)
+            daysWithReading.insert(day)
+            if day == today { todaySeconds += s.durationSeconds }
+        }
+
+        var count = 0
+        var check = today
+        if daysWithReading.contains(check) {
+            count = 1
+            check = calendar.date(byAdding: .day, value: -1, to: check)!
+        } else {
+            check = calendar.date(byAdding: .day, value: -1, to: check)!
+            if !daysWithReading.contains(check) {
+                return (0, todaySeconds / 60)
+            }
+        }
+        while daysWithReading.contains(check) {
+            count += 1
+            check = calendar.date(byAdding: .day, value: -1, to: check)!
+        }
+        return (count, todaySeconds / 60)
+    }
+
+    var body: some View {
+        let s = stats
+        ZStack(alignment: .bottomTrailing) {
+            GoalRing(
+                value: Double(s.todayMinutes),
+                goal: Double(dailyGoalMinutes),
+                size: 30,
+                lineWidth: 2,
+                progressColor: accentColor
+            ) {
+                ProfileAvatarView(serverConfig: serverConfig, size: 22)
+                    .overlay(
+                        Circle()
+                            .stroke(isActive ? accentColor : .clear, lineWidth: 1.5)
+                            .frame(width: 26, height: 26)
+                    )
+            }
+
+            if s.streakDays > 0 {
+                Text("\(s.streakDays)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(.orange))
+                    .overlay(Capsule().stroke(Color(.systemBackground), lineWidth: 1.5))
+                    .offset(x: 4, y: 4)
+            }
+        }
     }
 }
 
